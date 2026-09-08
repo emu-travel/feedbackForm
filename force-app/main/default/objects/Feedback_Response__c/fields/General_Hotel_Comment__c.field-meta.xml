@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>General_Hotel_Comment__c</fullName>
+    <description
+  >Screen 3 closing question: Weitere Anmerkungen oder Hinweise zu Ihren Hotels. Applies to the stay as a whole, not one hotel.</description>
+    <label>General Hotel Comment</label>
+    <length>2000</length>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+</CustomField>

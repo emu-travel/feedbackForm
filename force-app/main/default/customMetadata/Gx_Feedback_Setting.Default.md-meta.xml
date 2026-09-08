@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomMetadata
+  xmlns="http://soap.sforce.com/2006/04/metadata"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+>
+    <label>Default</label>
+    <protected>false</protected>
+    <values>
+        <field>Trustpilot_URL__c</field>
+        <value
+      xsi:type="xsd:string"
+    >https://www.trustpilot.com/evaluate/emu-travel.com</value>
+    </values>
+    <values>
+        <field>Google_Maps_URL__c</field>
+        <value
+      xsi:type="xsd:string"
+    >https://maps.google.com/?q=golf.extra+GmbH+Heilbronn</value>
+    </values>
+</CustomMetadata>

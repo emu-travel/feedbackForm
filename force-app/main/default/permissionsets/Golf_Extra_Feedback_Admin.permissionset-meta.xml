@@ -156,4 +156,16 @@
         <field>Feedback_Rating__c.Sub_Category__c</field>
         <readable>true</readable>
     </fieldPermissions>
+
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Feedback_Response__c.General_Hotel_Comment__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Feedback_Response__c.General_Golf_Comment__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
 </PermissionSet>

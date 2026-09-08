@@ -101,6 +101,12 @@ public without sharing class GxFeedbackService {
     @AuraEnabled
     public List<RateableItem> golfCourses = new List<RateableItem>();
 
+    /** Public review links for the promoter thank-you screen, from custom metadata. */
+    @AuraEnabled
+    public String trustpilotUrl;
+    @AuraEnabled
+    public String googleMapsUrl;
+
     /** Shown as context on the single flight / transfer / rental car ratings. */
     @AuraEnabled
     public List<String> flightSuppliers = new List<String>();
@@ -115,8 +121,15 @@ public without sharing class GxFeedbackService {
     public String reservationId;
     @AuraEnabled
     public String name;
+    /** Room type for hotels, service description for everything else. */
     @AuraEnabled
     public String detail;
+    /** "Almancil, Portugal" - shown under the hotel name on its card. */
+    @AuraEnabled
+    public String location;
+    /** Nights for hotels; null where it does not apply. */
+    @AuraEnabled
+    public Decimal nights;
     @AuraEnabled
     public String teeTime;
     @AuraEnabled
@@ -157,6 +170,8 @@ public without sharing class GxFeedbackService {
     public String positiveMoment;
     public String improvementSuggestions;
     public String generalFeedback;
+    public String generalHotelComment;
+    public String generalGolfComment;
     public Integer sustainabilityImportance;
   }
 
@@ -205,6 +220,12 @@ public without sharing class GxFeedbackService {
       ? b.Form_Designer_Name__c
       : (b.TravelDesigner__r != null ? b.TravelDesigner__r.Name : null);
     c.language = 'DE';
+
+    Gx_Feedback_Setting__mdt cfg = reviewLinks();
+    if (cfg != null) {
+      c.trustpilotUrl = cfg.Trustpilot_URL__c;
+      c.googleMapsUrl = cfg.Google_Maps_URL__c;
+    }
 
     applyItinerary(c, loadRateableReservations(b.Id));
 
@@ -276,6 +297,8 @@ public without sharing class GxFeedbackService {
     i.reservationId = r.Id;
     i.name = venueName;
     i.detail = r.Service__r != null ? r.Service__r.Name : null;
+    i.location = venueLocationFor(r);
+    i.nights = r.Duration__c;
     i.teeTime = r.TeeTime__c;
     i.startDate = formatDate(r.Date_Begin__c);
     i.endDate = formatDate(r.Date_End__c);
@@ -395,6 +418,8 @@ public without sharing class GxFeedbackService {
       Positive_Moment__c = clean(p.positiveMoment),
       Improvement_Suggestions__c = clean(p.improvementSuggestions),
       General_Feedback__c = clean(p.generalFeedback),
+      General_Hotel_Comment__c = clean(p.generalHotelComment),
+      General_Golf_Comment__c = clean(p.generalGolfComment),
       Sustainability_Importance__c = p.sustainabilityImportance,
       Public_Review_Prompted__c = p.recommendation >= PROMOTER_THRESHOLD,
       Submitted_On__c = Datetime.now()
@@ -584,10 +609,13 @@ public without sharing class GxFeedbackService {
         AccountType__c,
         Status__c,
         TeeTime__c,
+        Duration__c,
         Date_Begin__c,
         Date_End__c,
         Travel_Location__c,
         Travel_Location__r.Name,
+        Travel_Location__r.BillingCity,
+        Travel_Location__r.BillingCountry,
         Service__r.Name
       FROM Reservation__c
       WHERE
@@ -610,6 +638,32 @@ public without sharing class GxFeedbackService {
     return String.isNotBlank(b.MainContactName__c)
       ? b.MainContactName__c
       : null;
+  }
+
+  /** City and country of the venue, e.g. "Almancil, Portugal". */
+  private static String venueLocationFor(Reservation__c r) {
+    if (r.Travel_Location__r == null) {
+      return null;
+    }
+    List<String> parts = new List<String>();
+    if (String.isNotBlank(r.Travel_Location__r.BillingCity)) {
+      parts.add(r.Travel_Location__r.BillingCity);
+    }
+    if (String.isNotBlank(r.Travel_Location__r.BillingCountry)) {
+      parts.add(r.Travel_Location__r.BillingCountry);
+    }
+    return parts.isEmpty() ? null : String.join(parts, ', ');
+  }
+
+  /** Review links live in custom metadata so marketing can change them without a deploy. */
+  private static Gx_Feedback_Setting__mdt reviewLinks() {
+    List<Gx_Feedback_Setting__mdt> rows = [
+      SELECT Trustpilot_URL__c, Google_Maps_URL__c
+      FROM Gx_Feedback_Setting__mdt
+      WHERE DeveloperName = 'Default'
+      LIMIT 1
+    ];
+    return rows.isEmpty() ? null : rows[0];
   }
 
   private static String formatDate(Date d) {

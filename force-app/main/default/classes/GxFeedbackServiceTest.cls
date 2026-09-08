@@ -18,7 +18,12 @@ private class GxFeedbackServiceTest {
    * has a dependent lookup filter that matches it against AccountType__c.
    */
   private static Account newAccount(String name, String accountType) {
-    return new Account(Name = name, Account_Type__c = accountType);
+    return new Account(
+      Name = name,
+      Account_Type__c = accountType,
+      BillingCity = 'Almancil',
+      BillingCountry = 'Portugal'
+    );
   }
 
   private static Booking__c newBooking(
@@ -52,6 +57,8 @@ private class GxFeedbackServiceTest {
       Status__c = status,
       // Both dates are required: the org's ReservationTrigger runs
       // ReservationPricingService, which needs a date range to price the line.
+      // Duration__c is a formula (Date_End__c - Date_Begin__c), so the nights
+      // shown on the hotel card come from this six-day range.
       Date_Begin__c = Date.today().addDays(-18),
       Date_End__c = Date.today().addDays(-12)
     );
@@ -649,6 +656,72 @@ private class GxFeedbackServiceTest {
       2000,
       saved.General_Feedback__c.length(),
       'Text longer than the field is truncated, not rejected'
+    );
+  }
+
+  @IsTest
+  static void getContextCarriesTheHotelCardDetail() {
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    GxFeedbackService.RateableItem hotel = c.hotels[0];
+    Assert.areEqual(
+      'Almancil, Portugal',
+      hotel.location,
+      'The hotel card shows city and country under the name'
+    );
+    Assert.areEqual(
+      6,
+      hotel.nights,
+      'The hotel card shows the number of nights'
+    );
+    Assert.isNotNull(
+      hotel.startDate,
+      'The stay dates are available to the card'
+    );
+  }
+
+  @IsTest
+  static void getContextExposesTheReviewLinks() {
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Assert.isNotNull(
+      c.trustpilotUrl,
+      'The promoter screen needs the Trustpilot link from custom metadata'
+    );
+    Assert.isNotNull(
+      c.googleMapsUrl,
+      'The promoter screen needs the Google link'
+    );
+  }
+
+  @IsTest
+  static void submitStoresTheScreenClosingComments() {
+    Map<String, Object> payload = basePayload();
+    payload.put('generalHotelComment', 'Beide Hotels waren hervorragend.');
+    payload.put('generalGolfComment', 'Die Plaetze waren in Top-Zustand.');
+
+    GxFeedbackService.submit(JSON.serialize(payload));
+
+    Feedback_Response__c saved = [
+      SELECT General_Hotel_Comment__c, General_Golf_Comment__c
+      FROM Feedback_Response__c
+      LIMIT 1
+    ];
+    Assert.areEqual(
+      'Beide Hotels waren hervorragend.',
+      saved.General_Hotel_Comment__c,
+      'Screen 3 closing remarks are stored'
+    );
+    Assert.areEqual(
+      'Die Plaetze waren in Top-Zustand.',
+      saved.General_Golf_Comment__c,
+      'Screen 4 closing remarks are stored'
     );
   }
 }
