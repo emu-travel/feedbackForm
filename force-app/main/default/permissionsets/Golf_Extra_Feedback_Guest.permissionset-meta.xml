@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Guest access for the public post-trip feedback survey. Grants ONE Apex class and nothing else - no object, field or record access. All data work happens inside GxFeedbackService (without sharing), reached only through this controller.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Golf Extra Feedback - Guest</label>
+    <classAccesses>
+        <apexClass>GxFeedbackFormController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+</PermissionSet>
