@@ -80,7 +80,15 @@ The populated field is **`AccountType__c`**:
 
 Names come from `Travel_Location__r.Name`; `Service__r.Name` holds the service description.
 Only delivered travel is rated — filter `Status__c` to `Booked` / `Invoiced` / `Paid` /
-`Completed`, excluding `Calculation` / `Offered` / `Rejected` / `Canceled`.
+`Completed`, excluding `Calculation` / `Offered` / `Accepted` / `Rejected` / `Canceled`.
+
+Repeat rows for the same venue collapse into one rating card (a real booking carries the same
+hotel on four rows, one per room); distinct venues never collapse, so a guest who booked three
+hotels and two courses gets three hotel cards and two course cards.
+
+The golf card deliberately omits a hole count and highlight badge: no such field exists on
+`Account`, `Service__c` or `Reservation__c`, and adding one would be a data-maintenance
+commitment rather than a code change. Courses show name, service description and `TeeTime__c`.
 
 ## New data model
 

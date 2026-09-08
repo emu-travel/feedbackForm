@@ -99,12 +99,6 @@
 
     <fieldPermissions>
         <editable>true</editable>
-        <field>Feedback_Response__c.Positive_Moment__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-
-    <fieldPermissions>
-        <editable>true</editable>
         <field>Feedback_Response__c.Public_Review_Prompted__c</field>
         <readable>true</readable>
     </fieldPermissions>
@@ -118,12 +112,6 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>Feedback_Response__c.Submitted_On__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>Feedback_Response__c.Sustainability_Importance__c</field>
         <readable>true</readable>
     </fieldPermissions>
 

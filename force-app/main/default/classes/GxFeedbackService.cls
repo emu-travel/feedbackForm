@@ -167,12 +167,10 @@ public without sharing class GxFeedbackService {
     public List<ItemRatingInput> golfCourses;
     public Integer recommendation;
     public String nextDestination;
-    public String positiveMoment;
     public String improvementSuggestions;
     public String generalFeedback;
     public String generalHotelComment;
     public String generalGolfComment;
-    public Integer sustainabilityImportance;
   }
 
   public class RatingInput {
@@ -415,12 +413,10 @@ public without sharing class GxFeedbackService {
       Consultation_Comment__c = clean(p.consultationComment),
       Recommendation_NPS__c = p.recommendation,
       Next_Destination__c = clean(p.nextDestination),
-      Positive_Moment__c = clean(p.positiveMoment),
       Improvement_Suggestions__c = clean(p.improvementSuggestions),
       General_Feedback__c = clean(p.generalFeedback),
       General_Hotel_Comment__c = clean(p.generalHotelComment),
       General_Golf_Comment__c = clean(p.generalGolfComment),
-      Sustainability_Importance__c = p.sustainabilityImportance,
       Public_Review_Prompted__c = p.recommendation >= PROMOTER_THRESHOLD,
       Submitted_On__c = Datetime.now()
     );
@@ -560,12 +556,6 @@ public without sharing class GxFeedbackService {
       return 'Bitte beantworten Sie die Weiterempfehlungsfrage.';
     }
     if (p.consultation != null && !isValidScore(p.consultation)) {
-      return 'Ungültige Bewertung.';
-    }
-    if (
-      p.sustainabilityImportance != null &&
-      !isValidScore(p.sustainabilityImportance)
-    ) {
       return 'Ungültige Bewertung.';
     }
     return null;
