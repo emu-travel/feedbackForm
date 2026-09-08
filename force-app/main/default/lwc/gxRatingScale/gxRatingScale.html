@@ -1,0 +1,54 @@
+<template>
+  <div class="scale" data-compact={compact}>
+    <div class="ends">
+      <span class="end-label">{minLabel}</span>
+      <span class="badge">{valueLabel}</span>
+      <span class="end-label end-label_max">{maxLabel}</span>
+    </div>
+
+    <div class="track-wrap">
+      <input
+        type="range"
+        min="1"
+        max="10"
+        step="1"
+        class="track"
+        style={trackStyle}
+        value={currentValue}
+        aria-label={ariaLabel}
+        onchange={handleSlider}
+        oninput={handleSlider}
+      />
+
+      <div class="buttons" role="group" aria-label={ariaLabel}>
+        <template for:each={choices} for:item="choice">
+          <button
+            key={choice.value}
+            type="button"
+            class={choice.className}
+            data-value={choice.value}
+            aria-pressed={choice.selected}
+            onclick={handleChoice}
+          >
+            {choice.value}
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <template lwc:if={showComment}>
+      <div class="comment">
+        <label class="comment-prompt" for="comment-box">
+          {commentPrompt}
+        </label>
+        <textarea
+          id="comment-box"
+          class="comment-box"
+          rows="2"
+          placeholder={commentPlaceholder}
+          onchange={handleComment}
+        ></textarea>
+      </div>
+    </template>
+  </div>
+</template>

@@ -1,0 +1,189 @@
+:host {
+  --gx-gold: #e59e0f;
+  --gx-gold-dark: #b87a08;
+  --gx-gold-soft: #fffbeb;
+  --gx-gold-border: #fde68a;
+  --gx-forest: #0f3822;
+  --gx-slate-50: #f8fafc;
+  --gx-slate-200: #e2e8f0;
+  --gx-slate-400: #94a3b8;
+  --gx-slate-600: #475569;
+  --gx-slate-900: #0f172a;
+  display: block;
+}
+
+.scale {
+  font-family: inherit;
+}
+
+.ends {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--gx-slate-600);
+  padding: 0 0.25rem 0.375rem;
+}
+
+.end-label_max {
+  color: var(--gx-slate-900);
+  text-align: right;
+}
+
+.badge {
+  flex: none;
+  color: var(--gx-gold-dark);
+  background: var(--gx-gold-soft);
+  border: 1px solid var(--gx-gold-border);
+  border-radius: 999px;
+  padding: 0.125rem 0.625rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.track-wrap {
+  background: var(--gx-slate-50);
+  border: 1px solid var(--gx-slate-200);
+  border-radius: 1rem;
+  padding: 0.75rem;
+}
+
+.track {
+  width: 100%;
+  height: 0.5rem;
+  margin: 0 0 0.625rem;
+  border-radius: 999px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    var(--gx-gold) 0%,
+    var(--gx-gold) var(--gx-fill, 100%),
+    var(--gx-slate-200) var(--gx-fill, 100%),
+    var(--gx-slate-200) 100%
+  );
+}
+
+.track::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--gx-gold);
+  cursor: pointer;
+}
+
+.track::-moz-range-thumb {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--gx-gold);
+  cursor: pointer;
+}
+
+.track:focus-visible {
+  outline: 2px solid var(--gx-forest);
+  outline-offset: 2px;
+}
+
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 0.25rem;
+}
+
+.choice {
+  padding: 0.375rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gx-slate-200);
+  background: #fff;
+  color: var(--gx-slate-600);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.choice:hover {
+  background: var(--gx-slate-50);
+  color: var(--gx-slate-900);
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--gx-forest);
+  outline-offset: 1px;
+}
+
+.choice_selected {
+  background: var(--gx-gold);
+  border-color: var(--gx-gold);
+  color: var(--gx-forest);
+  font-weight: 800;
+  transform: scale(1.06);
+}
+
+.comment {
+  margin-top: 0.625rem;
+  background: var(--gx-gold-soft);
+  border: 1px solid var(--gx-gold-border);
+  border-radius: 1rem;
+  padding: 0.75rem;
+}
+
+.comment-prompt {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--gx-gold-dark);
+  margin-bottom: 0.375rem;
+}
+
+.comment-box {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--gx-slate-200);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--gx-slate-900);
+  resize: vertical;
+}
+
+.comment-box:focus {
+  outline: none;
+  border-color: var(--gx-gold);
+}
+
+.comment-box::placeholder {
+  color: var(--gx-slate-400);
+}
+
+/* Sub-ratings inside a hotel card sit tighter than a top-level question. */
+.scale[data-compact="true"] .track-wrap {
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+}
+
+.scale[data-compact="true"] .choice {
+  padding: 0.1875rem 0;
+  font-size: 0.625rem;
+}
+
+@media (max-width: 30rem) {
+  .choice {
+    font-size: 0.625rem;
+  }
+  .ends {
+    font-size: 0.625rem;
+  }
+}
