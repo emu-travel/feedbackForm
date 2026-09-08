@@ -55,3 +55,6 @@ reference-app/node_modules/
 # Local env files (keep the example)
 .env*
 !reference-app/.env.example
+
+# Retrieved org metadata kept locally for study, not part of this project's source
+.org-study/

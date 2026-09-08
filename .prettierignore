@@ -9,3 +9,5 @@
 .vscode
 
 coverage/
+# React prototype — reference only, not formatted by this project
+reference-app/**

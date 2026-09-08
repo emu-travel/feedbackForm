@@ -15,3 +15,6 @@ node_modules/
 
 # React prototype — reference only, never deploy
 reference-app/**
+
+# Local study copies of existing org metadata
+.org-study/**

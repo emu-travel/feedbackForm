@@ -15,7 +15,7 @@ reference-app/              React/Vite prototype — VISUAL SPEC ONLY, never dep
 ```
 
 `reference-app/` is the original AI Studio prototype. It is the source of truth for
-*behaviour and design*, not for production code. It is excluded from deployment via
+_behaviour and design_, not for production code. It is excluded from deployment via
 `.forceignore`. Its functional write-up lives in
 [`reference-app/TECHNICAL_DOCUMENTATION.md`](reference-app/TECHNICAL_DOCUMENTATION.md).
 
@@ -53,15 +53,15 @@ Reports & dashboards (NPS by month, average score per hotel, detractor list)
 
 ## Data model
 
-| Object | Purpose |
-|---|---|
-| `Feedback_Invitation__c` | Token, contact, booking ref, expiry, status, language |
-| `Trip_Itinerary__c` | Guest + trip header, review URLs, booked-service flags |
-| `Itinerary_Hotel__c` | One row per booked hotel — drives the dynamic hotel rating cards |
-| `Itinerary_Golf_Course__c` | One row per booked course — drives the course rating cards |
-| `Itinerary_Flight__c` | Flight legs shown in the itinerary summary |
-| `Feedback_Response__c` | One submission: overall, consultation, NPS, free-text answers |
-| `Feedback_Rating__c` | One row per rated item (category, item name, score, comment) |
+| Object                     | Purpose                                                          |
+| -------------------------- | ---------------------------------------------------------------- |
+| `Feedback_Invitation__c`   | Token, contact, booking ref, expiry, status, language            |
+| `Trip_Itinerary__c`        | Guest + trip header, review URLs, booked-service flags           |
+| `Itinerary_Hotel__c`       | One row per booked hotel — drives the dynamic hotel rating cards |
+| `Itinerary_Golf_Course__c` | One row per booked course — drives the course rating cards       |
+| `Itinerary_Flight__c`      | Flight legs shown in the itinerary summary                       |
+| `Feedback_Response__c`     | One submission: overall, consultation, NPS, free-text answers    |
+| `Feedback_Rating__c`       | One row per rated item (category, item name, score, comment)     |
 
 Ratings are normalised into child rows rather than columns, so adding a fourth golf course
 to a trip requires no schema change.
