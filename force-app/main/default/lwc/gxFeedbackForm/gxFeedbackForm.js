@@ -36,6 +36,7 @@ export default class GxFeedbackForm extends LightningElement {
   bookingNumber;
   secret;
 
+  lastAttempt;
   loadState = LOAD.LOADING;
   screen = SCREEN.OVERALL;
   submitting = false;
@@ -60,12 +61,36 @@ export default class GxFeedbackForm extends LightningElement {
     improvementSuggestions: ""
   };
 
+  connectedCallback() {
+    // LWR and Aura sites deliver query parameters differently, and on an LWR
+    // site CurrentPageReference can arrive empty for a guest. The address bar
+    // is authoritative on both, so read it first and let the wire correct it.
+    this.readParamsFromUrl();
+    this.load();
+  }
+
   @wire(CurrentPageReference)
   pageRef(ref) {
     const state = (ref && ref.state) || {};
-    this.bookingNumber = state.b;
-    this.secret = state.k;
+    if (state.b && state.k) {
+      this.bookingNumber = state.b;
+      this.secret = state.k;
+    }
     this.load();
+  }
+
+  readParamsFromUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const b = params.get("b");
+      const k = params.get("k");
+      if (b && k) {
+        this.bookingNumber = b;
+        this.secret = k;
+      }
+    } catch {
+      // No window.location to read - leave whatever the wire supplied.
+    }
   }
 
   async load() {
@@ -73,6 +98,13 @@ export default class GxFeedbackForm extends LightningElement {
       this.loadState = LOAD.INVALID;
       return;
     }
+    // Both connectedCallback and the wire call this; only ask Apex once.
+    const attempt = `${this.bookingNumber}|${this.secret}`;
+    if (this.lastAttempt === attempt) {
+      return;
+    }
+    this.lastAttempt = attempt;
+
     try {
       const context = await getContext({
         bookingNumber: this.bookingNumber,
