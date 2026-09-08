@@ -1,0 +1,403 @@
+<template>
+  <div class="shell">
+    <div class="survey">
+      <header class="brand">
+        <img src={logoUrl} alt="golf.extra" class="logo" />
+        <template lwc:if={showQuestions}>
+          <span class="step">{stepLabel}</span>
+        </template>
+      </header>
+
+      <template lwc:if={isLoading}>
+        <p class="state">Ihre Reisedaten werden geladen …</p>
+      </template>
+
+      <template lwc:if={isInvalid}>
+        <div class="state state_notice">
+          <h2 class="state-title">Dieser Link ist ungültig oder abgelaufen</h2>
+          <p>
+            Bitte öffnen Sie den Link erneut aus unserer E-Mail. Falls das
+            Problem bestehen bleibt, melden Sie sich gerne bei Ihrer
+            Reiseberaterin oder Ihrem Reiseberater.
+          </p>
+        </div>
+      </template>
+
+      <template lwc:if={isAlreadySubmitted}>
+        <div class="state state_notice">
+          <h2 class="state-title">Vielen Dank!</h2>
+          <p>
+            Für diese Reise haben wir Ihr Feedback bereits erhalten. Wir freuen
+            uns sehr darüber.
+          </p>
+        </div>
+      </template>
+
+      <template lwc:if={isEmpty}>
+        <div class="state state_notice">
+          <h2 class="state-title">Kein Feedback erforderlich</h2>
+          <p>
+            Zu dieser Buchung liegen uns keine bewertbaren Leistungen vor. Bitte
+            wenden Sie sich an Ihre Reiseberaterin oder Ihren Reiseberater.
+          </p>
+        </div>
+      </template>
+
+      <template lwc:if={showQuestions}>
+        <div class="progress">
+          <div class="progress-meta">
+            <span>Fortschritt</span>
+            <span>{progressPercentLabel}</span>
+          </div>
+          <div class="progress-rail">
+            <div class="progress-fill" style={progressStyle}></div>
+          </div>
+        </div>
+
+        <!-- SCREEN 1 -->
+        <template lwc:if={onOverall}>
+          <section class="screen">
+            <h2 class="title">Gesamteindruck Ihrer Golfreise</h2>
+
+            <div class="question">
+              <label class="question-label"
+                >1. Wie bewerten Sie Ihre Golfreise insgesamt?</label
+              >
+              <c-gx-rating-scale
+                data-field="overallExperience"
+                value={answers.overallExperience}
+                comment={answers.overallExperienceComment}
+                min-label="Unzureichend"
+                max-label="Ausgezeichnet"
+                aria-label="Gesamtbewertung Ihrer Golfreise"
+                comment-prompt="Was können wir tun, um Ihr Reiseerlebnis künftig noch weiter zu verbessern? (optional)"
+                comment-placeholder="Was können wir tun, um Ihr Reiseerlebnis künftig noch weiter zu verbessern?"
+                onvaluechange={handleScore}
+                oncommentchange={handleOverallComment}
+              ></c-gx-rating-scale>
+            </div>
+
+            <div class="question">
+              <label class="question-label"
+                >2. Wie zufrieden waren Sie mit unserer Beratung und
+                Produktauswahl?</label
+              >
+              <c-gx-rating-scale
+                data-field="consultation"
+                value={answers.consultation}
+                comment={answers.consultationComment}
+                min-label="Sehr unzufrieden"
+                max-label="Sehr zufrieden"
+                aria-label="Bewertung der Beratung und Produktauswahl"
+                comment-prompt="Was können wir tun, um unsere Beratung und Produktauswahl künftig noch weiter zu verbessern? (optional)"
+                comment-placeholder="Was können wir tun, um unsere Beratung und Produktauswahl künftig noch weiter zu verbessern?"
+                onvaluechange={handleScore}
+                oncommentchange={handleConsultationComment}
+              ></c-gx-rating-scale>
+            </div>
+          </section>
+        </template>
+
+        <!-- SCREEN 2 -->
+        <template lwc:if={onMobility}>
+          <section class="screen">
+            <h2 class="title">Transfer- und Mobilitätsleistungen</h2>
+
+            <template lwc:if={ctx.hasFlight}>
+              <div class="question">
+                <div class="question-head">
+                  <label class="question-label"
+                    >Wie zufrieden waren Sie mit den gebuchten
+                    Flugleistungen?</label
+                  >
+                  <template lwc:if={flightBadge}>
+                    <span class="badge">{flightBadge}</span>
+                  </template>
+                </div>
+                <c-gx-rating-scale
+                  data-field="flight"
+                  value={answers.flight.score}
+                  comment={answers.flight.comment}
+                  min-label="Sehr unzufrieden"
+                  max-label="Sehr zufrieden"
+                  aria-label="Bewertung der Flugleistungen"
+                  comment-prompt="Was können wir tun, um die für Sie gebuchten Flugleistungen künftig noch besser auf Ihre Wünsche abzustimmen? (optional)"
+                  comment-placeholder="Was können wir tun, um die für Sie gebuchten Flugleistungen künftig noch besser auf Ihre Wünsche abzustimmen?"
+                  onvaluechange={handleServiceScore}
+                  oncommentchange={handleServiceComment}
+                ></c-gx-rating-scale>
+              </div>
+            </template>
+
+            <template lwc:if={ctx.hasTransfers}>
+              <div class="question">
+                <div class="question-head">
+                  <label class="question-label"
+                    >Wie zufrieden waren Sie mit dem Transfer-/
+                    Chauffeurservice?</label
+                  >
+                  <template lwc:if={transferBadge}>
+                    <span class="badge">{transferBadge}</span>
+                  </template>
+                </div>
+                <c-gx-rating-scale
+                  data-field="transfer"
+                  value={answers.transfer.score}
+                  comment={answers.transfer.comment}
+                  min-label="Sehr unzufrieden"
+                  max-label="Sehr zufrieden"
+                  aria-label="Bewertung des Transfer- und Chauffeurservice"
+                  comment-prompt="Was können wir tun, um Ihre Transfer-/ Chauffeurleistungen künftig noch weiter zu verbessern? (optional)"
+                  comment-placeholder="Was können wir tun, um Ihre Transfer-/ Chauffeurleistungen künftig noch weiter zu verbessern?"
+                  onvaluechange={handleServiceScore}
+                  oncommentchange={handleServiceComment}
+                ></c-gx-rating-scale>
+              </div>
+            </template>
+
+            <template lwc:if={ctx.hasRentalCar}>
+              <div class="question">
+                <div class="question-head">
+                  <label class="question-label">Mietwagen</label>
+                  <template lwc:if={rentalBadge}>
+                    <span class="badge">{rentalBadge}</span>
+                  </template>
+                </div>
+                <c-gx-rating-scale
+                  data-field="rentalCar"
+                  value={answers.rentalCar.score}
+                  comment={answers.rentalCar.comment}
+                  min-label="Sehr unzufrieden"
+                  max-label="Sehr zufrieden"
+                  aria-label="Bewertung des Mietwagens"
+                  comment-prompt="Was können wir beim Mietwagen verbessern? (optional)"
+                  comment-placeholder="Bitte beschreiben Sie kurz Ihre Erfahrungen bezüglich Fahrzeugkategorie oder Abwicklung..."
+                  onvaluechange={handleServiceScore}
+                  oncommentchange={handleServiceComment}
+                ></c-gx-rating-scale>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <!-- SCREEN 3 -->
+        <template lwc:if={onHotels}>
+          <section class="screen">
+            <h2 class="title">{hotelsScreenTitle}</h2>
+
+            <div class="cards">
+              <template for:each={hotelCards} for:item="card">
+                <c-gx-hotel-card
+                  key={card.key}
+                  hotel={card.hotel}
+                  answer={card.answer}
+                  onscorechange={handleHotelScore}
+                  oncommentchange={handleHotelComment}
+                  onsubchange={handleHotelSub}
+                ></c-gx-hotel-card>
+              </template>
+            </div>
+
+            <div class="question">
+              <label class="question-label" for="hotel-remarks"
+                >Weitere Anmerkungen oder Hinweise zu Ihren Hotels
+                (optional):</label
+              >
+              <textarea
+                id="hotel-remarks"
+                class="textbox"
+                rows="2"
+                data-field="generalHotelComment"
+                onchange={handleText}
+              ></textarea>
+            </div>
+          </section>
+        </template>
+
+        <!-- SCREEN 4 -->
+        <template lwc:if={onGolf}>
+          <section class="screen">
+            <h2 class="title">Golfplätze</h2>
+
+            <div class="cards">
+              <template for:each={courseCards} for:item="card">
+                <c-gx-course-card
+                  key={card.key}
+                  course={card.course}
+                  answer={card.answer}
+                  onscorechange={handleCourseScore}
+                  oncommentchange={handleCourseComment}
+                ></c-gx-course-card>
+              </template>
+            </div>
+
+            <div class="question">
+              <label class="question-label" for="golf-remarks"
+                >Weitere Anmerkungen oder Hinweise zu Ihren Golfplätzen
+                (optional):</label
+              >
+              <textarea
+                id="golf-remarks"
+                class="textbox"
+                rows="2"
+                data-field="generalGolfComment"
+                onchange={handleText}
+              ></textarea>
+            </div>
+          </section>
+        </template>
+
+        <!-- SCREEN 5 -->
+        <template lwc:if={onConclusion}>
+          <section class="screen">
+            <h2 class="title">Fazit</h2>
+
+            <div class="question">
+              <label class="question-label"
+                >Wie wahrscheinlich ist es, dass Sie golf.extra Ihren Freunden,
+                Bekannten oder anderen Golfbegeisterten weiterempfehlen
+                würden?</label
+              >
+              <c-gx-rating-scale
+                data-field="recommendation"
+                value={answers.recommendation}
+                min-label="Sehr unwahrscheinlich"
+                max-label="Sehr wahrscheinlich"
+                aria-label="Weiterempfehlung von golf.extra"
+                no-comment="true"
+                onvaluechange={handleScore}
+              ></c-gx-rating-scale>
+            </div>
+
+            <div class="question">
+              <label class="question-label" for="bucket-list"
+                >Welche Destination, welcher Golfplatz oder welches besondere
+                Reiseerlebnis steht als Nächstes auf Ihrer Wunschliste?
+                (optional)</label
+              >
+              <textarea
+                id="bucket-list"
+                class="textbox"
+                rows="2"
+                data-field="nextDestination"
+                placeholder="z.B. Pebble Beach, St. Andrews, Mauritius, Augusta..."
+                onchange={handleText}
+              ></textarea>
+            </div>
+
+            <div class="question">
+              <label class="question-label" for="final-remarks"
+                >Gibt es abschließend noch Anregungen, Verbesserungsvorschläge
+                oder persönliche Hinweise, die Sie uns mitgeben möchten?
+                (optional)</label
+              >
+              <textarea
+                id="final-remarks"
+                class="textbox"
+                rows="3"
+                data-field="improvementSuggestions"
+                placeholder="z. B. persönliche Worte an Ihre Reiseberaterin oder Ihren Reiseberater, Wünsche für zukünftige Reiseangebote oder Hinweise dazu, was wir künftig verbessern können"
+                onchange={handleText}
+              ></textarea>
+            </div>
+          </section>
+        </template>
+
+        <template lwc:if={submitError}>
+          <p class="error" role="alert">{submitError}</p>
+        </template>
+
+        <nav class="nav">
+          <button
+            type="button"
+            class="btn btn_ghost"
+            disabled={submitting}
+            onclick={handleBack}
+          >
+            Zurück
+          </button>
+          <button
+            type="button"
+            class="btn btn_primary"
+            disabled={submitting}
+            onclick={handleNext}
+          >
+            {nextLabel}
+          </button>
+        </nav>
+      </template>
+
+      <!-- SCREEN 6 -->
+      <template lwc:if={onThanks}>
+        <section class="screen screen_thanks">
+          <div class="tick" aria-hidden="true">✓</div>
+          <h2 class="title">Vielen Dank!</h2>
+          <p class="lead">
+            Vielen Dank, dass Sie sich die Zeit genommen haben, uns Ihr Feedback
+            mitzuteilen.
+          </p>
+
+          <template lwc:if={showPublicReview}>
+            <p class="lead">
+              Wenn Sie mit Ihrer Reise und unserem Service rundum zufrieden
+              waren, würden wir uns sehr freuen, wenn Sie Ihre Erfahrungen auch
+              auf Trustpilot und Google teilen und uns mit fünf Sternen
+              bewerten. Ihre positive Bewertung bedeutet uns sehr viel und
+              unterstützt zugleich andere Golferinnen und Golfer bei ihrer
+              Reiseentscheidung.
+            </p>
+
+            <template lwc:if={hasReviewLinks}>
+              <div class="reviews">
+                <h3 class="reviews-title">Erfahrung öffentlich teilen</h3>
+                <div class="review-cards">
+                  <template lwc:if={trustpilotUrl}>
+                    <a
+                      href={trustpilotUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="review-card"
+                    >
+                      <span class="review-stars">★★★★★</span>
+                      <span class="review-name">Trustpilot</span>
+                      <span class="review-cta">Auf Trustpilot bewerten</span>
+                    </a>
+                  </template>
+                  <template lwc:if={googleMapsUrl}>
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="review-card"
+                    >
+                      <span class="review-stars">★★★★★</span>
+                      <span class="review-name">Google</span>
+                      <span class="review-cta">Auf Google bewerten</span>
+                    </a>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </template>
+
+          <template lwc:else>
+            <p class="lead">
+              Wir haben Ihre Rückmeldung dankend erhalten und nutzen diese, um
+              unsere Beratung und unseren Service fortlaufend
+              weiterzuentwickeln.
+            </p>
+          </template>
+
+          <p class="closing">
+            Vielen Dank und hoffentlich bis ganz bald auf einer unserer nächsten
+            Reisen.
+          </p>
+
+          <template lwc:if={reference}>
+            <p class="reference">Ihre Referenz: {reference}</p>
+          </template>
+        </section>
+      </template>
+    </div>
+  </div>
+</template>

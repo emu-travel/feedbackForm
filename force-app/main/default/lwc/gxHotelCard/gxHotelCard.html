@@ -1,0 +1,57 @@
+<template>
+  <article class="card">
+    <header class="head">
+      <h3 class="name">{name}</h3>
+      <template lwc:if={subtitle}>
+        <p class="subtitle">{subtitle}</p>
+      </template>
+    </header>
+
+    <c-gx-rating-scale
+      value={score}
+      min-label="Unzureichend"
+      max-label="Ausgezeichnet"
+      aria-label={ratingAriaLabel}
+      no-comment="true"
+      onvaluechange={handleScore}
+    ></c-gx-rating-scale>
+
+    <template lwc:if={showDetail}>
+      <div class="detail">
+        <p class="detail-intro">
+          Vielen Dank für Ihre Offenheit. Damit wir gezielt nachbessern können,
+          bitten wir Sie um eine kurze Einschätzung im Detail.
+        </p>
+
+        <template for:each={subRatings} for:item="sub">
+          <div key={sub.key} class="sub">
+            <span class="sub-label">{sub.label}</span>
+            <c-gx-rating-scale
+              value={sub.value}
+              data-category={sub.key}
+              min-label="Unzureichend"
+              max-label="Ausgezeichnet"
+              aria-label={sub.label}
+              compact="true"
+              no-comment="true"
+              onvaluechange={handleSubScore}
+            ></c-gx-rating-scale>
+          </div>
+        </template>
+
+        <div class="comment">
+          <label class="comment-prompt" for="hotel-comment">
+            {commentPrompt}
+          </label>
+          <textarea
+            id="hotel-comment"
+            class="comment-box"
+            rows="2"
+            placeholder={commentPlaceholder}
+            onchange={handleComment}
+          ></textarea>
+        </div>
+      </div>
+    </template>
+  </article>
+</template>

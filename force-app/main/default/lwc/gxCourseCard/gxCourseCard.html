@@ -1,0 +1,22 @@
+<template>
+  <article class="card">
+    <header class="head">
+      <h3 class="name">{name}</h3>
+      <template lwc:if={subtitle}>
+        <p class="subtitle">{subtitle}</p>
+      </template>
+    </header>
+
+    <c-gx-rating-scale
+      value={score}
+      comment={comment}
+      min-label="Unzureichend"
+      max-label="Ausgezeichnet"
+      aria-label={ratingAriaLabel}
+      comment-prompt={commentPrompt}
+      comment-placeholder={commentPlaceholder}
+      onvaluechange={handleScore}
+      oncommentchange={handleComment}
+    ></c-gx-rating-scale>
+  </article>
+</template>
