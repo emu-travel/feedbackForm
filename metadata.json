@@ -1,0 +1,8 @@
+{
+  "name": "Remix Golf Extra - Luxury Travel Survey",
+  "description": "Interactive post-trip feedback email template and survey platform for Golf Extra, featuring CEO video message, itinerary review, and Trustpilot & Google Maps review integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
