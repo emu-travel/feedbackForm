@@ -1,0 +1,654 @@
+/**
+ * GxFeedbackServiceTest
+ *
+ * Covers the public feedback form's service layer: token handling, the
+ * per-booking survey shape (including venue de-duplication), validation,
+ * and the tamper cases that matter because this runs for guest users.
+ */
+@IsTest
+private class GxFeedbackServiceTest {
+  private static final String SECRET = 'sekret-abc-123';
+  private static final String BOOKING_NUM = 'TEST-GX-0001';
+
+  // ------------------------------------------------------------------
+  // Fixtures
+
+  /**
+   * Venue accounts must carry Account_Type__c: Reservation__c.Travel_Location__c
+   * has a dependent lookup filter that matches it against AccountType__c.
+   */
+  private static Account newAccount(String name, String accountType) {
+    return new Account(Name = name, Account_Type__c = accountType);
+  }
+
+  private static Booking__c newBooking(
+    Account customer,
+    String bookingNumber,
+    String secret
+  ) {
+    return new Booking__c(
+      Quote_for__c = customer.Id,
+      BookingNumber__c = bookingNumber,
+      Form_Secret__c = secret,
+      Travel_Type__c = 'FIT',
+      DestinationCountry__c = 'EG',
+      Status__c = 'Completed',
+      Start_Date__c = Date.today().addDays(-20),
+      End_Date__c = Date.today().addDays(-10)
+    );
+  }
+
+  private static Reservation__c newReservation(
+    Id bookingId,
+    Account venue,
+    String accountType,
+    String status
+  ) {
+    return new Reservation__c(
+      Booking__c = bookingId,
+      Travel_Location__c = venue.Id,
+      AccountType__c = accountType,
+      Pricing__c = 'Leistung',
+      Status__c = status,
+      // Both dates are required: the org's ReservationTrigger runs
+      // ReservationPricingService, which needs a date range to price the line.
+      Date_Begin__c = Date.today().addDays(-18),
+      Date_End__c = Date.today().addDays(-12)
+    );
+  }
+
+  /**
+   * A rich booking: three hotels where one appears twice (the real data has a
+   * hotel repeated once per room), two golf courses, and one each of flight,
+   * transfer and rental car - plus two lines that must never be rated.
+   */
+  /**
+   * The org prices every Reservation__c through ReservationTriggerHandler, which
+   * needs a fully configured Service__c and season/rate graph behind it. These
+   * tests are about the feedback survey, not the pricing engine, so the handler
+   * is bypassed while fixtures are built.
+   */
+  @TestSetup
+  static void setup() {
+    TriggerHandler.bypass('ReservationTriggerHandler');
+
+    Account customer = newAccount('Test Customer GmbH', null);
+    insert customer;
+
+    List<Account> venues = new List<Account>{
+      newAccount('Hotel Alpha', 'Hotel'),
+      newAccount('Hotel Beta', 'Hotel'),
+      newAccount('Golf Club One', 'Golfclub'),
+      newAccount('Golf Club Two', 'Golfclub'),
+      newAccount('Test Airline', 'Airline'),
+      newAccount('Test Transfers', 'TransferCompany'),
+      newAccount('Test Rentals', 'CarRentalCompany'),
+      newAccount('Test Insurer', 'Insurance')
+    };
+    insert venues;
+
+    Booking__c b = newBooking(customer, BOOKING_NUM, SECRET);
+    insert b;
+
+    insert new List<Reservation__c>{
+      // Hotel Alpha twice - must collapse to one card
+      newReservation(b.Id, venues[0], 'Hotel', 'Completed'),
+      newReservation(b.Id, venues[0], 'Hotel', 'Paid'),
+      newReservation(b.Id, venues[1], 'Hotel', 'Booked'),
+      newReservation(b.Id, venues[2], 'Golfclub', 'Completed'),
+      newReservation(b.Id, venues[3], 'Golfclub', 'Invoiced'),
+      newReservation(b.Id, venues[4], 'Airline', 'Completed'),
+      newReservation(b.Id, venues[5], 'TransferCompany', 'Completed'),
+      newReservation(b.Id, venues[6], 'CarRentalCompany', 'Completed'),
+      // Not delivered - quote stage only
+      newReservation(b.Id, venues[2], 'Golfclub', 'Calculation'),
+      // Delivered but not a rateable category
+      newReservation(b.Id, venues[7], 'Insurance', 'Completed')
+    };
+
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+  }
+
+  private static Booking__c theBooking() {
+    return [
+      SELECT Id, BookingNumber__c
+      FROM Booking__c
+      WHERE BookingNumber__c = :BOOKING_NUM
+    ];
+  }
+
+  // ------------------------------------------------------------------
+  // getContext
+
+  @IsTest
+  static void getContextBuildsSurveyFromTheItinerary() {
+    Test.startTest();
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+    Test.stopTest();
+
+    Assert.isTrue(
+      c.ok,
+      'A valid booking number and secret should open the survey'
+    );
+    Assert.areEqual(
+      BOOKING_NUM,
+      c.bookingNumber,
+      'Booking number should be echoed back'
+    );
+
+    Assert.areEqual(
+      2,
+      c.hotels.size(),
+      'Hotel Alpha appears twice and must collapse to one card'
+    );
+    Assert.areEqual(
+      2,
+      c.golfCourses.size(),
+      'Both delivered golf courses should be asked about'
+    );
+    Assert.areEqual(1, c.flightSuppliers.size(), 'One airline was booked');
+    Assert.areEqual(
+      1,
+      c.transferSuppliers.size(),
+      'One transfer company was booked'
+    );
+    Assert.areEqual(
+      1,
+      c.rentalSuppliers.size(),
+      'One rental company was booked'
+    );
+
+    Assert.isTrue(
+      c.hasHotels &&
+        c.hasGolf &&
+        c.hasFlight &&
+        c.hasTransfers &&
+        c.hasRentalCar,
+      'Every booked service should switch its screen on'
+    );
+
+    Set<String> hotelNames = new Set<String>();
+    for (GxFeedbackService.RateableItem i : c.hotels) {
+      hotelNames.add(i.name);
+    }
+    Assert.isTrue(
+      hotelNames.contains('Hotel Alpha') && hotelNames.contains('Hotel Beta'),
+      'Distinct hotels must not be collapsed into each other'
+    );
+  }
+
+  @IsTest
+  static void getContextExcludesUndeliveredAndUnrateableLines() {
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    for (GxFeedbackService.RateableItem i : c.golfCourses) {
+      Assert.areNotEqual(
+        null,
+        i.reservationId,
+        'Rateable items carry their reservation'
+      );
+    }
+    // Golf Club One is on the booking twice: once Completed, once Calculation.
+    // De-duplication keeps one card; the Calculation row must not add a second.
+    Assert.areEqual(
+      2,
+      c.golfCourses.size(),
+      'A quote-stage golf line must not appear as an extra course'
+    );
+  }
+
+  @IsTest
+  static void getContextRejectsBadCredentials() {
+    Assert.areEqual(
+      'invalid',
+      GxFeedbackService.getContext(null, null).message,
+      'Blank input is rejected'
+    );
+    Assert.areEqual(
+      'invalid',
+      GxFeedbackService.getContext(BOOKING_NUM, 'wrong').message,
+      'A wrong secret is rejected'
+    );
+    Assert.areEqual(
+      'invalid',
+      GxFeedbackService.getContext('NOPE', SECRET).message,
+      'An unknown booking number is rejected'
+    );
+    Assert.isFalse(
+      GxFeedbackService.getContext(BOOKING_NUM, 'wrong').ok,
+      'A rejected context is never ok'
+    );
+  }
+
+  @IsTest
+  static void getContextReportsAnEmptyItinerary() {
+    Account customer = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Test Customer GmbH'
+      LIMIT 1
+    ];
+    Booking__c bare = newBooking(customer, 'TEST-GX-EMPTY', 'empty-secret');
+    insert bare;
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      'TEST-GX-EMPTY',
+      'empty-secret'
+    );
+
+    Assert.isFalse(
+      c.ok,
+      'A booking with nothing rateable does not open a survey'
+    );
+    Assert.areEqual(
+      'empty',
+      c.message,
+      'The caller is told the itinerary is empty'
+    );
+  }
+
+  @IsTest
+  static void getContextClosesAfterSubmission() {
+    insert new Feedback_Response__c(
+      Booking__c = theBooking().Id,
+      Overall_Experience__c = 9,
+      Recommendation_NPS__c = 9
+    );
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Assert.isFalse(c.ok, 'A booking that already has feedback does not reopen');
+    Assert.areEqual(
+      'submitted',
+      c.message,
+      'The caller is told feedback already arrived'
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // submit
+
+  private static Map<String, Object> basePayload() {
+    return new Map<String, Object>{
+      'bookingNumber' => BOOKING_NUM,
+      'secret' => SECRET,
+      'language' => 'DE',
+      'overallExperience' => 9,
+      'recommendation' => 10
+    };
+  }
+
+  @IsTest
+  static void submitStoresResponseAndRatings() {
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Map<String, Object> payload = basePayload();
+    payload.put('consultation', 8);
+    payload.put('consultationComment', 'Etwas langsam.');
+    payload.put(
+      'flight',
+      new Map<String, Object>{ 'score' => 7, 'comment' => 'Verspätet' }
+    );
+    payload.put('transfer', new Map<String, Object>{ 'score' => 10 });
+    payload.put('rentalCar', new Map<String, Object>{ 'score' => 9 });
+    payload.put('improvementSuggestions', 'Weiter so!');
+    payload.put(
+      'hotels',
+      new List<Object>{
+        new Map<String, Object>{
+          'reservationId' => c.hotels[0].reservationId,
+          'itemName' => c.hotels[0].name,
+          'score' => 6,
+          'comment' => 'Zimmer war laut',
+          'sub' => new Map<String, Object>{
+            'Room' => 5,
+            'Service' => 8,
+            'Catering' => 7,
+            'Cleanliness' => 9
+          }
+        }
+      }
+    );
+    payload.put(
+      'golfCourses',
+      new List<Object>{
+        new Map<String, Object>{
+          'reservationId' => c.golfCourses[0].reservationId,
+          'itemName' => c.golfCourses[0].name,
+          'score' => 10
+        }
+      }
+    );
+
+    Test.startTest();
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(payload)
+    );
+    Test.stopTest();
+
+    Assert.isTrue(r.ok, 'A complete payload should be accepted');
+    Assert.isTrue(
+      r.showPublicReview,
+      'A recommendation of 10 earns the public review prompt'
+    );
+    Assert.isNotNull(r.reference, 'The guest gets a reference number back');
+
+    Feedback_Response__c saved = [
+      SELECT
+        Id,
+        Overall_Experience__c,
+        Recommendation_NPS__c,
+        NPS_Category__c,
+        Consultation_Rating__c,
+        Public_Review_Prompted__c,
+        Submitted_On__c,
+        Language__c
+      FROM Feedback_Response__c
+      WHERE Booking__c = :theBooking().Id
+    ];
+    Assert.areEqual(9, saved.Overall_Experience__c, 'Overall score is stored');
+    Assert.areEqual(
+      'Promoter',
+      saved.NPS_Category__c,
+      'A 10 classifies as a Promoter'
+    );
+    Assert.isTrue(
+      saved.Public_Review_Prompted__c,
+      'The review prompt is recorded'
+    );
+    Assert.isNotNull(
+      saved.Submitted_On__c,
+      'Submission time is stamped server-side'
+    );
+
+    List<Feedback_Rating__c> ratings = [
+      SELECT
+        Category__c,
+        Sub_Category__c,
+        Item_Name__c,
+        Score__c,
+        Reservation__c
+      FROM Feedback_Rating__c
+      WHERE Feedback_Response__c = :saved.Id
+    ];
+    // flight + transfer + rentalCar + hotel + 4 hotel sub-ratings + golf course
+    Assert.areEqual(
+      9,
+      ratings.size(),
+      'Every scored item becomes its own rating row'
+    );
+
+    Integer subRatings = 0;
+    for (Feedback_Rating__c r2 : ratings) {
+      if (r2.Sub_Category__c != null) {
+        subRatings++;
+        Assert.areEqual(
+          'Hotel',
+          r2.Category__c,
+          'Sub-ratings belong to the hotel'
+        );
+        Assert.areNotEqual(
+          null,
+          r2.Reservation__c,
+          'Sub-ratings keep the reservation link'
+        );
+      }
+    }
+    Assert.areEqual(4, subRatings, 'All four hotel sub-categories are stored');
+  }
+
+  @IsTest
+  static void submitWithLowRecommendationSkipsPublicReview() {
+    Map<String, Object> payload = basePayload();
+    payload.put('recommendation', 6);
+
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(payload)
+    );
+
+    Assert.isTrue(r.ok, 'A detractor response is still accepted');
+    Assert.isFalse(
+      r.showPublicReview,
+      'A score of 6 must not trigger the review invitation'
+    );
+
+    Feedback_Response__c saved = [
+      SELECT NPS_Category__c, Public_Review_Prompted__c
+      FROM Feedback_Response__c
+      LIMIT 1
+    ];
+    Assert.areEqual(
+      'Detractor',
+      saved.NPS_Category__c,
+      'A 6 classifies as a Detractor'
+    );
+    Assert.isFalse(
+      saved.Public_Review_Prompted__c,
+      'No review prompt is recorded'
+    );
+  }
+
+  @IsTest
+  static void submitRejectsSecondResponseForTheSameBooking() {
+    GxFeedbackService.submit(JSON.serialize(basePayload()));
+
+    GxFeedbackService.SubmitResult second = GxFeedbackService.submit(
+      JSON.serialize(basePayload())
+    );
+
+    Assert.isFalse(second.ok, 'A booking accepts feedback only once');
+    Assert.areEqual(
+      1,
+      [SELECT COUNT() FROM Feedback_Response__c],
+      'The second attempt creates nothing'
+    );
+  }
+
+  @IsTest
+  static void submitRejectsBadCredentialsAndMalformedInput() {
+    Assert.isFalse(
+      GxFeedbackService.submit('not json at all').ok,
+      'Unparseable JSON is rejected'
+    );
+    Assert.isFalse(
+      GxFeedbackService.submit(
+          JSON.serialize(
+            new Map<String, Object>{
+              'bookingNumber' => BOOKING_NUM,
+              'secret' => 'wrong',
+              'overallExperience' => 9,
+              'recommendation' => 9
+            }
+          )
+        )
+        .ok,
+      'A wrong secret is rejected'
+    );
+    Assert.isFalse(
+      GxFeedbackService.submit(
+          JSON.serialize(new Map<String, Object>{ 'overallExperience' => 9 })
+        )
+        .ok,
+      'A payload with no credentials is rejected'
+    );
+    Assert.areEqual(
+      0,
+      [SELECT COUNT() FROM Feedback_Response__c],
+      'No rejected attempt writes anything'
+    );
+  }
+
+  @IsTest
+  static void submitEnforcesRequiredAndRangedScores() {
+    Map<String, Object> noOverall = basePayload();
+    noOverall.remove('overallExperience');
+    Assert.isFalse(
+      GxFeedbackService.submit(JSON.serialize(noOverall)).ok,
+      'The overall score is required'
+    );
+
+    Map<String, Object> outOfRange = basePayload();
+    outOfRange.put('overallExperience', 11);
+    Assert.isFalse(
+      GxFeedbackService.submit(JSON.serialize(outOfRange)).ok,
+      'A score above 10 is rejected rather than stored'
+    );
+
+    Map<String, Object> noRecommendation = basePayload();
+    noRecommendation.remove('recommendation');
+    Assert.isFalse(
+      GxFeedbackService.submit(JSON.serialize(noRecommendation)).ok,
+      'The recommendation score is required'
+    );
+
+    Assert.areEqual(
+      0,
+      [SELECT COUNT() FROM Feedback_Response__c],
+      'No invalid submission is stored'
+    );
+  }
+
+  @IsTest
+  static void submitIgnoresOutOfRangeItemScores() {
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Map<String, Object> payload = basePayload();
+    payload.put(
+      'hotels',
+      new List<Object>{
+        new Map<String, Object>{
+          'reservationId' => c.hotels[0].reservationId,
+          'itemName' => c.hotels[0].name,
+          'score' => 99,
+          'sub' => new Map<String, Object>{ 'Room' => 42, 'Bogus' => 5 }
+        }
+      }
+    );
+
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(payload)
+    );
+
+    Assert.isTrue(r.ok, 'The response is still saved');
+    Assert.areEqual(
+      0,
+      [SELECT COUNT() FROM Feedback_Rating__c],
+      'An impossible item score is dropped rather than stored'
+    );
+  }
+
+  @IsTest
+  static void submitIgnoresAReservationFromAnotherBooking() {
+    Account customer = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Test Customer GmbH'
+      LIMIT 1
+    ];
+    Account venue = [SELECT Id FROM Account WHERE Name = 'Hotel Alpha' LIMIT 1];
+    Booking__c other = newBooking(customer, 'TEST-GX-OTHER', 'other-secret');
+    insert other;
+
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Reservation__c foreign = newReservation(
+      other.Id,
+      venue,
+      'Hotel',
+      'Completed'
+    );
+    insert foreign;
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    Map<String, Object> payload = basePayload();
+    payload.put(
+      'hotels',
+      new List<Object>{
+        new Map<String, Object>{
+          'reservationId' => foreign.Id,
+          'itemName' => 'Injected Hotel',
+          'score' => 10
+        }
+      }
+    );
+
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(payload)
+    );
+
+    Assert.isTrue(r.ok, 'The rest of the submission still succeeds');
+    Feedback_Rating__c rating = [
+      SELECT Reservation__c, Item_Name__c
+      FROM Feedback_Rating__c
+      LIMIT 1
+    ];
+    Assert.areEqual(
+      null,
+      rating.Reservation__c,
+      'A reservation from another booking must never be linked'
+    );
+    Assert.areEqual(
+      'Injected Hotel',
+      rating.Item_Name__c,
+      'Without a trusted reservation the name falls back to the client value'
+    );
+  }
+
+  @IsTest
+  static void submitStripsMarkupFromGuestText() {
+    Map<String, Object> payload = basePayload();
+    payload.put(
+      'improvementSuggestions',
+      '<script>alert(1)</script>Bitte mehr Golf'
+    );
+
+    GxFeedbackService.submit(JSON.serialize(payload));
+
+    Feedback_Response__c saved = [
+      SELECT Improvement_Suggestions__c
+      FROM Feedback_Response__c
+      LIMIT 1
+    ];
+    Assert.isFalse(
+      saved.Improvement_Suggestions__c.contains('<script>'),
+      'Markup is stripped from guest free text'
+    );
+    Assert.isTrue(
+      saved.Improvement_Suggestions__c.contains('Bitte mehr Golf'),
+      'The guest\'s actual words survive'
+    );
+  }
+
+  @IsTest
+  static void submitCapsOverlongText() {
+    Map<String, Object> payload = basePayload();
+    payload.put('generalFeedback', 'x'.repeat(3000));
+
+    GxFeedbackService.submit(JSON.serialize(payload));
+
+    Feedback_Response__c saved = [
+      SELECT General_Feedback__c
+      FROM Feedback_Response__c
+      LIMIT 1
+    ];
+    Assert.areEqual(
+      2000,
+      saved.General_Feedback__c.length(),
+      'Text longer than the field is truncated, not rejected'
+    );
+  }
+}
