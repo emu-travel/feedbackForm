@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Sub_Category__c</fullName>
+    <description
+  >Set only for hotel sub-ratings, which the survey reveals when the overall hotel score is below 9. Null on top-level ratings.</description>
+    <label>Sub Category</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Room</fullName>
+                <default>false</default>
+                <label>Zimmer / Room</label>
+            </value>
+            <value>
+                <fullName>Service</fullName>
+                <default>false</default>
+                <label>Service</label>
+            </value>
+            <value>
+                <fullName>Catering</fullName>
+                <default>false</default>
+                <label>Gastronomie / Catering</label>
+            </value>
+            <value>
+                <fullName>Cleanliness</fullName>
+                <default>false</default>
+                <label>Sauberkeit / Cleanliness</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

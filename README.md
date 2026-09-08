@@ -1,8 +1,8 @@
 # Golf Extra — Post-Trip Feedback Form (Salesforce)
 
-Salesforce implementation of the Golf Extra GmbH post-trip guest feedback survey.
-Guests receive an email after their golf trip and complete a personalised survey
-built from the itinerary they actually booked.
+Salesforce implementation of the golf.extra / EMU exclusive travel post-trip guest feedback
+survey. Guests receive an email after their golf trip and complete a personalised survey built
+from the itinerary they actually booked.
 
 ## Repository layout
 
@@ -15,62 +15,97 @@ reference-app/              React/Vite prototype — VISUAL SPEC ONLY, never dep
 ```
 
 `reference-app/` is the original AI Studio prototype. It is the source of truth for
-_behaviour and design_, not for production code. It is excluded from deployment via
-`.forceignore`. Its functional write-up lives in
+_behaviour and design_, not for production code, and is excluded from deployment via
+`.forceignore`. Its functional write-up is in
 [`reference-app/TECHNICAL_DOCUMENTATION.md`](reference-app/TECHNICAL_DOCUMENTATION.md).
 
 ## Architecture
 
-Itinerary data is owned by an **external CMS**, not Salesforce. When a trip completes,
-the CMS pushes a snapshot into Salesforce along with an invitation token. The guest-facing
-form reads only that snapshot — no live callout at render time.
+All data already lives in Salesforce. There is no external system and no integration layer.
+The survey reads the itinerary directly from the existing booking model and writes feedback
+into two new objects.
 
 ```
-CMS (booking system of record)
-      │  trip completes
-      ▼
-POST /services/apexrest/gx/v1/invitation      (integration user, OAuth client credentials)
-      ├─ upsert Trip_Itinerary__c            on CMS_Booking_Id__c
-      ├─ upsert Itinerary_Hotel__c / _Golf_Course__c / _Flight__c on CMS_Item_Id__c
-      └─ insert Feedback_Invitation__c  →  { token, surveyUrl }
-      │
-      ▼
-Email with tokenised link  →  Experience Cloud public page  →  gxSurveyContainer (LWC)
-      │
-      ▼
-GxSurveyController.getContext(token)   reads the snapshot
-GxSurveyController.submit(token, json) writes Feedback_Response__c + Feedback_Rating__c
-      │
-      ▼
-Reports & dashboards (NPS by month, average score per hotel, detractor list)
+Booking__c  (trip header — already exists)
+   │  SendSurvey__c / SurveySent__c / Form_Secret__c  ← already exist
+   │
+   ├── Reservation__c (itinerary line items — already exist)
+   │      AccountType__c: Hotel | Golfclub | Airline | TransferCompany | CarRentalCompany | …
+   │      Travel_Location__r.Name → the hotel / golf club / supplier
+   │
+   ▼
+Email with tokenised link  →  Experience Cloud public page
+   https://…/feedback?b={BookingNumber__c}&k={Form_Secret__c}
+   │
+   ▼
+gxFeedbackForm (LWC)
+   │
+   ▼
+GxFeedbackFormController   thin, `with sharing`, the only Apex the guest may call
+GxFeedbackService          `without sharing`, token check + rate limit + all logic
+   │
+   ▼
+Feedback_Response__c  +  Feedback_Rating__c        ← the only new objects
+   │
+   ▼
+Reports & dashboards (NPS by month, average score per hotel / course, detractor list)
 ```
 
-### Why a snapshot rather than a live CMS callout
+### Reusing what the org already has
 
-- The guest user never triggers an outbound callout — no latency or uptime coupling.
-- Feedback records what the guest actually rated, even if the CMS itinerary changes later.
-- Ratings are reportable natively in Salesforce.
+This org already solved guest access for the **Reiseanmeldung** booking-confirmation form.
+We follow that pattern rather than inventing a parallel one:
 
-## Data model
+| Existing                                                 | Reused for                                      |
+| -------------------------------------------------------- | ----------------------------------------------- |
+| `Booking__c.Form_Secret__c`                              | The invitation token — no new invitation object |
+| `ReiseanmeldungFormController` / `ReiseanmeldungService` | Shape of our controller/service pair            |
+| LWC `reiseanmeldungForm` (reads `?b=` and `?k=`)         | URL parameter handling                          |
+| `Booking__c.SendSurvey__c` / `SurveySent__c`             | Dispatch flags, already flow-driven             |
+| Experience Cloud public site pattern                     | Where the form is hosted                        |
 
-| Object                     | Purpose                                                          |
-| -------------------------- | ---------------------------------------------------------------- |
-| `Feedback_Invitation__c`   | Token, contact, booking ref, expiry, status, language            |
-| `Trip_Itinerary__c`        | Guest + trip header, review URLs, booked-service flags           |
-| `Itinerary_Hotel__c`       | One row per booked hotel — drives the dynamic hotel rating cards |
-| `Itinerary_Golf_Course__c` | One row per booked course — drives the course rating cards       |
-| `Itinerary_Flight__c`      | Flight legs shown in the itinerary summary                       |
-| `Feedback_Response__c`     | One submission: overall, consultation, NPS, free-text answers    |
-| `Feedback_Rating__c`       | One row per rated item (category, item name, score, comment)     |
+### Reading the itinerary — important
 
-Ratings are normalised into child rows rather than columns, so adding a fourth golf course
-to a trip requires no schema change.
+`Reservation__c.Type__c` looks like the right discriminator but is **null on every row**.
+The populated field is **`AccountType__c`**:
+
+| `AccountType__c`                       | Survey section                                      |
+| -------------------------------------- | --------------------------------------------------- |
+| `Hotel`                                | Per-hotel rating card, sub-ratings when score `< 9` |
+| `Golfclub`                             | Per-course rating card                              |
+| `Airline`                              | Flight rating                                       |
+| `TransferCompany`                      | Transfer / chauffeur rating                         |
+| `CarRentalCompany`                     | Rental car rating                                   |
+| `Insurance`, `DMC`, `General Services` | Not rated                                           |
+
+Names come from `Travel_Location__r.Name`; `Service__r.Name` holds the service description.
+Only delivered travel is rated — filter `Status__c` to `Booked` / `Invoiced` / `Paid` /
+`Completed`, excluding `Calculation` / `Offered` / `Rejected` / `Canceled`.
+
+## New data model
+
+| Object                 | Purpose                                                           |
+| ---------------------- | ----------------------------------------------------------------- |
+| `Feedback_Response__c` | One submission per booking: overall, consultation, NPS, free text |
+| `Feedback_Rating__c`   | One row per rated item — category, item name, score, comment      |
+
+Ratings are normalised into child rows rather than columns, so a trip with four golf courses
+instead of three needs no schema change. Each rating keeps a lookup to the `Reservation__c` it
+came from, so "average score for Real Club Valderrama" is a report, not code.
+
+## Why not Salesforce Surveys
+
+Feedback Management is already in this org and was tried: seven `Survey` records dating to
+Sept 2025, including an active `golf.extra Feedback`. It never launched —
+`SurveyInvitation` and `SurveyResponse` both hold zero rows. The existing survey is a flat
+25-question single page with no conditional logic and no per-hotel or per-course
+personalisation, which is precisely what the prototype was built to replace.
 
 ## Survey behaviour to preserve
 
 Ported from `reference-app/src/components/SurveyView.tsx`:
 
-- Screens skip themselves based on which services were booked (`getNextScreen`/`getPrevScreen`)
+- Screens skip themselves based on which services were booked
 - Any rating `<= 8` reveals a follow-up comment box
 - A hotel rating `< 9` expands four sub-ratings: room, service, catering, cleanliness
 - A recommendation score `>= 9` reveals the Trustpilot and Google Maps review cards;
@@ -83,13 +118,13 @@ Ported from `reference-app/src/components/SurveyView.tsx`:
 **Prerequisites:** Node.js 20+, Salesforce CLI (`npm install --global @salesforce/cli`)
 
 ```bash
-npm install                                   # dev dependencies (eslint, jest, prettier)
+npm install
 sf org login web --alias gx-sandbox --instance-url https://test.salesforce.com --set-default
-sf org display --target-org gx-sandbox        # confirm which org you are pointed at
+sf org display --target-org gx-sandbox
 ```
 
-`sfdx-project.json` sets `sfdcLoginUrl` to `https://test.salesforce.com` — this project
-targets sandboxes by default.
+`sfdx-project.json` sets `sfdcLoginUrl` to `https://test.salesforce.com`; this project targets
+sandboxes by default. Production deployment is a deliberate, separate step.
 
 ### Everyday commands
 
@@ -100,25 +135,27 @@ npm run prettier:verify    # formatting check
 sf project deploy start --dry-run --target-org gx-sandbox    # validate only
 sf project deploy start --target-org gx-sandbox              # deploy
 sf apex run test --target-org gx-sandbox --code-coverage --result-format human
-sf project retrieve start --target-org gx-sandbox            # pull org changes back to source
+sf project retrieve start --target-org gx-sandbox            # pull org changes into source
 ```
 
 ## Working agreement
 
-1. Develop against the **sandbox**, never production.
-2. Metadata lives in this repo. Anything changed in the org UI gets retrieved back into source.
-3. Tests are written alongside components, not afterwards — Apex tests with real assertions
-   (target ~90%, not the 75% floor) and Jest tests for the conditional-reveal logic.
+1. Develop and test in the **staging sandbox**, then promote to production.
+2. Metadata lives in this repo. Anything changed in the org UI is retrieved back into source.
+3. Tests are written alongside components — Apex tests with real assertions (target ~90%,
+   not the 75% floor) and Jest tests for the conditional-reveal logic.
 4. Validate with `--dry-run` before any deploy.
 5. Deploy from source with the CLI. No change sets.
+6. Never modify the existing Reiseanmeldung or booking metadata; this project only adds.
 
 ## Security notes
 
 The survey is served to unauthenticated guests on the public internet:
 
-- Record IDs are never exposed to the client; the token is the only handle.
-- Tokens are cryptographically random, single-use, and expiring.
-- Every score is re-validated server-side (1–10); free text is sanitised.
-- The guest profile gets read access to itinerary objects and create access to feedback
-  objects — nothing else.
-- The inbound CMS endpoint uses a dedicated integration user, never the guest user.
+- Record IDs are never exposed to the client; `BookingNumber__c` + `Form_Secret__c` is the
+  only handle, exactly as the Reiseanmeldung form does it.
+- The guest profile gets access to `GxFeedbackFormController` only — no object permissions of
+  its own. All logic runs in `GxFeedbackService` (`without sharing`).
+- Every score is re-validated server-side (1–10); free text is length-capped and sanitised.
+- Submissions are rate-limited per booking, following the existing form's 10/hour precedent.
+- One response per booking; re-submission is rejected.

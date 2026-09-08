@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description
+  >One submitted post-trip feedback survey for a Booking. Created by the guest user through GxFeedbackService; individual item scores live on the child Feedback_Rating__c records.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>Feedback Response</label>
+    <nameField>
+        <displayFormat>FB-{00000}</displayFormat>
+        <label>Feedback Number</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Feedback Responses</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

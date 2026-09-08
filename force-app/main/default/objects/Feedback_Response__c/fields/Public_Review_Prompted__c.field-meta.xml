@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Public_Review_Prompted__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description
+  >True when the Trustpilot / Google Maps invitation was shown, i.e. the recommendation score was 9 or 10.</description>
+    <label>Public Review Prompted</label>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

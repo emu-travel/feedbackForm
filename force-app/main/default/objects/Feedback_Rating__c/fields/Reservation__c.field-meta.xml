@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reservation__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description
+  >The itinerary line item that was rated. Makes "average score for this hotel or golf club" reportable by joining through Reservation__c.Travel_Location__c. Null for ratings that are not tied to a single reservation.</description>
+    <label>Reservation</label>
+    <referenceTo>Reservation__c</referenceTo>
+    <relationshipLabel>Feedback Ratings</relationshipLabel>
+    <relationshipName>Feedback_Ratings</relationshipName>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

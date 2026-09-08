@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description
+  >A single 1-10 score given in a feedback survey - one row per rated hotel, golf course, flight, transfer or rental car, plus hotel sub-category scores. Normalised so a trip with more items needs no schema change.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>false</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>Feedback Rating</label>
+    <nameField>
+        <displayFormat>FR-{000000}</displayFormat>
+        <label>Rating Number</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Feedback Ratings</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

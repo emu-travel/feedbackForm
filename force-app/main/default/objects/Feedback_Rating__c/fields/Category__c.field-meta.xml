@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Category__c</fullName>
+    <description
+  >Which part of the trip this score is about. Mirrors Reservation__c.AccountType__c, which is the populated discriminator on the itinerary (Type__c is unused).</description>
+    <label>Category</label>
+    <required>true</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Hotel</fullName>
+                <default>false</default>
+                <label>Hotel</label>
+            </value>
+            <value>
+                <fullName>Golfclub</fullName>
+                <default>false</default>
+                <label>Golf Course</label>
+            </value>
+            <value>
+                <fullName>Airline</fullName>
+                <default>false</default>
+                <label>Flight</label>
+            </value>
+            <value>
+                <fullName>TransferCompany</fullName>
+                <default>false</default>
+                <label>Transfer / Chauffeur</label>
+            </value>
+            <value>
+                <fullName>CarRentalCompany</fullName>
+                <default>false</default>
+                <label>Rental Car</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
