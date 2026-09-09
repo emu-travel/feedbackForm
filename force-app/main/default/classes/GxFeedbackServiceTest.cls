@@ -90,7 +90,9 @@ private class GxFeedbackServiceTest {
       newAccount('Test Airline', 'Airline'),
       newAccount('Test Transfers', 'TransferCompany'),
       newAccount('Test Rentals', 'CarRentalCompany'),
-      newAccount('Test Insurer', 'Insurance')
+      newAccount('Test Insurer', 'Insurance'),
+      newAccount('Golf Club Three', 'Golfclub'),
+      newAccount('Golf Club Four', 'Golfclub')
     };
     insert venues;
 
@@ -107,8 +109,13 @@ private class GxFeedbackServiceTest {
       newReservation(b.Id, venues[4], 'Airline', 'Completed'),
       newReservation(b.Id, venues[5], 'TransferCompany', 'Completed'),
       newReservation(b.Id, venues[6], 'CarRentalCompany', 'Completed'),
-      // Not delivered - quote stage only
+      // Same club as venues[2], still at quote stage - must collapse, not duplicate
       newReservation(b.Id, venues[2], 'Golfclub', 'Calculation'),
+      // A course the guest played whose line was never advanced past quote stage.
+      // On a delivered booking this must still be rated.
+      newReservation(b.Id, venues[8], 'Golfclub', 'Calculation'),
+      // Genuinely cancelled - never rated, whatever the booking says
+      newReservation(b.Id, venues[9], 'Golfclub', 'Canceled'),
       // Delivered but not a rateable category
       newReservation(b.Id, venues[7], 'Insurance', 'Completed')
     };
@@ -152,9 +159,9 @@ private class GxFeedbackServiceTest {
       'Hotel Alpha appears twice and must collapse to one card'
     );
     Assert.areEqual(
-      2,
+      3,
       c.golfCourses.size(),
-      'Both delivered golf courses should be asked about'
+      'A delivered booking rates every course except the cancelled one'
     );
     Assert.areEqual(1, c.flightSuppliers.size(), 'One airline was booked');
     Assert.areEqual(
@@ -188,7 +195,26 @@ private class GxFeedbackServiceTest {
   }
 
   @IsTest
-  static void getContextExcludesUndeliveredAndUnrateableLines() {
+  static void deliveredBookingRatesACourseWhoseLineStalledAtQuoteStage() {
+    // Booking status is Completed, so the trip happened. A green fee left at
+    // Calculation is a data-entry gap, not a service the guest did not receive.
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Set<String> played = new Set<String>();
+    for (GxFeedbackService.RateableItem i : c.golfCourses) {
+      played.add(i.name);
+    }
+    Assert.isTrue(
+      played.contains('Golf Club Three'),
+      'A course on a delivered trip is rated even if its line was never advanced'
+    );
+  }
+
+  @IsTest
+  static void cancelledLinesAreNeverRated() {
     GxFeedbackService.Context c = GxFeedbackService.getContext(
       BOOKING_NUM,
       SECRET
@@ -196,17 +222,62 @@ private class GxFeedbackServiceTest {
 
     for (GxFeedbackService.RateableItem i : c.golfCourses) {
       Assert.areNotEqual(
-        null,
-        i.reservationId,
-        'Rateable items carry their reservation'
+        'Golf Club Four',
+        i.name,
+        'A cancelled line is never rated, however the booking is set'
       );
     }
-    // Golf Club One is on the booking twice: once Completed, once Calculation.
-    // De-duplication keeps one card; the Calculation row must not add a second.
+  }
+
+  @IsTest
+  static void bookingStillBeingQuotedFallsBackToTheStrictLineCheck() {
+    // Built rather than mutated: changing Status__c on an existing booking fires
+    // the org's "Booking - Update Reservations and Opp Status" flow, which cannot
+    // complete in a test context.
+    Account customer = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Test Customer GmbH'
+      LIMIT 1
+    ];
+    Account played = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Golf Club One'
+      LIMIT 1
+    ];
+    Account quoted = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Golf Club Three'
+      LIMIT 1
+    ];
+
+    Booking__c quoting = newBooking(customer, 'TEST-GX-QUOTE', 'quote-secret');
+    quoting.Status__c = 'Offered';
+    insert quoting;
+
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    insert new List<Reservation__c>{
+      newReservation(quoting.Id, played, 'Golfclub', 'Booked'),
+      newReservation(quoting.Id, quoted, 'Golfclub', 'Calculation')
+    };
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      'TEST-GX-QUOTE',
+      'quote-secret'
+    );
+
     Assert.areEqual(
-      2,
+      1,
       c.golfCourses.size(),
-      'A quote-stage golf line must not appear as an extra course'
+      'A trip that has not been delivered surveys only properly booked lines'
+    );
+    Assert.areEqual(
+      'Golf Club One',
+      c.golfCourses[0].name,
+      'The quote-stage course is left out until the trip is delivered'
     );
   }
 

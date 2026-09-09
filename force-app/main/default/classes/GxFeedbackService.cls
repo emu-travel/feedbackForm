@@ -19,8 +19,27 @@ public without sharing class GxFeedbackService {
   // ------------------------------------------------------------------
   // Constants
 
-  /** Only travel that was actually delivered is rated. Quote-stage and dead
-   *  lines (Calculation, Offered, Accepted, Rejected, Canceled) are excluded. */
+  /**
+   * Whether a trip actually happened is decided by the booking, not by its
+   * individual lines. Reservation statuses are not reliably advanced when a trip
+   * completes - a real booking sits in Feedback with its green fee still at
+   * Calculation - and on a golf product, silently dropping the golf is worse
+   * than the alternative.
+   */
+  private static final Set<String> DELIVERED_BOOKING_STATUS = new Set<String>{
+    'Feedback',
+    'Completed',
+    'Paid',
+    'Invoiced'
+  };
+
+  /** Never rated, whatever the booking says: the guest did not receive these. */
+  private static final Set<String> EXCLUDED_RESERVATION_STATUS = new Set<String>{
+    'Rejected',
+    'Canceled'
+  };
+
+  /** Used only when the booking itself does not yet say the trip was delivered. */
   private static final Set<String> RATEABLE_RESERVATION_STATUS = new Set<String>{
     'Booked',
     'Invoiced',
@@ -231,7 +250,7 @@ public without sharing class GxFeedbackService {
       c.googleMapsUrl = cfg.Google_Maps_URL__c;
     }
 
-    applyItinerary(c, loadRateableReservations(b.Id));
+    applyItinerary(c, loadRateableReservations(b));
 
     // A booking with nothing rateable gets no survey rather than an empty one.
     if (
@@ -383,7 +402,7 @@ public without sharing class GxFeedbackService {
     // Only reservations actually on this booking may be referenced, so a
     // tampered payload cannot attach feedback to someone else's trip.
     Map<Id, Reservation__c> allowed = new Map<Id, Reservation__c>(
-      loadRateableReservations(b.Id)
+      loadRateableReservations(b)
     );
 
     Savepoint sp = Database.setSavepoint();
@@ -589,6 +608,7 @@ public without sharing class GxFeedbackService {
         BookingNumber__c,
         MainContact__c,
         MainContactName__c,
+        Status__c,
         Start_Date__c,
         End_Date__c,
         toLabel(DestinationCountry__c),
@@ -601,8 +621,13 @@ public without sharing class GxFeedbackService {
     return found.size() == 1 ? found[0] : null;
   }
 
-  private static List<Reservation__c> loadRateableReservations(Id bookingId) {
-    return [
+  /**
+   * On a delivered booking every line is rated except the ones the guest never
+   * received. On a booking that is not yet delivered we fall back to the strict
+   * line-level check, so a trip still being quoted cannot be surveyed by mistake.
+   */
+  private static List<Reservation__c> loadRateableReservations(Booking__c b) {
+    List<Reservation__c> rows = [
       SELECT
         Id,
         Name,
@@ -619,11 +644,23 @@ public without sharing class GxFeedbackService {
         Service__r.Name
       FROM Reservation__c
       WHERE
-        Booking__c = :bookingId
-        AND Status__c IN :RATEABLE_RESERVATION_STATUS
+        Booking__c = :b.Id
+        AND Status__c NOT IN :EXCLUDED_RESERVATION_STATUS
         AND AccountType__c IN :RATEABLE_ACCOUNT_TYPE
       ORDER BY Date_Begin__c NULLS LAST, Name
     ];
+
+    if (DELIVERED_BOOKING_STATUS.contains(b.Status__c)) {
+      return rows;
+    }
+
+    List<Reservation__c> delivered = new List<Reservation__c>();
+    for (Reservation__c r : rows) {
+      if (RATEABLE_RESERVATION_STATUS.contains(r.Status__c)) {
+        delivered.add(r);
+      }
+    }
+    return delivered;
   }
 
   private static Boolean hasExistingResponse(Id bookingId) {
