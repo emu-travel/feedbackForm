@@ -724,4 +724,94 @@ private class GxFeedbackServiceTest {
       'Screen 4 closing remarks are stored'
     );
   }
+
+  // ------------------------------------------------------------------
+  // Link expiry
+
+  private static void setTripEnd(Date ended) {
+    Booking__c b = theBooking();
+    b.Start_Date__c = ended.addDays(-7);
+    b.End_Date__c = ended;
+    update b;
+  }
+
+  @IsTest
+  static void expiredLinkRefusesToOpenTheSurvey() {
+    setTripEnd(Date.today().addDays(-400));
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Assert.isFalse(c.ok, 'A long-past trip does not open a survey');
+    Assert.areEqual(
+      'expired',
+      c.message,
+      'The caller is told the link expired'
+    );
+    Assert.isTrue(c.hotels.isEmpty(), 'An expired link discloses no itinerary');
+    Assert.areEqual(
+      null,
+      c.bookingNumber,
+      'An expired link echoes nothing back'
+    );
+  }
+
+  @IsTest
+  static void expiredLinkRefusesToSubmit() {
+    setTripEnd(Date.today().addDays(-400));
+
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(basePayload())
+    );
+
+    Assert.isFalse(r.ok, 'A stale link cannot write feedback');
+    Assert.areEqual(
+      0,
+      [SELECT COUNT() FROM Feedback_Response__c],
+      'Nothing is stored for an expired link'
+    );
+  }
+
+  @IsTest
+  static void linkStillWorksInsideTheWindow() {
+    setTripEnd(Date.today().addDays(-30));
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Assert.isTrue(
+      c.ok,
+      'A trip inside the 90 day window is still open for feedback'
+    );
+  }
+
+  @IsTest
+  static void bookingWithoutDatesNeverExpires() {
+    Booking__c b = theBooking();
+    b.Start_Date__c = null;
+    b.End_Date__c = null;
+    update b;
+
+    Assert.isFalse(
+      GxFeedbackService.isExpired(b),
+      'With no date to measure from the secret stays the only gate'
+    );
+  }
+
+  @IsTest
+  static void expiryFallsBackToTheStartDateWhenThereIsNoEnd() {
+    Booking__c b = theBooking();
+    b.End_Date__c = null;
+    b.Start_Date__c = Date.today().addDays(-400);
+    update b;
+
+    Assert.isTrue(
+      GxFeedbackService.isExpired(b),
+      'A trip that started long ago is expired even without an end date'
+    );
+  }
 }

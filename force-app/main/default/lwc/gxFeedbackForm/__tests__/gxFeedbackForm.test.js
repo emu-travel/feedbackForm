@@ -130,6 +130,16 @@ describe("c-gx-feedback-form", () => {
       expect(text(element)).toContain("keine bewertbaren Leistungen");
     });
 
+    it("distinguishes an expired link from a broken one", async () => {
+      getContext.mockResolvedValue({ ok: false, message: "expired" });
+      const element = mount();
+      withUrl();
+      await flush();
+
+      expect(text(element)).toContain("abgelaufen");
+      expect(text(element)).toContain("Reiseberater");
+    });
+
     it("shows a neutral message when Apex fails outright", async () => {
       getContext.mockRejectedValue(new Error("boom"));
       const element = mount();

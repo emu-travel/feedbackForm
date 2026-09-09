@@ -208,6 +208,11 @@ public without sharing class GxFeedbackService {
       return c;
     }
 
+    if (isExpired(b)) {
+      c.message = 'expired';
+      return c;
+    }
+
     c.bookingNumber = b.BookingNumber__c;
     c.guestName = buildGuestName(b);
     c.destination = b.DestinationCountry__c;
@@ -219,7 +224,7 @@ public without sharing class GxFeedbackService {
       : (b.TravelDesigner__r != null ? b.TravelDesigner__r.Name : null);
     c.language = 'DE';
 
-    Gx_Feedback_Setting__mdt cfg = reviewLinks();
+    Gx_Feedback_Setting__mdt cfg = config();
     if (cfg != null) {
       c.trustpilotUrl = cfg.Trustpilot_URL__c;
       c.googleMapsUrl = cfg.Google_Maps_URL__c;
@@ -358,6 +363,11 @@ public without sharing class GxFeedbackService {
     // One response per booking. This is a stronger constraint than the
     // per-hour rate limit the Reiseanmeldung form needs, because that form
     // legitimately accepts repeat submissions and this one does not.
+    if (isExpired(b)) {
+      res.message = 'Der Link zu dieser Umfrage ist leider abgelaufen.';
+      return res;
+    }
+
     if (hasExistingResponse(b.Id)) {
       res.message = 'Für diese Reise haben wir Ihr Feedback bereits erhalten. Vielen Dank!';
       return res;
@@ -646,14 +656,41 @@ public without sharing class GxFeedbackService {
   }
 
   /** Review links live in custom metadata so marketing can change them without a deploy. */
-  private static Gx_Feedback_Setting__mdt reviewLinks() {
-    List<Gx_Feedback_Setting__mdt> rows = [
-      SELECT Trustpilot_URL__c, Google_Maps_URL__c
-      FROM Gx_Feedback_Setting__mdt
-      WHERE DeveloperName = 'Default'
-      LIMIT 1
-    ];
-    return rows.isEmpty() ? null : rows[0];
+  private static Gx_Feedback_Setting__mdt settings;
+
+  private static Gx_Feedback_Setting__mdt config() {
+    if (settings == null) {
+      List<Gx_Feedback_Setting__mdt> rows = [
+        SELECT Trustpilot_URL__c, Google_Maps_URL__c, Link_Validity_Days__c
+        FROM Gx_Feedback_Setting__mdt
+        WHERE DeveloperName = 'Default'
+        LIMIT 1
+      ];
+      settings = rows.isEmpty() ? new Gx_Feedback_Setting__mdt() : rows[0];
+    }
+    return settings;
+  }
+
+  /**
+   * A feedback link stops working a configurable number of days after the trip
+   * ends, so a forwarded email or a shared browser does not expose someone's
+   * itinerary indefinitely.
+   *
+   * Dates the survey can measure from, in order: the trip end, then the trip
+   * start. A booking carrying neither is not expired - the secret remains the
+   * gate. Blank or zero validity disables expiry entirely.
+   */
+  @TestVisible
+  private static Boolean isExpired(Booking__c b) {
+    Decimal validityDays = config().Link_Validity_Days__c;
+    if (validityDays == null || validityDays <= 0) {
+      return false;
+    }
+    Date reference = b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c;
+    if (reference == null) {
+      return false;
+    }
+    return reference.daysBetween(Date.today()) > validityDays.intValue();
   }
 
   private static String formatDate(Date d) {

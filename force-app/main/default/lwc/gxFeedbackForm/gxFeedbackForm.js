@@ -25,7 +25,8 @@ const LOAD = {
   READY: "ready",
   INVALID: "invalid",
   SUBMITTED: "submitted",
-  EMPTY: "empty"
+  EMPTY: "empty",
+  EXPIRED: "expired"
 };
 
 const DEFAULT_SCORE = 10;
@@ -128,6 +129,9 @@ export default class GxFeedbackForm extends LightningElement {
     if (message === "empty") {
       return LOAD.EMPTY;
     }
+    if (message === "expired") {
+      return LOAD.EXPIRED;
+    }
     return LOAD.INVALID;
   }
 
@@ -148,6 +152,9 @@ export default class GxFeedbackForm extends LightningElement {
   }
   get isEmpty() {
     return this.loadState === LOAD.EMPTY;
+  }
+  get isExpired() {
+    return this.loadState === LOAD.EXPIRED;
   }
 
   // ------------------------------------------------------------------

@@ -33,6 +33,17 @@
         </div>
       </template>
 
+      <template lwc:if={isExpired}>
+        <div class="state state_notice">
+          <h2 class="state-title">Dieser Link ist abgelaufen</h2>
+          <p>
+            Der Zeitraum für Ihr Feedback zu dieser Reise ist leider vorbei.
+            Wenn Sie uns dennoch etwas mitteilen möchten, wenden Sie sich gerne
+            direkt an Ihre Reiseberaterin oder Ihren Reiseberater.
+          </p>
+        </div>
+      </template>
+
       <template lwc:if={isEmpty}>
         <div class="state state_notice">
           <h2 class="state-title">Kein Feedback erforderlich</h2>
