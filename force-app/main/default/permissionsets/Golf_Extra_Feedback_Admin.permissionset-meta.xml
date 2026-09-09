@@ -156,4 +156,10 @@
         <field>Feedback_Response__c.General_Golf_Comment__c</field>
         <readable>true</readable>
     </fieldPermissions>
+
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Booking__c.Survey_Link__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
 </PermissionSet>
