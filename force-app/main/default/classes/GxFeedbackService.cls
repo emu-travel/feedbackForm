@@ -244,11 +244,8 @@ public without sharing class GxFeedbackService {
     c.designerName = b.Form_Designer_Name__c;
     c.language = 'DE';
 
-    Gx_Feedback_Setting__mdt cfg = config();
-    if (cfg != null) {
-      c.trustpilotUrl = cfg.Trustpilot_URL__c;
-      c.googleMapsUrl = cfg.Google_Maps_URL__c;
-    }
+    c.trustpilotUrl = GxFeedbackSettings.trustpilotUrl();
+    c.googleMapsUrl = GxFeedbackSettings.googleMapsUrl();
 
     applyItinerary(c, loadRateableReservations(b));
 
@@ -622,6 +619,22 @@ public without sharing class GxFeedbackService {
   }
 
   /**
+   * What the survey would ask this booking about. Dispatch uses it to avoid
+   * inviting a guest to a survey with no questions in it.
+   */
+  public static List<Reservation__c> rateableItemsFor(Id bookingId) {
+    List<Booking__c> found = [
+      SELECT Id, Status__c
+      FROM Booking__c
+      WHERE Id = :bookingId
+      LIMIT 1
+    ];
+    return found.isEmpty()
+      ? new List<Reservation__c>()
+      : loadRateableReservations(found[0]);
+  }
+
+  /**
    * On a delivered booking every line is rated except the ones the guest never
    * received. On a booking that is not yet delivered we fall back to the strict
    * line-level check, so a trip still being quoted cannot be surveyed by mistake.
@@ -693,22 +706,6 @@ public without sharing class GxFeedbackService {
   }
 
   /** Review links live in custom metadata so marketing can change them without a deploy. */
-  private static Gx_Feedback_Setting__mdt settings;
-
-  /**
-   * Read via getInstance rather than SOQL: a guest user cannot query a custom
-   * metadata type at all - SOQL reports it as an unsupported sObject - and
-   * getInstance costs no query against the governor limits either.
-   */
-  private static Gx_Feedback_Setting__mdt config() {
-    if (settings == null) {
-      Gx_Feedback_Setting__mdt found = Gx_Feedback_Setting__mdt.getInstance(
-        'Default'
-      );
-      settings = found == null ? new Gx_Feedback_Setting__mdt() : found;
-    }
-    return settings;
-  }
 
   /**
    * A feedback link stops working a configurable number of days after the trip
@@ -721,7 +718,7 @@ public without sharing class GxFeedbackService {
    */
   @TestVisible
   private static Boolean isExpired(Booking__c b) {
-    Decimal validityDays = config().Link_Validity_Days__c;
+    Decimal validityDays = GxFeedbackSettings.linkValidityDays();
     if (validityDays == null || validityDays <= 0) {
       return false;
     }

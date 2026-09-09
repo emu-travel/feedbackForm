@@ -847,7 +847,7 @@ private class GxFeedbackServiceTest {
 
   @IsTest
   static void linkStillWorksInsideTheWindow() {
-    setTripEnd(Date.today().addDays(-30));
+    setTripEnd(Date.today().addDays(-3));
 
     GxFeedbackService.Context c = GxFeedbackService.getContext(
       BOOKING_NUM,
@@ -856,7 +856,7 @@ private class GxFeedbackServiceTest {
 
     Assert.isTrue(
       c.ok,
-      'A trip inside the 90 day window is still open for feedback'
+      'A trip inside the configured validity window is still open for feedback'
     );
   }
 

@@ -20,6 +20,16 @@
     </values>
     <values>
         <field>Link_Validity_Days__c</field>
-        <value xsi:type="xsd:double">90</value>
+        <value xsi:type="xsd:double">14</value>
+    </values>
+    <values>
+        <field>Dispatch_Delay_Hours__c</field>
+        <value xsi:type="xsd:double">36</value>
+    </values>
+    <values>
+        <field>Survey_Base_URL__c</field>
+        <value
+      xsi:type="xsd:string"
+    >https://emu-travel--staging.sandbox.my.site.com/feedback/</value>
     </values>
 </CustomMetadata>
