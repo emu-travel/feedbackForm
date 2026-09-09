@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<SharingRules xmlns="http://soap.sforce.com/2006/04/metadata">
+    <sharingGuestRules>
+        <fullName>Gx_Feedback_Guest_Bookings</fullName>
+        <accessLevel>Read</accessLevel>
+        <description
+    >Lets the feedback site guest user read only bookings that were actually invited to give feedback. Without this the survey cannot resolve a booking at all - guest users see no records even in without-sharing Apex.</description>
+        <label>Golf Extra Feedback - Guest Bookings</label>
+        <sharedTo>
+            <guestUser>Golf_Extra_Feedback</guestUser>
+        </sharedTo>
+        <criteriaItems>
+            <field>Status__c</field>
+            <operation>equals</operation>
+            <value>Feedback</value>
+        </criteriaItems>
+    </sharingGuestRules>
+</SharingRules>

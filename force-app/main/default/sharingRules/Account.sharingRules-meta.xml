@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<SharingRules xmlns="http://soap.sforce.com/2006/04/metadata">
+    <sharingGuestRules>
+        <fullName>Gx_Feedback_Guest_Suppliers</fullName>
+        <accessLevel>Read</accessLevel>
+        <description
+    >Lets the feedback site guest user read supplier accounts only - hotels, golf clubs, airlines, transfer and rental companies - so the survey can name the venues being rated. Customer accounts are never shared.</description>
+        <label>Golf Extra Feedback - Guest Suppliers</label>
+        <sharedTo>
+            <guestUser>Golf_Extra_Feedback</guestUser>
+        </sharedTo>
+        <criteriaItems>
+            <field>Account_Type__c</field>
+            <operation>equals</operation>
+            <value
+      >Hotel,Golfclub,Airline,TransferCompany,CarRentalCompany</value>
+        </criteriaItems>
+    </sharingGuestRules>
+</SharingRules>

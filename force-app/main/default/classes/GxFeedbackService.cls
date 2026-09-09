@@ -219,9 +219,10 @@ public without sharing class GxFeedbackService {
     c.region = b.Region__c;
     c.startDate = formatDate(b.Start_Date__c);
     c.endDate = formatDate(b.End_Date__c);
-    c.designerName = String.isNotBlank(b.Form_Designer_Name__c)
-      ? b.Form_Designer_Name__c
-      : (b.TravelDesigner__r != null ? b.TravelDesigner__r.Name : null);
+    // Deliberately no TravelDesigner__r.Name traversal: guest users have heavily
+    // restricted access to User, and Form_Designer_Name__c exists on Booking__c
+    // precisely so a public form never has to reach across to it.
+    c.designerName = b.Form_Designer_Name__c;
     c.language = 'DE';
 
     Gx_Feedback_Setting__mdt cfg = config();
@@ -592,7 +593,6 @@ public without sharing class GxFeedbackService {
         End_Date__c,
         toLabel(DestinationCountry__c),
         toLabel(Region__c),
-        TravelDesigner__r.Name,
         Form_Designer_Name__c
       FROM Booking__c
       WHERE BookingNumber__c = :bookingNumber AND Form_Secret__c = :secret
@@ -658,15 +658,17 @@ public without sharing class GxFeedbackService {
   /** Review links live in custom metadata so marketing can change them without a deploy. */
   private static Gx_Feedback_Setting__mdt settings;
 
+  /**
+   * Read via getInstance rather than SOQL: a guest user cannot query a custom
+   * metadata type at all - SOQL reports it as an unsupported sObject - and
+   * getInstance costs no query against the governor limits either.
+   */
   private static Gx_Feedback_Setting__mdt config() {
     if (settings == null) {
-      List<Gx_Feedback_Setting__mdt> rows = [
-        SELECT Trustpilot_URL__c, Google_Maps_URL__c, Link_Validity_Days__c
-        FROM Gx_Feedback_Setting__mdt
-        WHERE DeveloperName = 'Default'
-        LIMIT 1
-      ];
-      settings = rows.isEmpty() ? new Gx_Feedback_Setting__mdt() : rows[0];
+      Gx_Feedback_Setting__mdt found = Gx_Feedback_Setting__mdt.getInstance(
+        'Default'
+      );
+      settings = found == null ? new Gx_Feedback_Setting__mdt() : found;
     }
     return settings;
   }
