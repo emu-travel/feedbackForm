@@ -1,0 +1,49 @@
+<html>
+<head>
+	<meta charset="UTF-8" />
+	<title></title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #fafafa;">
+<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; background-color: #fafafa;" width="100%">
+	<tr>
+		<td align="center" style="padding: 24px 12px;">
+		<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;" width="600">
+			<tr>
+				<td style="padding: 28px 32px 8px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.6; color: #0f172a;">Sehr geehrte*r {{{Recipient.Name}}},<br />
+				<br />
+				wir hoffen, Sie hatten eine wunderbare Reise und sind wohlbehalten zurückgekehrt.<br />
+				<br />
+				Es ist uns ein großes Anliegen, unseren Service und die Qualität unseres Reiseangebots stetig zu verbessern. Daher würden wir uns sehr freuen, wenn Sie sich einen kurzen Moment Zeit nehmen und uns ein Feedback zu Ihrer Reise geben könnten.<br />
+				<br />
+				Was hat Ihnen besonders gut gefallen? Gab es vielleicht etwas, das wir verbessern könnten?<br />
+				Ihre Meinung ist uns sehr wichtig und hilft uns, Ihre Wünsche und Erwartungen noch besser zu erfüllen.</td>
+			</tr>
+			<tr>
+				<td align="center" style="padding: 24px 32px 8px 32px;">
+				<table border="0" cellpadding="0" cellspacing="0" role="presentation">
+					<tr>
+						<td align="center" bgcolor="#0f3822" style="border-radius: 999px;"><a href="{{{Booking__c.Survey_Link__c}}}" style="display: inline-block; padding: 14px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: bold; color: #ffffff; text-decoration: none; border-radius: 999px;" target="_blank">Feedback-Umfrage jetzt starten</a></td>
+					</tr>
+				</table>
+				</td>
+			</tr>
+			<tr>
+				<td align="center" style="padding: 4px 32px 20px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.6; color: #64748b;">Falls sich die Schaltfläche nicht öffnen lässt, kopieren Sie bitte diesen Link in Ihren Browser:<br />
+				<a href="{{{Booking__c.Survey_Link__c}}}" style="color: #b87a08; word-break: break-all;" target="_blank">{{{Booking__c.Survey_Link__c}}}</a></td>
+			</tr>
+			<tr>
+				<td style="padding: 0 32px 28px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.6; color: #0f172a;">Für Ihre Unterstützung danken wir Ihnen herzlich und freuen uns schon darauf, Sie bald wieder bei einer unserer Reisen begrüßen zu dürfen.<br />
+				<br />
+				Herzlichst,<br />
+				Ihr Team von&nbsp;golf.extra</td>
+			</tr>
+			<tr>
+				<td align="center" style="padding: 18px 32px; border-top: 1px solid #e2e8f0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.6; color: #94a3b8;">golf.extra<br />
+				<a href="https://www.golf-extra.com" style="color: #94a3b8; text-decoration: none;" target="_blank">www.golf-extra.com</a></td>
+			</tr>
+		</table>
+		</td>
+	</tr>
+</table>
+</body>
+</html>

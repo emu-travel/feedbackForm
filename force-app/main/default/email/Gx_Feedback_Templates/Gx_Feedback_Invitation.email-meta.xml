@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<EmailTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <available>true</available>
+    <description
+  >Post-trip feedback invitation. Merges Booking__c.Survey_Link__c, which resolves to the guest's personal survey link for the environment it is sent from.</description>
+    <encodingKey>UTF-8</encodingKey>
+    <name>golf.extra Feedback Einladung</name>
+    <relatedEntityType>Booking__c</relatedEntityType>
+    <style>none</style>
+    <subject>Willkommen zurück – wir freuen uns auf Ihr Feedback!</subject>
+    <type>custom</type>
+    <uiType>SFX</uiType>
+</EmailTemplate>
