@@ -32,4 +32,8 @@
       xsi:type="xsd:string"
     >https://emu-travel--staging.sandbox.my.site.com/feedback/</value>
     </values>
+    <values>
+        <field>Sender_Email__c</field>
+        <value xsi:type="xsd:string">anfrage@golf-extra.com</value>
+    </values>
 </CustomMetadata>

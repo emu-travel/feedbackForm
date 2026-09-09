@@ -51,4 +51,9 @@ public with sharing class GxFeedbackSettings {
   public static String surveyBaseUrl() {
     return config().Survey_Base_URL__c;
   }
+
+  /** Org-wide address the invitation is sent from. */
+  public static String senderEmail() {
+    return config().Sender_Email__c;
+  }
 }

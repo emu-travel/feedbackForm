@@ -38,6 +38,12 @@ public with sharing class GxFeedbackDispatch {
       required=true
     )
     public Id bookingId;
+
+    @InvocableVariable(
+      label='Allow Resend'
+      description='Set when a person is deliberately re-sending. Bypasses the already-invited guard, but never the guard on feedback that has already been given.'
+    )
+    public Boolean allowResend = false;
   }
 
   public class Result {
@@ -119,7 +125,8 @@ public with sharing class GxFeedbackDispatch {
         ? null
         : bookings.get(r.bookingId);
 
-      String problem = ineligibleReason(b, answered);
+      Boolean resending = r != null && r.allowResend == true;
+      String problem = ineligibleReason(b, answered, resending);
       if (problem != null) {
         out.skippedReason = problem;
         results.add(out);
@@ -150,7 +157,11 @@ public with sharing class GxFeedbackDispatch {
   }
 
   /** Null when the booking is ready; otherwise why it was skipped. */
-  private static String ineligibleReason(Booking__c b, Set<Id> answered) {
+  private static String ineligibleReason(
+    Booking__c b,
+    Set<Id> answered,
+    Boolean allowResend
+  ) {
     if (b == null) {
       return 'Booking not found';
     }
@@ -163,7 +174,7 @@ public with sharing class GxFeedbackDispatch {
     if (answered.contains(b.Id)) {
       return 'Feedback already received';
     }
-    if (b.SurveySent__c == true) {
+    if (b.SurveySent__c == true && allowResend != true) {
       return 'Invitation already sent';
     }
     if (!ELIGIBLE_BOOKING_STATUS.contains(b.Status__c)) {
