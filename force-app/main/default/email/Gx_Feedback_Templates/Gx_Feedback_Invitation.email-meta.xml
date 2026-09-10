@@ -2,7 +2,7 @@
 <EmailTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
     <available>true</available>
     <description
-  >Post-trip feedback invitation. Merges Booking__c.Survey_Link__c, which resolves to the guest's personal survey link for the environment it is sent from.</description>
+  >Post-trip feedback invitation. Merges the guest's own letter salutation, the region and dates, the logo address and Booking__c.Survey_Link__c - all of which resolve per environment, so nothing needs changing between staging and production.</description>
     <encodingKey>UTF-8</encodingKey>
     <name>golf.extra Feedback Einladung</name>
     <relatedEntityType>Booking__c</relatedEntityType>

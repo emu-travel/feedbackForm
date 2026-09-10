@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Logo_URL__c</fullName>
+    <description
+  >Public address of the golf.extra logo for the feedback emails. Not booking data - it sits here because a Lightning email template can only merge fields from a record, and cannot read custom metadata directly.
+
+Derived from the same Survey_Base_URL__c setting as the survey link, so staging and production each resolve to their own site and there is nothing to change by hand at release. The image is the golfextra_logo static resource, served publicly by the Experience site.</description>
+    <externalId>false</externalId>
+    <formula>IF(
+  ISBLANK($CustomMetadata.Gx_Feedback_Setting__mdt.Default.Survey_Base_URL__c),
+  &quot;&quot;,
+  $CustomMetadata.Gx_Feedback_Setting__mdt.Default.Survey_Base_URL__c
+    &amp; &quot;sfsites/c/resource/golfextra_logo&quot;
+)</formula>
+    <formulaTreatBlanksAs>BlankAsBlank</formulaTreatBlanksAs>
+    <inlineHelpText
+  >Logo address used by the feedback emails. Generated automatically.</inlineHelpText>
+    <label>Survey Logo URL</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

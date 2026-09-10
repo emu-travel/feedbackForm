@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Trip_Summary__c</fullName>
+    <description
+  >The line under "Willkommen zurück" in the feedback emails: the region and the travel dates, e.g. "Mallorca • 18. Juli - 25. Juli 2026". Built here rather than merged from three fields because Lightning email templates have no conditional logic and no date formatting - a booking with no region drops the bullet and shows the dates alone, so the line never renders half-empty. Month names are German by CASE, since a merge field would format the date to whichever locale sent the mail.
+
+Deliberately does NOT use Booking__c.Name: that field is internal free text ("Test booking for invoices", and names of other customers), and is not safe to show a guest.</description>
+    <externalId>false</externalId>
+    <formula>IF(
+  ISPICKVAL(Region__c, &quot;&quot;),
+  &quot;&quot;,
+  TEXT(Region__c) &amp;
+  IF(OR(ISBLANK(Start_Date__c), ISBLANK(End_Date__c)), &quot;&quot;, &quot; • &quot;)
+)
+&amp;
+IF(
+  OR(ISBLANK(Start_Date__c), ISBLANK(End_Date__c)),
+  &quot;&quot;,
+  TEXT(DAY(Start_Date__c)) &amp; &quot;. &quot; &amp;
+  CASE(MONTH(Start_Date__c),
+    1, &quot;Januar&quot;, 2, &quot;Februar&quot;, 3, &quot;März&quot;, 4, &quot;April&quot;,
+    5, &quot;Mai&quot;, 6, &quot;Juni&quot;, 7, &quot;Juli&quot;, 8, &quot;August&quot;,
+    9, &quot;September&quot;, 10, &quot;Oktober&quot;, 11, &quot;November&quot;, 12, &quot;Dezember&quot;, &quot;&quot;) &amp;
+  &quot; – &quot; &amp;
+  TEXT(DAY(End_Date__c)) &amp; &quot;. &quot; &amp;
+  CASE(MONTH(End_Date__c),
+    1, &quot;Januar&quot;, 2, &quot;Februar&quot;, 3, &quot;März&quot;, 4, &quot;April&quot;,
+    5, &quot;Mai&quot;, 6, &quot;Juni&quot;, 7, &quot;Juli&quot;, 8, &quot;August&quot;,
+    9, &quot;September&quot;, 10, &quot;Oktober&quot;, 11, &quot;November&quot;, 12, &quot;Dezember&quot;, &quot;&quot;) &amp;
+  &quot; &quot; &amp; TEXT(YEAR(End_Date__c))
+)</formula>
+    <formulaTreatBlanksAs>BlankAsBlank</formulaTreatBlanksAs>
+    <inlineHelpText
+  >Region and dates as shown in the feedback emails. Generated automatically; do not edit.</inlineHelpText>
+    <label>Survey Trip Summary</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
