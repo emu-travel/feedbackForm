@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<QuickAction xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >Sends the post-trip feedback invitation for this booking on demand - a one-off, or a resend. The scheduled job covers the normal case.</description>
+    <flowDefinition>Gx_Send_Feedback_Survey</flowDefinition>
+    <label>Feedback-Umfrage senden</label>
+    <optionsCreateFeedItem>false</optionsCreateFeedItem>
+    <type>Flow</type>
+</QuickAction>

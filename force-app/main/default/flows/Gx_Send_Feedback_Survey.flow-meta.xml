@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Golf Extra - Feedback-Umfrage senden
+
+  The manual counterpart to GxFeedbackScheduler: a travel designer opens a
+  Booking and sends the guest their survey, as a one-off or a resend.
+
+  Deliberately thin. Every rule about who may be invited lives in
+  GxFeedbackDispatch, and this flow only confirms with the user, calls
+  GxFeedbackSender, and reports back whatever the Apex says - so the button and
+  the nightly job can never drift apart.
+
+  Element order below is the Metadata API's, not the reading order: repeated
+  elements of one type must sit together, so the screens are all at the bottom.
+  The path through them is
+  Get_Booking -> Confirm -> Send_Invitation -> Did_It_Send -> Sent | Not_Sent.
+-->
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>68.0</apiVersion>
+
+    <actionCalls>
+        <description
+    >allowResend is true because a person is deliberately choosing to send. It bypasses only the already-invited guard, never the guard on feedback already given.</description>
+        <name>Send_Invitation</name>
+        <label>Einladung senden</label>
+        <locationX>176</locationX>
+        <locationY>374</locationY>
+        <actionName>GxFeedbackSender</actionName>
+        <actionType>apex</actionType>
+        <connector>
+            <targetReference>Did_It_Send</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Failed</targetReference>
+        </faultConnector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>bookingId</name>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>allowResend</name>
+            <value>
+                <booleanValue>true</booleanValue>
+            </value>
+        </inputParameters>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </actionCalls>
+
+    <decisions>
+        <name>Did_It_Send</name>
+        <label>Wurde gesendet?</label>
+        <locationX>176</locationX>
+        <locationY>494</locationY>
+        <defaultConnector>
+            <targetReference>Not_Sent</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Nein</defaultConnectorLabel>
+        <rules>
+            <name>Was_Sent</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Send_Invitation.sent</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Sent</targetReference>
+            </connector>
+            <label>Ja</label>
+        </rules>
+    </decisions>
+
+    <description
+  >Sends a guest their post-trip feedback invitation on demand, for a one-off or a resend. Every eligibility rule lives in GxFeedbackSender and GxFeedbackDispatch; this flow only confirms with the user and reports what happened.</description>
+    <environments>Default</environments>
+    <interviewLabel
+  >Golf Extra - Feedback-Umfrage senden {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Golf Extra - Feedback-Umfrage senden</label>
+    <processType>Flow</processType>
+
+    <recordLookups>
+        <description
+    >Only so the confirmation screen can name the guest being emailed.</description>
+        <name>Get_Booking</name>
+        <label>Buchung laden</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <assignNullValuesIfNoRecordsFound
+    >false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Confirm</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Failed</targetReference>
+        </faultConnector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Booking__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+
+    <screens>
+        <description
+    >An email to a guest cannot be recalled, so the send is confirmed first.</description>
+        <name>Confirm</name>
+        <label>Feedback-Umfrage senden</label>
+        <locationX>176</locationX>
+        <locationY>254</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <connector>
+            <targetReference>Send_Invitation</targetReference>
+        </connector>
+        <fields>
+            <name>Confirm_Text</name>
+            <fieldText
+      >&lt;p&gt;Die Einladung zur Feedback-Umfrage geht an &lt;b&gt;{!Get_Booking.MainContact__r.Name}&lt;/b&gt; ({!Get_Booking.MainContact__r.Email}) zur Buchung &lt;b&gt;{!Get_Booking.BookingNumber__c}&lt;/b&gt;.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Wurde bereits eine Einladung verschickt, wird sie erneut gesendet – der bestehende Link bleibt dabei gültig. Hat der Gast das Feedback bereits abgegeben, wird nichts gesendet.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <nextOrFinishButtonLabel>Jetzt senden</nextOrFinishButtonLabel>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+
+    <screens>
+        <name>Sent</name>
+        <label>Einladung gesendet</label>
+        <locationX>50</locationX>
+        <locationY>614</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>Sent_Text</name>
+            <fieldText
+      >&lt;p&gt;Die Feedback-Umfrage wurde an &lt;b&gt;{!Get_Booking.MainContact__r.Email}&lt;/b&gt; gesendet.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Der persönliche Link des Gastes:&lt;/p&gt;&lt;p&gt;{!Send_Invitation.surveyUrl}&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+
+    <screens>
+        <description
+    >The reason comes straight from the Apex, so this screen never repeats the eligibility rules.</description>
+        <name>Not_Sent</name>
+        <label>Nichts gesendet</label>
+        <locationX>308</locationX>
+        <locationY>614</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>Not_Sent_Text</name>
+            <fieldText
+      >&lt;p&gt;Es wurde &lt;b&gt;keine&lt;/b&gt; Einladung gesendet.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Grund: {!Send_Invitation.message}&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+
+    <screens>
+        <name>Failed</name>
+        <label>Senden fehlgeschlagen</label>
+        <locationX>440</locationX>
+        <locationY>494</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>Failed_Text</name>
+            <fieldText
+      >&lt;p&gt;Die Feedback-Umfrage konnte nicht gesendet werden. Bitte wenden Sie sich an die Administration.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;{!$Flow.FaultMessage}&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+
+    <start>
+        <locationX>176</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_Booking</targetReference>
+        </connector>
+    </start>
+
+    <status>Active</status>
+
+    <variables>
+        <name>recordId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+</Flow>

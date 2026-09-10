@@ -162,4 +162,24 @@
         <field>Booking__c.Survey_Link__c</field>
         <readable>true</readable>
     </fieldPermissions>
+
+    <!--
+      What the "Feedback-Umfrage senden" button on a Booking needs. The flow
+      runs in the user's own context, so whoever presses it also needs edit on
+      Booking__c - which travel designers already have from their profile.
+    -->
+    <classAccesses>
+        <apexClass>GxFeedbackSender</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>GxFeedbackDispatch</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <flowAccesses>
+        <enabled>true</enabled>
+        <flow>
+Gx_Send_Feedback_Survey;
+    </flow>
+    </flowAccesses>
 </PermissionSet>
