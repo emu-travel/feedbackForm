@@ -9,7 +9,8 @@ import {
   shouldShowComment,
   shouldExpandHotelDetail,
   earnsPublicReview,
-  buildPayload
+  buildPayload,
+  DEFAULT_SCORE
 } from "c/gxSurveyFlow";
 
 const context = (overrides = {}) => ({
@@ -210,6 +211,49 @@ describe("payload assembly", () => {
     expect(p.language).toBe("DE");
   });
 
+  /**
+   * A guest who is happy clicks straight through without moving a slider. The
+   * cards read 10/10 from the moment they render, so that is their answer -
+   * and it has to survive into the payload. It did not: hotel and golf scores
+   * came through undefined and were dropped on the way into Salesforce, which
+   * only showed up in a real end-to-end submission.
+   */
+  it("records the score a card is already showing when the guest never touches it", () => {
+    const p = buildPayload({
+      ...base,
+      answers: {
+        overallExperience: 10,
+        consultation: 10,
+        recommendation: 10,
+        hotels: {},
+        golfCourses: {}
+      }
+    });
+
+    expect(p.hotels[0].score).toBe(DEFAULT_SCORE);
+    expect(p.golfCourses[0].score).toBe(DEFAULT_SCORE);
+    expect(p.flight.score).toBe(DEFAULT_SCORE);
+    expect(p.transfer.score).toBe(DEFAULT_SCORE);
+    expect(p.rentalCar.score).toBe(DEFAULT_SCORE);
+  });
+
+  it("does not treat a defaulted score as a low score", () => {
+    const p = buildPayload({
+      ...base,
+      answers: { ...base.answers, hotels: {}, golfCourses: {} }
+    });
+    expect(p.hotels[0].comment).toBeUndefined();
+    expect(p.hotels[0].sub).toBeUndefined();
+  });
+
+  it("keeps an explicit low score rather than defaulting it", () => {
+    const p = buildPayload({
+      ...base,
+      answers: { ...base.answers, hotels: { h1: { score: 3 } } }
+    });
+    expect(p.hotels[0].score).toBe(3);
+  });
+
   it("omits sections the guest never saw", () => {
     const p = buildPayload({ ...base, context: HOTELS_ONLY });
     expect(p.flight).toBeUndefined();
@@ -283,12 +327,18 @@ describe("payload assembly", () => {
     expect(p.improvementSuggestions).toBe("St Andrews");
   });
 
-  it("still produces a rating entry when a hotel was left unscored", () => {
+  /**
+   * This assertion used to expect an undefined score, on the reading that a
+   * hotel the guest never touched was "unscored". There is no such state: the
+   * card shows 10/10 as soon as it renders, so an untouched card has an answer
+   * and the entry must carry it, paired with its reservation.
+   */
+  it("pairs every hotel entry with its reservation and a real score", () => {
     const p = buildPayload({
       ...base,
       answers: { ...base.answers, hotels: {} }
     });
-    expect(p.hotels[0].score).toBeUndefined();
     expect(p.hotels[0].reservationId).toBe("h1");
+    expect(p.hotels[0].score).toBe(DEFAULT_SCORE);
   });
 });

@@ -10,7 +10,8 @@ import {
   isLastQuestionScreen,
   progressFor,
   earnsPublicReview,
-  buildPayload
+  buildPayload,
+  DEFAULT_SCORE
 } from "c/gxSurveyFlow";
 
 /**
@@ -28,8 +29,6 @@ const LOAD = {
   EMPTY: "empty",
   EXPIRED: "expired"
 };
-
-const DEFAULT_SCORE = 10;
 
 export default class GxFeedbackForm extends LightningElement {
   logoUrl = LOGO;

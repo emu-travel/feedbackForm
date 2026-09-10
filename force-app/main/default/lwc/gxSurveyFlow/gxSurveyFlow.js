@@ -36,6 +36,15 @@ export const HOTEL_DETAIL_THRESHOLD = 9;
 /** Recommendation score at or above which the public review cards appear. */
 export const PROMOTER_THRESHOLD = 9;
 
+/**
+ * What every scale reads before the guest touches it. Defined here, next to the
+ * payload builder, because the two have to agree: the cards show this number
+ * from the moment they render, so a guest who is happy and clicks straight
+ * through has answered 10 - and their answer must be recorded, not dropped for
+ * never having moved a slider.
+ */
+export const DEFAULT_SCORE = 10;
+
 export function hasMobility(context) {
   if (!context) {
     return false;
@@ -195,10 +204,17 @@ export function buildPayload({ context, bookingNumber, secret, answers }) {
   return payload;
 }
 
+/** An untouched scale still has the answer it is showing. */
+function scoreOf(entry) {
+  const given = entry && entry.score;
+  return given === undefined || given === null ? DEFAULT_SCORE : given;
+}
+
 function singleRating(entry) {
   const e = entry || {};
-  const rating = { score: e.score };
-  if (shouldShowComment(e.score)) {
+  const score = scoreOf(e);
+  const rating = { score };
+  if (shouldShowComment(score)) {
     rating.comment = emptyToNull(e.comment);
   }
   return rating;
@@ -212,16 +228,17 @@ function itemRatings(items, answersByReservation, withSubRatings) {
 
   return items.map((item) => {
     const given = byReservation[item.reservationId] || {};
+    const score = scoreOf(given);
     const entry = {
       reservationId: item.reservationId,
       itemName: item.name,
-      score: given.score
+      score
     };
 
-    if (shouldShowComment(given.score)) {
+    if (shouldShowComment(score)) {
       entry.comment = emptyToNull(given.comment);
     }
-    if (withSubRatings && shouldExpandHotelDetail(given.score) && given.sub) {
+    if (withSubRatings && shouldExpandHotelDetail(score) && given.sub) {
       entry.sub = given.sub;
     }
     return entry;

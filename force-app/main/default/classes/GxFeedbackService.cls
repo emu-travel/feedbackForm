@@ -405,11 +405,24 @@ public without sharing class GxFeedbackService {
     Savepoint sp = Database.setSavepoint();
     try {
       Feedback_Response__c resp = buildResponse(p, b);
-      insert resp;
+      // System mode, deliberately. Feedback_Response__c is a detail of
+      // Booking__c, and inserting a detail record requires EDIT access to its
+      // master. A guest user can only ever hold Read Only on a booking - that
+      // is the hard ceiling on what a guest sharing rule can grant - so in user
+      // mode this insert always fails with
+      // INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY, and `without sharing`
+      // does not lift it because guest record access is enforced beneath it.
+      //
+      // What actually guards this write is above, not here: the booking is
+      // resolved by its secret, the link must not have expired, feedback must
+      // not already exist, the payload is validated, and every reservation id
+      // is checked against the ones on this booking. The guest's own record
+      // access was never the control.
+      Database.insert(resp, true, AccessLevel.SYSTEM_MODE);
 
       List<Feedback_Rating__c> ratings = buildRatings(p, resp.Id, allowed);
       if (!ratings.isEmpty()) {
-        insert ratings;
+        Database.insert(ratings, true, AccessLevel.SYSTEM_MODE);
       }
 
       res.ok = true;
