@@ -207,6 +207,11 @@
         <apexClass>GxFeedbackDispatch</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <!-- Without this the tab exists but nobody can see it. -->
+    <tabSettings>
+        <tab>Feedback_Response__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
     <flowAccesses>
         <enabled>true</enabled>
         <flow>Gx_Send_Feedback_Survey</flow>
