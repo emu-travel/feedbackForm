@@ -45,6 +45,17 @@ export const PROMOTER_THRESHOLD = 9;
  */
 export const DEFAULT_SCORE = 10;
 
+/**
+ * The hotel detail panel's four scales, and what they read before the guest
+ * touches them. Keys are the Sub_Category__c picklist values, so they live here
+ * with the payload contract rather than in the card that draws them - the card
+ * supplies the German labels.
+ */
+export const SUB_CATEGORIES = ["Room", "Service", "Catering", "Cleanliness"];
+
+/** The spec defaults sub-ratings to 8, not 10. */
+export const DEFAULT_SUB_SCORE = 8;
+
 export function hasMobility(context) {
   if (!context) {
     return false;
@@ -160,21 +171,27 @@ function isScore(value) {
  */
 export function buildPayload({ context, bookingNumber, secret, answers }) {
   const a = answers || {};
+  // Every scale on screen has an answer from the moment it renders, so nothing
+  // here may fall back to undefined just because a slider was never moved.
+  const overall = orDefault(a.overallExperience, DEFAULT_SCORE);
+  const consultation = orDefault(a.consultation, DEFAULT_SCORE);
+  const recommendation = orDefault(a.recommendation, DEFAULT_SCORE);
+
   const payload = {
     bookingNumber,
     secret,
     language: (context && context.language) || "DE",
-    overallExperience: a.overallExperience,
-    consultation: a.consultation,
-    recommendation: a.recommendation,
+    overallExperience: overall,
+    consultation,
+    recommendation,
     nextDestination: emptyToNull(a.nextDestination),
     improvementSuggestions: emptyToNull(a.improvementSuggestions)
   };
 
-  if (shouldShowComment(a.overallExperience)) {
+  if (shouldShowComment(overall)) {
     payload.overallExperienceComment = emptyToNull(a.overallExperienceComment);
   }
-  if (shouldShowComment(a.consultation)) {
+  if (shouldShowComment(consultation)) {
     payload.consultationComment = emptyToNull(a.consultationComment);
   }
 
@@ -206,8 +223,26 @@ export function buildPayload({ context, bookingNumber, secret, answers }) {
 
 /** An untouched scale still has the answer it is showing. */
 function scoreOf(entry) {
-  const given = entry && entry.score;
-  return given === undefined || given === null ? DEFAULT_SCORE : given;
+  return orDefault(entry && entry.score, DEFAULT_SCORE);
+}
+
+function orDefault(value, fallback) {
+  return value === undefined || value === null ? fallback : value;
+}
+
+/**
+ * The whole detail panel, whether or not the guest moved its scales. Once a
+ * hotel scores low enough to open the panel, all four scales are on screen
+ * showing a value - and an unhappy guest's breakdown is the most useful thing
+ * in the survey, so none of it may depend on their having touched a slider.
+ */
+function subScores(given) {
+  const g = given || {};
+  const out = {};
+  SUB_CATEGORIES.forEach((key) => {
+    out[key] = orDefault(g[key], DEFAULT_SUB_SCORE);
+  });
+  return out;
 }
 
 function singleRating(entry) {
@@ -238,8 +273,8 @@ function itemRatings(items, answersByReservation, withSubRatings) {
     if (shouldShowComment(score)) {
       entry.comment = emptyToNull(given.comment);
     }
-    if (withSubRatings && shouldExpandHotelDetail(score) && given.sub) {
-      entry.sub = given.sub;
+    if (withSubRatings && shouldExpandHotelDetail(score)) {
+      entry.sub = subScores(given.sub);
     }
     return entry;
   });

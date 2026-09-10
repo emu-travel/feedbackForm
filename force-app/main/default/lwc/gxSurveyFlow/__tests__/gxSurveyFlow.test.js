@@ -10,7 +10,8 @@ import {
   shouldExpandHotelDetail,
   earnsPublicReview,
   buildPayload,
-  DEFAULT_SCORE
+  DEFAULT_SCORE,
+  DEFAULT_SUB_SCORE
 } from "c/gxSurveyFlow";
 
 const context = (overrides = {}) => ({
@@ -333,6 +334,43 @@ describe("payload assembly", () => {
    * card shows 10/10 as soon as it renders, so an untouched card has an answer
    * and the entry must carry it, paired with its reservation.
    */
+  /**
+   * The same defect as the main scores, one level down: once a hotel scores
+   * below 9 all four sub-scales are on screen showing a value, and an unhappy
+   * guest who does not drag them was losing the entire breakdown. Found by
+   * submitting the real form with a hotel at 5 and getting no sub rows.
+   */
+  it("saves the whole hotel detail panel even when no sub-scale is touched", () => {
+    const p = buildPayload({
+      ...base,
+      answers: { ...base.answers, hotels: { h1: { score: 5 } } }
+    });
+
+    expect(p.hotels[0].sub).toEqual({
+      Room: DEFAULT_SUB_SCORE,
+      Service: DEFAULT_SUB_SCORE,
+      Catering: DEFAULT_SUB_SCORE,
+      Cleanliness: DEFAULT_SUB_SCORE
+    });
+  });
+
+  it("keeps the sub-scores the guest did set, and defaults only the rest", () => {
+    const p = buildPayload({
+      ...base,
+      answers: {
+        ...base.answers,
+        hotels: { h1: { score: 4, sub: { Room: 2, Catering: 9 } } }
+      }
+    });
+
+    expect(p.hotels[0].sub).toEqual({
+      Room: 2,
+      Service: DEFAULT_SUB_SCORE,
+      Catering: 9,
+      Cleanliness: DEFAULT_SUB_SCORE
+    });
+  });
+
   it("pairs every hotel entry with its reservation and a real score", () => {
     const p = buildPayload({
       ...base,
