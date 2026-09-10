@@ -112,6 +112,12 @@
         <field>Booking__c.Form_Designer_Name__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <!-- Read by isExpired: the survey measures link validity from it. -->
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Booking__c.Survey_Sent_On__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
         <field>Reservation__c.Status__c</field>

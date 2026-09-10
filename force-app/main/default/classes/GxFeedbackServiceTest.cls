@@ -123,9 +123,10 @@ private class GxFeedbackServiceTest {
     TriggerHandler.clearBypass('ReservationTriggerHandler');
   }
 
+  /** Carries every field isExpired measures from, so expiry tests can use it. */
   private static Booking__c theBooking() {
     return [
-      SELECT Id, BookingNumber__c
+      SELECT Id, BookingNumber__c, Survey_Sent_On__c, Start_Date__c, End_Date__c
       FROM Booking__c
       WHERE BookingNumber__c = :BOOKING_NUM
     ];
@@ -883,6 +884,57 @@ private class GxFeedbackServiceTest {
     Assert.isTrue(
       GxFeedbackService.isExpired(b),
       'A trip that started long ago is expired even without an end date'
+    );
+  }
+
+  /**
+   * The reason validity is counted from the invitation rather than the trip: a
+   * guest reminded on day ten has to get a working link, not the tail of one.
+   */
+  @IsTest
+  static void theWindowRunsFromWhenTheGuestWasLastAsked() {
+    setTripEnd(Date.today().addDays(-400));
+    Booking__c b = theBooking();
+    b.Survey_Sent_On__c = Datetime.now().addDays(-2);
+    update b;
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Assert.isTrue(
+      c.ok,
+      'Asked two days ago, the guest can answer - however old the trip is: ' +
+      c.message
+    );
+  }
+
+  @IsTest
+  static void anOldInvitationExpiresEvenOnARecentTrip() {
+    setTripEnd(Date.today().addDays(-1));
+    Booking__c b = theBooking();
+    b.Survey_Sent_On__c = Datetime.now().addDays(-400);
+    update b;
+
+    Assert.isTrue(
+      GxFeedbackService.isExpired(theBooking()),
+      'Once asked, the clock is the invitation - not the trip dates'
+    );
+  }
+
+  @IsTest
+  static void theTripDatesRemainTheFallbackForOlderBookings() {
+    setTripEnd(Date.today().addDays(-3));
+    Booking__c b = theBooking();
+
+    Assert.isNull(
+      b.Survey_Sent_On__c,
+      'This booking predates the field, as every booking invited before it did'
+    );
+    Assert.isFalse(
+      GxFeedbackService.isExpired(b),
+      'And is still measured from its trip end'
     );
   }
 }

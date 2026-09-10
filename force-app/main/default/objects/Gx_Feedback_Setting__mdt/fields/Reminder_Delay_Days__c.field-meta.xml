@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reminder_Delay_Days__c</fullName>
+    <description
+  >How many days after the invitation to remind a guest who has not answered. Measured from Survey_Sent_On__c. Blank or zero switches reminders off entirely. Only ever one reminder per booking, tracked by Survey_Reminder_Sent__c.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Reminder Delay (Days)</label>
+    <precision>4</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

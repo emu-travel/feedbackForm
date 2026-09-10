@@ -44,6 +44,12 @@ public with sharing class GxFeedbackDispatch {
       description='Set when a person is deliberately re-sending. Bypasses the already-invited guard, but never the guard on feedback that has already been given.'
     )
     public Boolean allowResend = false;
+
+    @InvocableVariable(
+      label='Mark As Reminder'
+      description='Set by the reminder pass. Records that this guest has now been reminded, so they are only ever reminded once.'
+    )
+    public Boolean markReminder = false;
   }
 
   public class Result {
@@ -100,7 +106,9 @@ public with sharing class GxFeedbackDispatch {
           Start_Date__c,
           MainContact__c,
           Form_Secret__c,
-          SurveySent__c
+          SurveySent__c,
+          Survey_Sent_On__c,
+          Survey_Reminder_Sent__c
         FROM Booking__c
         WHERE Id IN :bookingIds
       ]
@@ -116,6 +124,12 @@ public with sharing class GxFeedbackDispatch {
       answered.add(f.Booking__c);
     }
 
+    // An invitation to a survey with no questions in it is worse than no
+    // invitation, so every booking is checked against the same rules the survey
+    // itself applies. Asked once for the whole batch: checking each booking on
+    // its own costs two queries apiece, which a nightly run cannot afford.
+    Set<Id> rateable = GxFeedbackService.bookingsWithRateableItems(bookingIds);
+
     Map<Id, Booking__c> toUpdate = new Map<Id, Booking__c>();
 
     for (Request r : requests) {
@@ -126,7 +140,7 @@ public with sharing class GxFeedbackDispatch {
         : bookings.get(r.bookingId);
 
       Boolean resending = r != null && r.allowResend == true;
-      String problem = ineligibleReason(b, answered, resending);
+      String problem = ineligibleReason(b, answered, rateable, resending);
       if (problem != null) {
         out.skippedReason = problem;
         results.add(out);
@@ -138,6 +152,14 @@ public with sharing class GxFeedbackDispatch {
       }
       b.Status__c = STATUS_FEEDBACK;
       b.SurveySent__c = true;
+      // Moves forward on every send, reminder included, because the survey's
+      // expiry counts from the last time the guest was actually asked.
+      b.Survey_Sent_On__c = Datetime.now();
+      if (r.markReminder == true) {
+        // Set before the reminder leaves, so a failed send is not retried.
+        // With a guest's inbox at stake, under-reminding is the safer failure.
+        b.Survey_Reminder_Sent__c = true;
+      }
       toUpdate.put(b.Id, b);
 
       out.ok = true;
@@ -160,6 +182,7 @@ public with sharing class GxFeedbackDispatch {
   private static String ineligibleReason(
     Booking__c b,
     Set<Id> answered,
+    Set<Id> rateable,
     Boolean allowResend
   ) {
     if (b == null) {
@@ -183,7 +206,7 @@ public with sharing class GxFeedbackDispatch {
     if (!waitingPeriodPassed(b)) {
       return 'Waiting period after the trip has not passed yet';
     }
-    if (!hasSomethingToRate(b.Id)) {
+    if (!rateable.contains(b.Id)) {
       return 'Nothing on this itinerary can be rated';
     }
     return null;
@@ -210,14 +233,6 @@ public with sharing class GxFeedbackDispatch {
       Time.newInstance(0, 0, 0, 0)
     );
     return Datetime.now() >= tripEnd.addMinutes((hours * 60).intValue());
-  }
-
-  /**
-   * An invitation to a survey with no questions is worse than no invitation.
-   * Uses the same rules the survey itself applies.
-   */
-  private static Boolean hasSomethingToRate(Id bookingId) {
-    return !GxFeedbackService.rateableItemsFor(bookingId).isEmpty();
   }
 
   private static String buildUrl(Booking__c b) {

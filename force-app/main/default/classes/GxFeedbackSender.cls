@@ -22,6 +22,12 @@ public with sharing class GxFeedbackSender {
       description='Set when a person is deliberately re-sending an invitation.'
     )
     public Boolean allowResend = false;
+
+    @InvocableVariable(
+      label='Mark As Reminder'
+      description='Set by the nightly reminder pass, so a guest is only ever reminded once.'
+    )
+    public Boolean markReminder = false;
   }
 
   public class Result {
@@ -54,6 +60,7 @@ public with sharing class GxFeedbackSender {
       GxFeedbackDispatch.Request p = new GxFeedbackDispatch.Request();
       p.bookingId = r == null ? null : r.bookingId;
       p.allowResend = r != null && r.allowResend == true;
+      p.markReminder = r != null && r.markReminder == true;
       toPrepare.add(p);
     }
 

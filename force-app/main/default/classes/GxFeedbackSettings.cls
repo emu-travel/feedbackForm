@@ -37,7 +37,7 @@ public with sharing class GxFeedbackSettings {
     return config().Google_Maps_URL__c;
   }
 
-  /** Days after the trip ends that a feedback link keeps working. */
+  /** Days a feedback link keeps working, from the moment the guest was last asked. */
   public static Decimal linkValidityDays() {
     return config().Link_Validity_Days__c;
   }
@@ -45,6 +45,14 @@ public with sharing class GxFeedbackSettings {
   /** Hours to wait after a trip ends before inviting the guest. */
   public static Decimal dispatchDelayHours() {
     return config().Dispatch_Delay_Hours__c;
+  }
+
+  /**
+   * Days to wait after inviting a guest before reminding them. Blank or zero
+   * switches reminders off.
+   */
+  public static Decimal reminderDelayDays() {
+    return config().Reminder_Delay_Days__c;
   }
 
   /** Public address of the survey page. Differs per environment. */

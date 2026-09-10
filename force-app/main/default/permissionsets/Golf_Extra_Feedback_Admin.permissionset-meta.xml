@@ -164,6 +164,22 @@
     </fieldPermissions>
 
     <!--
+      System-maintained, so readable but not editable: staff need to see when a
+      guest was last asked and whether they have already been reminded, without
+      being able to hand-edit the dispatch's own bookkeeping.
+    -->
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Booking__c.Survey_Sent_On__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Booking__c.Survey_Reminder_Sent__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+
+    <!--
       What the "Feedback-Umfrage senden" button on a Booking needs. The flow
       runs in the user's own context, so whoever presses it also needs edit on
       Booking__c - which travel designers already have from their profile.

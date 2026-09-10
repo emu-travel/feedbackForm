@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Reminder_Sent__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description
+  >Set once a guest has been reminded, so one reminder stays one reminder. GxFeedbackDispatch sets it in the same committed update as the token, before the reminder email leaves - which means a reminder whose email fails is not retried. That is deliberate: with a guest's inbox at stake, under-reminding is the safer failure.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >Whether this guest has already had a feedback reminder. Set automatically.</inlineHelpText>
+    <label>Survey Reminder Sent</label>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

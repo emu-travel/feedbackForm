@@ -610,7 +610,8 @@ public without sharing class GxFeedbackService {
         End_Date__c,
         toLabel(DestinationCountry__c),
         toLabel(Region__c),
-        Form_Designer_Name__c
+        Form_Designer_Name__c,
+        Survey_Sent_On__c
       FROM Booking__c
       WHERE BookingNumber__c = :bookingNumber AND Form_Secret__c = :secret
       LIMIT 2
@@ -635,15 +636,68 @@ public without sharing class GxFeedbackService {
   }
 
   /**
+   * Which of these bookings the survey would have something to ask about, in
+   * two queries however many bookings are passed in. Dispatch uses it to keep a
+   * nightly batch inside the SOQL limit; rateableItemsFor above is the
+   * single-booking form for the survey itself.
+   */
+  public static Set<Id> bookingsWithRateableItems(Set<Id> bookingIds) {
+    Set<Id> withItems = new Set<Id>();
+    if (bookingIds == null || bookingIds.isEmpty()) {
+      return withItems;
+    }
+    Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
+      [SELECT Id, Status__c FROM Booking__c WHERE Id IN :bookingIds]
+    );
+    Map<Id, List<Reservation__c>> rateable = loadRateableReservations(bookings);
+    for (Id bookingId : rateable.keySet()) {
+      if (!rateable.get(bookingId).isEmpty()) {
+        withItems.add(bookingId);
+      }
+    }
+    return withItems;
+  }
+
+  /**
    * On a delivered booking every line is rated except the ones the guest never
    * received. On a booking that is not yet delivered we fall back to the strict
    * line-level check, so a trip still being quoted cannot be surveyed by mistake.
    */
   private static List<Reservation__c> loadRateableReservations(Booking__c b) {
-    List<Reservation__c> rows = [
+    List<Reservation__c> found = loadRateableReservations(
+        new Map<Id, Booking__c>{ b.Id => b }
+      )
+      .get(b.Id);
+    return found == null ? new List<Reservation__c>() : found;
+  }
+
+  /**
+   * The bulk form, and the only place the rateability rules are actually
+   * expressed - the single-booking version above delegates here.
+   *
+   * Bulk because dispatch asks about a whole nightly batch: at two queries per
+   * booking a 200 booking run would exhaust the SOQL limit before it reached
+   * the fiftieth guest, and nothing in a one-booking test would ever show it.
+   */
+  private static Map<Id, List<Reservation__c>> loadRateableReservations(
+    Map<Id, Booking__c> bookings
+  ) {
+    Map<Id, List<Reservation__c>> byBooking = new Map<Id, List<Reservation__c>>();
+    if (bookings == null || bookings.isEmpty()) {
+      return byBooking;
+    }
+    for (Id bookingId : bookings.keySet()) {
+      byBooking.put(bookingId, new List<Reservation__c>());
+    }
+
+    // Booking__c and AccountType__c carry no field permissions of their own
+    // (master-detail and a required picklist), so selecting them here does not
+    // widen what the guest permission set has to grant.
+    for (Reservation__c r : [
       SELECT
         Id,
         Name,
+        Booking__c,
         AccountType__c,
         Status__c,
         TeeTime__c,
@@ -657,23 +711,27 @@ public without sharing class GxFeedbackService {
         Service__r.Name
       FROM Reservation__c
       WHERE
-        Booking__c = :b.Id
+        Booking__c IN :bookings.keySet()
         AND Status__c NOT IN :EXCLUDED_RESERVATION_STATUS
         AND AccountType__c IN :RATEABLE_ACCOUNT_TYPE
       ORDER BY Date_Begin__c NULLS LAST, Name
-    ];
-
-    if (DELIVERED_BOOKING_STATUS.contains(b.Status__c)) {
-      return rows;
-    }
-
-    List<Reservation__c> delivered = new List<Reservation__c>();
-    for (Reservation__c r : rows) {
-      if (RATEABLE_RESERVATION_STATUS.contains(r.Status__c)) {
-        delivered.add(r);
+    ]) {
+      Booking__c b = bookings.get(r.Booking__c);
+      if (b == null) {
+        continue;
+      }
+      // On a delivered booking every line is rated except the ones the guest
+      // never received. On a booking that is not yet delivered we fall back to
+      // the strict line-level check, so a trip still being quoted cannot be
+      // surveyed by mistake.
+      Boolean rateable =
+        DELIVERED_BOOKING_STATUS.contains(b.Status__c) ||
+        RATEABLE_RESERVATION_STATUS.contains(r.Status__c);
+      if (rateable) {
+        byBooking.get(r.Booking__c).add(r);
       }
     }
-    return delivered;
+    return byBooking;
   }
 
   private static Boolean hasExistingResponse(Id bookingId) {
@@ -708,13 +766,20 @@ public without sharing class GxFeedbackService {
   /** Review links live in custom metadata so marketing can change them without a deploy. */
 
   /**
-   * A feedback link stops working a configurable number of days after the trip
-   * ends, so a forwarded email or a shared browser does not expose someone's
-   * itinerary indefinitely.
+   * A feedback link stops working a configurable number of days after the guest
+   * was last asked for feedback, so a forwarded email or a shared browser does
+   * not expose someone's itinerary indefinitely.
    *
-   * Dates the survey can measure from, in order: the trip end, then the trip
-   * start. A booking carrying neither is not expired - the secret remains the
-   * gate. Blank or zero validity disables expiry entirely.
+   * Counted from the invitation rather than from the trip, because a guest who
+   * is reminded on day ten would otherwise be handed a link with days left on
+   * it - which defeats the point of reminding them. A reminder moves
+   * Survey_Sent_On__c forward, so it also renews the window.
+   *
+   * Dates the survey can measure from, in order: when we last asked, then the
+   * trip end, then the trip start. The trip dates are the fallback for bookings
+   * invited before Survey_Sent_On__c existed. A booking carrying none of the
+   * three is not expired - the secret remains the gate. Blank or zero validity
+   * disables expiry entirely.
    */
   @TestVisible
   private static Boolean isExpired(Booking__c b) {
@@ -722,7 +787,9 @@ public without sharing class GxFeedbackService {
     if (validityDays == null || validityDays <= 0) {
       return false;
     }
-    Date reference = b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c;
+    Date reference = b.Survey_Sent_On__c != null
+      ? b.Survey_Sent_On__c.date()
+      : (b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c);
     if (reference == null) {
       return false;
     }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Sent_On__c</fullName>
+    <description
+  >When the guest was most recently asked for feedback - set by GxFeedbackDispatch as it prepares each invitation, and moved forward again by a reminder. Two things read it: the reminder pass, which waits Reminder_Delay_Days__c after this moment, and the survey's own expiry check, so a reminded guest gets a full validity window from the day they were last asked rather than from the day their trip ended. SurveySent__c only records that an invitation happened; this records when.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >When we last asked this guest for feedback. Set automatically.</inlineHelpText>
+    <label>Survey Sent On</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>DateTime</type>
+</CustomField>

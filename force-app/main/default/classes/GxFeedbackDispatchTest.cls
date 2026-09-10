@@ -80,7 +80,14 @@ private class GxFeedbackDispatchTest {
 
   private static Booking__c theBooking() {
     return [
-      SELECT Id, Status__c, SurveySent__c, Form_Secret__c, End_Date__c
+      SELECT
+        Id,
+        Status__c,
+        SurveySent__c,
+        Form_Secret__c,
+        End_Date__c,
+        Survey_Sent_On__c,
+        Survey_Reminder_Sent__c
       FROM Booking__c
       WHERE BookingNumber__c = :BOOKING_NUM
     ];
@@ -150,6 +157,49 @@ private class GxFeedbackDispatchTest {
       'The booking is shared to the guest as part of preparing the link'
     );
     Assert.isTrue(after.SurveySent__c, 'The booking is marked as invited');
+  }
+
+  @IsTest
+  static void preparingRecordsWhenTheGuestWasAsked() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+
+    run(theBooking().Id);
+
+    Booking__c after = theBooking();
+    Assert.isNotNull(
+      after.Survey_Sent_On__c,
+      'The reminder pass and the link expiry both count from this'
+    );
+    Assert.isFalse(
+      after.Survey_Reminder_Sent__c,
+      'A first invitation is not a reminder'
+    );
+  }
+
+  @IsTest
+  static void markingAReminderIsWhatStopsASecondOne() {
+    GxFeedbackSettings.useForTest(
+      settings(0, 'https://example.test/feedback/')
+    );
+
+    GxFeedbackDispatch.Request req = new GxFeedbackDispatch.Request();
+    req.bookingId = theBooking().Id;
+    req.allowResend = true;
+    req.markReminder = true;
+    List<GxFeedbackDispatch.Result> out = GxFeedbackDispatch.prepare(
+      new List<GxFeedbackDispatch.Request>{ req }
+    );
+
+    Assert.isTrue(
+      out[0].ok,
+      'The reminder is prepared: ' + out[0].skippedReason
+    );
+    Assert.isTrue(
+      theBooking().Survey_Reminder_Sent__c,
+      'Recorded in the same committed update as the token, before any email'
+    );
   }
 
   @IsTest
@@ -306,6 +356,93 @@ private class GxFeedbackDispatchTest {
       new List<GxFeedbackDispatch.Request>{ req }
     );
     Assert.isFalse(empty[0].ok, 'A missing id is reported, not thrown');
+  }
+
+  /**
+   * The nightly job hands dispatch a whole batch at once. This is the test that
+   * was missing when the rateability check ran per booking: at two queries each
+   * it exhausted the SOQL limit somewhere around the fiftieth guest, and every
+   * existing test passed because none of them prepared more than two bookings.
+   */
+  @IsTest
+  static void awholeBatchCostsTheSameFewQueriesAsOneBooking() {
+    GxFeedbackSettings.useForTest(
+      settings(0, 'https://example.test/feedback/')
+    );
+
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Account customer = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Dispatch Customer'
+      LIMIT 1
+    ];
+    Account hotel = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Dispatch Hotel'
+      LIMIT 1
+    ];
+    Contact guest = [SELECT Id FROM Contact LIMIT 1];
+    Opportunity opp = [SELECT Id FROM Opportunity LIMIT 1];
+
+    List<Booking__c> batch = new List<Booking__c>();
+    for (Integer i = 0; i < 60; i++) {
+      batch.add(
+        new Booking__c(
+          Opportunity__c = opp.Id,
+          Quote_for__c = customer.Id,
+          MainContact__c = guest.Id,
+          BookingNumber__c = 'TEST-GX-BULK-' + i,
+          Travel_Type__c = 'FIT',
+          DestinationCountry__c = 'EG',
+          Status__c = 'Completed',
+          Start_Date__c = Date.today().addDays(-14),
+          End_Date__c = Date.today().addDays(-7)
+        )
+      );
+    }
+    insert batch;
+
+    List<Reservation__c> lines = new List<Reservation__c>();
+    for (Booking__c b : batch) {
+      lines.add(
+        new Reservation__c(
+          Booking__c = b.Id,
+          Travel_Location__c = hotel.Id,
+          AccountType__c = 'Hotel',
+          Pricing__c = 'Leistung',
+          Status__c = 'Completed',
+          Date_Begin__c = Date.today().addDays(-14),
+          Date_End__c = Date.today().addDays(-7)
+        )
+      );
+    }
+    insert lines;
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    List<GxFeedbackDispatch.Request> requests = new List<GxFeedbackDispatch.Request>();
+    for (Booking__c b : batch) {
+      GxFeedbackDispatch.Request req = new GxFeedbackDispatch.Request();
+      req.bookingId = b.Id;
+      requests.add(req);
+    }
+
+    Test.startTest();
+    Integer before = Limits.getQueries();
+    List<GxFeedbackDispatch.Result> out = GxFeedbackDispatch.prepare(requests);
+    Integer used = Limits.getQueries() - before;
+    Test.stopTest();
+
+    Assert.areEqual(60, out.size(), 'Every booking comes back');
+    for (GxFeedbackDispatch.Result r : out) {
+      Assert.isTrue(r.ok, 'All 60 are ready: ' + r.skippedReason);
+    }
+    Assert.isTrue(
+      used <= 10,
+      'Preparing 60 bookings must not scale with the batch. Queries used: ' +
+      used
+    );
   }
 
   @IsTest
