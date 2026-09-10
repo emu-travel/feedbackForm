@@ -1,0 +1,48 @@
+<html>
+<head>
+	<meta charset="UTF-8" />
+	<title></title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #fafafa;">
+<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; background-color: #fafafa;" width="100%">
+	<tr>
+		<td align="center" style="padding: 24px 12px;">
+		<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;" width="600">
+			<tr>
+				<td style="padding: 28px 32px 8px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.6; color: #0f172a;">{{{Recipient.LetterSalutation__c}}},<br />
+				<br />
+				wir hoffen, dass Sie {{{Booking__c.Survey_Destination_Phrase__c}}} in bester Erinnerung behalten haben.<br />
+				<br />
+				Vor einigen Tagen hatten wir Ihnen unser persönliches Feedbackformular zugesandt. Sollten Sie bislang noch keine Gelegenheit gefunden haben, uns Ihre Eindrücke mitzuteilen, ist das selbstverständlich kein Problem. Falls Sie zu einem späteren Zeitpunkt ein paar Minuten Zeit finden, freuen wir uns sehr über Ihr Feedback.<br />
+				<br />
+				Ihre persönliche Rückmeldung ist für uns von großem Wert. Sie gibt uns wichtige Einblicke in Ihre Reiseerfahrung und unterstützt uns dabei, die Qualität unserer Beratung, unserer Partner sowie der von uns zusammengestellten Reisen kontinuierlich auf höchstem Niveau weiterzuentwickeln. Daher senden wir Ihnen unser Feedbackformular nachfolgend gerne noch einmal zu.</td>
+			</tr>
+			<tr>
+				<td align="center" style="padding: 24px 32px 8px 32px;">
+				<table border="0" cellpadding="0" cellspacing="0" role="presentation">
+					<tr>
+						<td align="center" bgcolor="#0f3822" style="border-radius: 999px;"><a href="{{{Booking__c.Survey_Link__c}}}" style="display: inline-block; padding: 14px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: bold; color: #ffffff; text-decoration: none; border-radius: 999px;" target="_blank">Zum Feedbackformular</a></td>
+					</tr>
+				</table>
+				</td>
+			</tr>
+			<tr>
+				<td align="center" style="padding: 4px 32px 20px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.6; color: #64748b;">Falls sich die Schaltfläche nicht öffnen lässt, kopieren Sie bitte diesen Link in Ihren Browser:<br />
+				<a href="{{{Booking__c.Survey_Link__c}}}" style="color: #b87a08; word-break: break-all;" target="_blank">{{{Booking__c.Survey_Link__c}}}</a></td>
+			</tr>
+			<tr>
+				<td style="padding: 0 32px 28px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.6; color: #0f172a;">Für Ihre Zeit und Ihr Vertrauen in unser Team möchten wir uns erneut herzlich bedanken und würden uns sehr freuen, Sie auch bei einer Ihrer nächsten Reisen wieder begleiten zu dürfen.<br />
+				<br />
+				Mit besten Grüßen,<br />
+				Ihr golf.extra Team</td>
+			</tr>
+			<tr>
+				<td align="center" style="padding: 18px 32px; border-top: 1px solid #e2e8f0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.6; color: #94a3b8;">golf.extra<br />
+				<a href="https://www.golf-extra.com" style="color: #94a3b8; text-decoration: none;" target="_blank">www.golf-extra.com</a></td>
+			</tr>
+		</table>
+		</td>
+	</tr>
+</table>
+</body>
+</html>

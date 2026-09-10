@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<EmailTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <available>true</available>
+    <description
+  >Post-trip feedback reminder, sent once to a guest who was invited and has not answered. Merges the guest's own letter salutation, the destination phrase and Booking__c.Survey_Link__c - the same link as the original invitation, since re-preparing a booking reuses its token rather than minting a new one.</description>
+    <encodingKey>UTF-8</encodingKey>
+    <name>golf.extra Feedback Erinnerung</name>
+    <relatedEntityType>Booking__c</relatedEntityType>
+    <style>none</style>
+    <subject
+  >Ihre Meinung liegt uns am Herzen – wir freuen uns auf Ihr Feedback</subject>
+    <type>custom</type>
+    <uiType>SFX</uiType>
+</EmailTemplate>

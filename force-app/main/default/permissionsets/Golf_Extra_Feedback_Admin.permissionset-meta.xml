@@ -178,6 +178,11 @@
         <field>Booking__c.Survey_Reminder_Sent__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Booking__c.Survey_Destination_Phrase__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
 
     <!--
       What the "Feedback-Umfrage senden" button on a Booking needs. The flow

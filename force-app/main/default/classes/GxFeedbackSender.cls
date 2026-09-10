@@ -13,6 +13,10 @@ public with sharing class GxFeedbackSender {
   @TestVisible
   private static final String TEMPLATE = 'Gx_Feedback_Invitation';
 
+  /** The follow-up, for a guest who was invited and stayed silent. */
+  @TestVisible
+  private static final String REMINDER_TEMPLATE = 'Gx_Feedback_Reminder';
+
   public class Request {
     @InvocableVariable(label='Booking Id' required=true)
     public Id bookingId;
@@ -68,7 +72,7 @@ public with sharing class GxFeedbackSender {
       toPrepare
     );
 
-    Id templateId = templateId();
+    Map<String, Id> templates = templateIds();
     Id senderId = senderId();
 
     List<Messaging.SingleEmailMessage> outbox = new List<Messaging.SingleEmailMessage>();
@@ -84,8 +88,15 @@ public with sharing class GxFeedbackSender {
         results.add(out);
         continue;
       }
+
+      // A reminder is a different email, not the same one sent twice.
+      Boolean reminding =
+        requests[i] != null &&
+        requests[i].markReminder == true;
+      String wanted = reminding ? REMINDER_TEMPLATE : TEMPLATE;
+      Id templateId = templates.get(wanted);
       if (templateId == null) {
-        out.message = 'Email template ' + TEMPLATE + ' not found';
+        out.message = 'Email template ' + wanted + ' not found';
         results.add(out);
         continue;
       }
@@ -136,15 +147,20 @@ public with sharing class GxFeedbackSender {
       : errors[0].getMessage();
   }
 
-  /** Looked up by developer name so the same code works in every org. */
-  private static Id templateId() {
-    List<EmailTemplate> found = [
-      SELECT Id
+  /**
+   * Both templates in one query, looked up by developer name so the same code
+   * works in every org without an id to configure.
+   */
+  private static Map<String, Id> templateIds() {
+    Map<String, Id> byName = new Map<String, Id>();
+    for (EmailTemplate t : [
+      SELECT Id, DeveloperName
       FROM EmailTemplate
-      WHERE DeveloperName = :TEMPLATE
-      LIMIT 1
-    ];
-    return found.isEmpty() ? null : found[0].Id;
+      WHERE DeveloperName IN (:TEMPLATE, :REMINDER_TEMPLATE)
+    ]) {
+      byName.put(t.DeveloperName, t.Id);
+    }
+    return byName;
   }
 
   /** Null falls back to the running user, which is correct for a manual send. */

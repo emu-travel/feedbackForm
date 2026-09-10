@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Destination_Phrase__c</fullName>
+    <description
+  >The words "Ihre Reise nach &lt;Region&gt;" for the feedback emails, or just "Ihre Reise" when the booking has no region. Exists because Lightning email templates have no conditional logic and Region__c is blank on about half of all bookings - merging the region directly would produce "Ihre Reise nach ." for those guests. The German lives here so the sentence stays grammatical either way; if the email copy changes, this field changes with it.</description>
+    <externalId>false</externalId>
+    <formula>IF(
+  ISPICKVAL(Region__c, &quot;&quot;),
+  &quot;Ihre Reise&quot;,
+  &quot;Ihre Reise nach &quot; &amp; TEXT(Region__c)
+)</formula>
+    <formulaTreatBlanksAs>BlankAsBlank</formulaTreatBlanksAs>
+    <inlineHelpText
+  >Used by the feedback emails. Generated automatically; do not edit.</inlineHelpText>
+    <label>Survey Destination Phrase</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

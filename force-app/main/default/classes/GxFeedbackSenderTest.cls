@@ -328,6 +328,40 @@ private class GxFeedbackSenderTest {
     );
   }
 
+  /**
+   * A reminder that reads exactly like the invitation looks like a fault to the
+   * guest, so the two are different templates. Both must exist in the org.
+   */
+  @IsTest
+  static void theInvitationAndTheReminderAreDifferentEmails() {
+    Map<String, EmailTemplate> found = new Map<String, EmailTemplate>();
+    for (EmailTemplate t : [
+      SELECT DeveloperName, Subject
+      FROM EmailTemplate
+      WHERE
+        DeveloperName IN (
+          :GxFeedbackSender.TEMPLATE,
+          :GxFeedbackSender.REMINDER_TEMPLATE
+        )
+    ]) {
+      found.put(t.DeveloperName, t);
+    }
+
+    Assert.isTrue(
+      found.containsKey(GxFeedbackSender.TEMPLATE),
+      'The invitation template is deployed'
+    );
+    Assert.isTrue(
+      found.containsKey(GxFeedbackSender.REMINDER_TEMPLATE),
+      'The reminder template is deployed'
+    );
+    Assert.areNotEqual(
+      found.get(GxFeedbackSender.TEMPLATE).Subject,
+      found.get(GxFeedbackSender.REMINDER_TEMPLATE).Subject,
+      'A guest must not receive the same subject line twice'
+    );
+  }
+
   @IsTest
   static void aGuestIsNeverRemindedTwice() {
     pinSettings(36, 10);
