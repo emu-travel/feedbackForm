@@ -10,13 +10,13 @@
         <field>Trustpilot_URL__c</field>
         <value
       xsi:type="xsd:string"
-    >https://www.trustpilot.com/evaluate/emu-travel.com</value>
+    >https://www.trustpilot.com/evaluate/golf-extra.com</value>
     </values>
     <values>
         <field>Google_Maps_URL__c</field>
         <value
       xsi:type="xsd:string"
-    >https://maps.google.com/?q=golf.extra+GmbH+Heilbronn</value>
+    >https://g.page/r/CXPNAtLxy7_jEAE/review</value>
     </values>
     <values>
         <field>Link_Validity_Days__c</field>
