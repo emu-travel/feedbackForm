@@ -178,8 +178,6 @@
     </classAccesses>
     <flowAccesses>
         <enabled>true</enabled>
-        <flow>
-Gx_Send_Feedback_Survey;
-    </flow>
+        <flow>Gx_Send_Feedback_Survey</flow>
     </flowAccesses>
 </PermissionSet>
