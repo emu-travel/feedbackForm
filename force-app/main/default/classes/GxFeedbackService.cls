@@ -469,9 +469,23 @@ public without sharing class GxFeedbackService {
   ) {
     List<Feedback_Rating__c> out = new List<Feedback_Rating__c>();
 
-    addSingle(out, responseId, TYPE_FLIGHT, 'Flug', p.flight);
-    addSingle(out, responseId, TYPE_TRANSFER, 'Transfer', p.transfer);
-    addSingle(out, responseId, TYPE_RENTAL, 'Mietwagen', p.rentalCar);
+    addSuppliers(out, responseId, TYPE_FLIGHT, 'Flug', p.flight, allowed);
+    addSuppliers(
+      out,
+      responseId,
+      TYPE_TRANSFER,
+      'Transfer',
+      p.transfer,
+      allowed
+    );
+    addSuppliers(
+      out,
+      responseId,
+      TYPE_RENTAL,
+      'Mietwagen',
+      p.rentalCar,
+      allowed
+    );
 
     addItems(out, responseId, TYPE_HOTEL, p.hotels, allowed, true);
     addItems(out, responseId, TYPE_GOLF, p.golfCourses, allowed, false);
@@ -479,23 +493,64 @@ public without sharing class GxFeedbackService {
     return out;
   }
 
-  private static void addSingle(
+  /**
+   * One flight, transfer or rental-car answer, saved against every supplier
+   * the guest was shown for it.
+   *
+   * The survey asks a single question per mode - "how were the flights" - but
+   * a trip can carry Lufthansa out and Condor back. Storing the answer under
+   * a generic "Flug" made every airline indistinguishable in reporting, so it
+   * is recorded once per supplier instead, each row linked to its reservation.
+   * The guest rated the flights as a whole, so each airline on the trip gets
+   * that same score. Dashboards count distinct responses, not rows, so this
+   * does not inflate any total.
+   *
+   * Suppliers are de-duplicated exactly as the survey de-duplicates them for
+   * display, so what is saved matches what the guest saw. If none can be found
+   * the answer is kept under the generic label rather than dropped.
+   */
+  private static void addSuppliers(
     List<Feedback_Rating__c> out,
     Id responseId,
     String category,
-    String label,
-    RatingInput input
+    String fallbackLabel,
+    RatingInput input,
+    Map<Id, Reservation__c> allowed
   ) {
     if (input == null || !isValidScore(input.score)) {
+      return;
+    }
+    String comment = clean(input.comment);
+
+    Set<String> seen = new Set<String>();
+    Integer added = 0;
+    for (Reservation__c r : allowed.values()) {
+      if (r.AccountType__c != category || !seen.add(venueKeyFor(r))) {
+        continue;
+      }
+      out.add(
+        new Feedback_Rating__c(
+          Feedback_Response__c = responseId,
+          Reservation__c = r.Id,
+          Category__c = category,
+          Item_Name__c = venueNameFor(r),
+          Score__c = input.score,
+          Comment__c = comment
+        )
+      );
+      added++;
+    }
+
+    if (added > 0) {
       return;
     }
     out.add(
       new Feedback_Rating__c(
         Feedback_Response__c = responseId,
         Category__c = category,
-        Item_Name__c = label,
+        Item_Name__c = fallbackLabel,
         Score__c = input.score,
-        Comment__c = clean(input.comment)
+        Comment__c = comment
       )
     );
   }

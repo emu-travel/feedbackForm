@@ -366,6 +366,126 @@ private class GxFeedbackServiceTest {
     };
   }
 
+  /**
+   * Flight, transfer and rental answers used to be stored under a generic
+   * "Flug", "Transfer" or "Mietwagen", which made every supplier
+   * indistinguishable in reporting. Each is now saved against the supplier the
+   * guest was shown, linked to its reservation.
+   */
+  @IsTest
+  static void mobilityScoresAreStoredAgainstTheSupplier() {
+    Map<String, Object> payload = basePayload();
+    payload.put(
+      'flight',
+      new Map<String, Object>{ 'score' => 7, 'comment' => 'Verspätet' }
+    );
+    payload.put('transfer', new Map<String, Object>{ 'score' => 10 });
+    payload.put('rentalCar', new Map<String, Object>{ 'score' => 9 });
+
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(payload)
+    );
+    Assert.isTrue(r.ok, 'Submission saved: ' + r.message);
+
+    Map<String, Feedback_Rating__c> byCategory = new Map<String, Feedback_Rating__c>();
+    for (Feedback_Rating__c row : [
+      SELECT Category__c, Item_Name__c, Score__c, Comment__c, Reservation__c
+      FROM Feedback_Rating__c
+      WHERE Category__c IN ('Airline', 'TransferCompany', 'CarRentalCompany')
+    ]) {
+      byCategory.put(row.Category__c, row);
+    }
+
+    Assert.areEqual(
+      'Test Airline',
+      byCategory.get('Airline').Item_Name__c,
+      'The airline is named, not filed under a generic "Flug"'
+    );
+    Assert.isNotNull(
+      byCategory.get('Airline').Reservation__c,
+      'And linked to the reservation it came from'
+    );
+    Assert.areEqual(
+      7,
+      byCategory.get('Airline').Score__c,
+      'With the guest score'
+    );
+    Assert.areEqual(
+      'Verspätet',
+      byCategory.get('Airline').Comment__c,
+      'And their comment'
+    );
+    Assert.areEqual(
+      'Test Transfers',
+      byCategory.get('TransferCompany').Item_Name__c,
+      'Transfer companies likewise'
+    );
+    Assert.areEqual(
+      'Test Rentals',
+      byCategory.get('CarRentalCompany').Item_Name__c,
+      'And rental firms'
+    );
+  }
+
+  @IsTest
+  static void aTripWithTwoAirlinesRatesBoth() {
+    // Outbound with one airline, back with another: the guest answers one
+    // flight question, and both airlines should carry that answer.
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Account second = newAccount('Second Airline', 'Airline');
+    insert second;
+    insert newReservation(theBooking().Id, second, 'Airline', 'Completed');
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    Map<String, Object> payload = basePayload();
+    payload.put('flight', new Map<String, Object>{ 'score' => 6 });
+    GxFeedbackService.submit(JSON.serialize(payload));
+
+    List<Feedback_Rating__c> flights = [
+      SELECT Item_Name__c, Score__c
+      FROM Feedback_Rating__c
+      WHERE Category__c = 'Airline'
+      ORDER BY Item_Name__c
+    ];
+    Assert.areEqual(2, flights.size(), 'One row per airline on the trip');
+    Assert.areEqual(
+      'Second Airline',
+      flights[0].Item_Name__c,
+      'The second airline is rated'
+    );
+    Assert.areEqual(
+      'Test Airline',
+      flights[1].Item_Name__c,
+      'And so is the first'
+    );
+    Assert.areEqual(6, flights[0].Score__c, 'Each carrying the same answer');
+    Assert.areEqual(6, flights[1].Score__c, 'Each carrying the same answer');
+  }
+
+  @IsTest
+  static void theSameAirlineTwiceIsRatedOnce() {
+    // Out and back with the same carrier is still one airline.
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Account airline = [
+      SELECT Id
+      FROM Account
+      WHERE Name = 'Test Airline'
+      LIMIT 1
+    ];
+    insert newReservation(theBooking().Id, airline, 'Airline', 'Completed');
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    Map<String, Object> payload = basePayload();
+    payload.put('flight', new Map<String, Object>{ 'score' => 8 });
+    GxFeedbackService.submit(JSON.serialize(payload));
+
+    Assert.areEqual(
+      1,
+      [SELECT COUNT() FROM Feedback_Rating__c WHERE Category__c = 'Airline'],
+      'Two reservations with one airline is one airline to rate'
+    );
+  }
+
   @IsTest
   static void submitStoresResponseAndRatings() {
     GxFeedbackService.Context c = GxFeedbackService.getContext(
