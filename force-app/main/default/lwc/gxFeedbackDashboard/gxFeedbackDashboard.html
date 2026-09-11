@@ -124,6 +124,14 @@
           <div class="panel-head">
             <h2 class="panel-title">Responses</h2>
             <span class="panel-count">{responsesSummary}</span>
+            <lightning-button
+              class="export-btn"
+              label={exportLabel}
+              icon-name="utility:download"
+              title="Download everything this list shows, all pages, as a spreadsheet"
+              disabled={exportDisabled}
+              onclick={handleExport}
+            ></lightning-button>
           </div>
           <div class="finder">
             <lightning-input
@@ -694,6 +702,57 @@
             </template>
           </section>
         </template>
+
+        <!-- Invited, not answered yet -->
+        <section class="panel" data-section="waiting">
+          <div class="panel-head">
+            <h2 class="panel-title">Waiting for an answer</h2>
+            <span class="panel-count">{waitingSummary}</span>
+          </div>
+          <p class="panel-note">
+            Guests who were sent the survey and have not answered, most recently
+            asked first. One reminder goes out automatically; a personal word
+            from the travel designer often does more.
+          </p>
+          <template lwc:if={hasWaiting}>
+            <ul class="rlist">
+              <template for:each={waitingList} for:item="w">
+                <li key={w.key} class="wrow">
+                  <div class="rmain">
+                    <p class="meta rwho">
+                      <span class="rguest">{w.guest}</span>
+                      <span aria-hidden="true">·</span>
+                      <a href={w.url}>{w.bookingNumber}</a>
+                    </p>
+                    <p class="meta rtrip">
+                      <span>{w.trip}</span>
+                      <template lwc:if={w.designer}>
+                        <span aria-hidden="true">·</span>
+                        <span>{w.designer}</span>
+                      </template>
+                    </p>
+                  </div>
+                  <div class="wstate">
+                    <span class="wsent">{w.sentLabel}</span>
+                    <span class={w.stateCls}>{w.stateLabel}</span>
+                  </div>
+                </li>
+              </template>
+            </ul>
+            <c-gx-pager
+              label="Pages of guests waiting"
+              total={waitingTotal}
+              page={waitingPageNo}
+              page-size={waitingPageSize}
+              onpagechange={handleWaitingPage}
+            ></c-gx-pager>
+          </template>
+          <template lwc:else>
+            <p class="panel-note">
+              Everyone invited in this selection has answered.
+            </p>
+          </template>
+        </section>
       </template>
     </div>
   </div>

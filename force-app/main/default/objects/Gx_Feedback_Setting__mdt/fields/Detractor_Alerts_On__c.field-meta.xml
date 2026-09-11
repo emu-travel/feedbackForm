@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Detractor_Alerts_On__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description
+  >When ticked, a guest who answers the recommendation question with 6 or below triggers an immediate email to the trip's travel designer, copied to Alert Copy Email. In a sandbox the designer is never emailed: the alert goes to Alert Copy Email only, so testing cannot reach colleagues.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Detractor Alerts On</label>
+    <type>Checkbox</type>
+</CustomField>

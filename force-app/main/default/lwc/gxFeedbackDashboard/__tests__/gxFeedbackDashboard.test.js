@@ -3,6 +3,8 @@ import GxFeedbackDashboard from "c/gxFeedbackDashboard";
 import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDashboard";
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
 import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findResponses";
+import findWaiting from "@salesforce/apex/GxFeedbackDashboardController.findWaiting";
+import exportResponses from "@salesforce/apex/GxFeedbackDashboardController.exportResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
 import updateFollowUp from "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp";
 import GxResponseModal from "c/gxResponseModal";
@@ -29,6 +31,19 @@ jest.mock(
     const { createApexTestWireAdapter } = require("@salesforce/sfdx-lwc-jest");
     return { default: createApexTestWireAdapter(jest.fn()) };
   },
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/GxFeedbackDashboardController.findWaiting",
+  () => {
+    const { createApexTestWireAdapter } = require("@salesforce/sfdx-lwc-jest");
+    return { default: createApexTestWireAdapter(jest.fn()) };
+  },
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/GxFeedbackDashboardController.exportResponses",
+  () => ({ default: jest.fn() }),
   { virtual: true }
 );
 jest.mock(
@@ -656,5 +671,120 @@ describe("c-gx-feedback-dashboard for the people who use it", () => {
     expect(
       JSON.parse(getDashboard.getLastConfig().filtersJson).designer
     ).toBeUndefined();
+  });
+});
+
+describe("c-gx-feedback-dashboard exports and chases", () => {
+  const originalCreate = URL.createObjectURL;
+  const originalRevoke = URL.revokeObjectURL;
+
+  beforeEach(() => {
+    URL.createObjectURL = jest.fn(() => "blob:feedback");
+    URL.revokeObjectURL = jest.fn();
+  });
+
+  afterEach(() => {
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+    while (document.body.firstChild) {
+      document.body.removeChild(document.body.firstChild);
+    }
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+  });
+
+  const PAGE = {
+    total: 1,
+    page: 1,
+    pageSize: 10,
+    rows: [{ responseId: "r1", guest: "Ali Haider", nps: 10 }]
+  };
+
+  function exportButton(el) {
+    return el.shadowRoot.querySelector("lightning-button.export-btn");
+  }
+
+  it("exports what the list is showing, all of it, as a download", async () => {
+    exportResponses.mockResolvedValue({
+      csv: '"Feedback number"\r\n"FB-1"',
+      fileName: "golf-extra-feedback-2026-09-11.csv",
+      rows: 1,
+      total: 1
+    });
+    const clicked = jest
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    const el = mount();
+    getDashboard.emit(DATA);
+    findResponses.emit(PAGE);
+    await flush();
+
+    const chip = [...el.shadowRoot.querySelectorAll("button.chip")].find(
+      (b) => b.dataset.value === "detractors"
+    );
+    chip.click();
+    await flush();
+    exportButton(el).click();
+    await flush();
+
+    expect(exportResponses).toHaveBeenCalledWith(
+      expect.objectContaining({ groupName: "detractors", sortBy: "newest" })
+    );
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(clicked).toHaveBeenCalled();
+  });
+
+  it("offers no export when there is nothing to export", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    findResponses.emit({ ...PAGE, total: 0, rows: [] });
+    await flush();
+    expect(exportButton(el).disabled).toBe(true);
+  });
+
+  it("lists the guests still to answer, and what happens next", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    findWaiting.emit({
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      rows: [
+        {
+          bookingId: "b9",
+          bookingNumber: "GX-TEST-A2",
+          guest: "Ali Haider",
+          lastSent: "2026-09-11T14:02:27.000Z",
+          reminded: false,
+          reminderDue: "2026-09-21",
+          expiresOn: "2026-09-25",
+          state: "waiting"
+        }
+      ]
+    });
+    await flush();
+
+    const row = el.shadowRoot.querySelector("li.wrow");
+    expect(row.textContent).toContain("GX-TEST-A2");
+    expect(row.textContent).toContain("Reminder due 21 Sep 2026");
+    expect(text(el)).toContain("1 guest not answered yet");
+  });
+
+  it("follows the dashboard filters, from page one", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    await flush();
+
+    const region = [
+      ...el.shadowRoot.querySelectorAll("lightning-combobox")
+    ].find((c) => c.dataset.field === "region");
+    region.dispatchEvent(
+      new CustomEvent("change", { detail: { value: "Algarve" } })
+    );
+    await flush();
+
+    const config = findWaiting.getLastConfig();
+    expect(JSON.parse(config.filtersJson).region).toBe("Algarve");
+    expect(config.pageNumber).toBe(1);
   });
 });

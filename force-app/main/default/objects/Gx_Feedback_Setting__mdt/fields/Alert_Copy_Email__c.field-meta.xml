@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Alert_Copy_Email__c</fullName>
+    <description
+  >Team address copied on every detractor alert, and the only recipient when a trip has no travel designer (and always, in a sandbox). Blank: designers only, and no alerts at all from a sandbox.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Alert Copy Email</label>
+    <required>false</required>
+    <type>Email</type>
+    <unique>false</unique>
+</CustomField>

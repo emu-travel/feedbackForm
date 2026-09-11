@@ -77,4 +77,14 @@ public with sharing class GxFeedbackSettings {
   public static String senderEmail() {
     return config().Sender_Email__c;
   }
+
+  /** Whether a low recommendation emails the travel designer at once. */
+  public static Boolean detractorAlertsOn() {
+    return config().Detractor_Alerts_On__c == true;
+  }
+
+  /** Copied on every detractor alert; the only recipient in a sandbox. */
+  public static String alertCopyEmail() {
+    return config().Alert_Copy_Email__c;
+  }
 }

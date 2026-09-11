@@ -60,6 +60,10 @@ public with sharing class GxFeedbackDashboardController {
   /** SOQL cannot skip further than this, so deeper pages ask for a search. */
   private static final Integer MAX_OFFSET = 2000;
 
+  /** Most responses one export file holds; more asks for narrower dates. */
+  @TestVisible
+  private static Integer maxExport = 1000;
+
   /** The designer filter's value for trips with no travel designer set. */
   private static final String NO_DESIGNER = 'none';
 
@@ -172,6 +176,60 @@ public with sharing class GxFeedbackDashboardController {
     /** True when there are more rows than paging can reach. */
     @AuraEnabled
     public Boolean capped = false;
+  }
+
+  /** A spreadsheet of responses, ready to download. */
+  public class ExportResult {
+    @AuraEnabled
+    public String csv;
+    @AuraEnabled
+    public String fileName;
+    @AuraEnabled
+    public Integer rows = 0;
+    @AuraEnabled
+    public Integer total = 0;
+    /** True when the selection held more than one file takes. */
+    @AuraEnabled
+    public Boolean capped = false;
+  }
+
+  /** A guest who was invited and has not answered yet. */
+  public class WaitingRow {
+    @AuraEnabled
+    public Id bookingId;
+    @AuraEnabled
+    public String bookingNumber;
+    @AuraEnabled
+    public String guest;
+    @AuraEnabled
+    public String designer;
+    @AuraEnabled
+    public String region;
+    @AuraEnabled
+    public Date tripEnd;
+    /** When they were last asked: the invitation, or the reminder. */
+    @AuraEnabled
+    public Datetime lastSent;
+    @AuraEnabled
+    public Boolean reminded = false;
+    @AuraEnabled
+    public Date reminderDue;
+    @AuraEnabled
+    public Date expiresOn;
+    /** 'waiting', 'reminded' or 'expired'. */
+    @AuraEnabled
+    public String state;
+  }
+
+  public class WaitingPage {
+    @AuraEnabled
+    public List<WaitingRow> rows = new List<WaitingRow>();
+    @AuraEnabled
+    public Integer total = 0;
+    @AuraEnabled
+    public Integer page = 1;
+    @AuraEnabled
+    public Integer pageSize;
   }
 
   /** A response as a list row: who, which trip, and what stood out. */
@@ -727,23 +785,8 @@ public with sharing class GxFeedbackDashboardController {
     out.pageSize = responsePageSize;
 
     Map<String, Object> binds = new Map<String, Object>();
-    List<String> clauses = new List<String>();
-    String term = String.isBlank(search) ? '' : search.trim();
-    if (term.length() >= 2) {
-      out.searching = true;
-      binds.put('term', '%' + escapeLike(term) + '%');
-      clauses.add(
-        '(Contact__r.LastName LIKE :term OR Contact__r.Name LIKE :term' +
-          ' OR Contact__r.Email LIKE :term' +
-          ' OR Booking__r.BookingNumber__c LIKE :term OR Name LIKE :term)'
-      );
-    } else {
-      clauses.addAll(bookingClauses('Booking__r.', f, binds));
-    }
-    String groupClause = groupClause(groupName, binds);
-    if (groupClause != null) {
-      clauses.add(groupClause);
-    }
+    List<String> clauses = listClauses(f, search, groupName, binds);
+    out.searching = binds.containsKey('term');
 
     out.total = Database.countQueryWithBinds(
       'SELECT COUNT() FROM Feedback_Response__c' + whereOf(clauses),
@@ -761,9 +804,7 @@ public with sharing class GxFeedbackDashboardController {
       Math.min(lastPage, reachable)
     );
 
-    String order = sortBy == 'lowest'
-      ? 'Recommendation_NPS__c ASC NULLS LAST, Overall_Experience__c ASC NULLS LAST, Submitted_On__c DESC'
-      : 'Submitted_On__c DESC NULLS LAST, Id DESC';
+    String order = orderOf(sortBy);
     List<Feedback_Response__c> found = (List<Feedback_Response__c>) Database.queryWithBinds(
       'SELECT ' +
         RESPONSE_FIELDS +
@@ -1162,6 +1203,388 @@ public with sharing class GxFeedbackDashboardController {
     return r.Reservation__c != null
       ? String.valueOf(r.Reservation__c)
       : r.Item_Name__c;
+  }
+
+  /**
+   * The same selection as the response list - filters or search, group and
+   * order - as a spreadsheet. Semicolon-separated UTF-8, which is what
+   * Excel set to German opens straight into columns; the page adds the byte
+   * order mark that tells Excel it is UTF-8, so umlauts survive.
+   */
+  @AuraEnabled
+  public static ExportResult exportResponses(
+    String filtersJson,
+    String search,
+    String groupName,
+    String sortBy
+  ) {
+    Filters f = parse(filtersJson);
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = listClauses(f, search, groupName, binds);
+
+    ExportResult out = new ExportResult();
+    out.total = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Feedback_Response__c' + whereOf(clauses),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    out.capped = out.total > maxExport;
+    out.fileName =
+      'golf-extra-feedback-' +
+      Datetime.now().format('yyyy-MM-dd') +
+      '.csv';
+
+    List<Feedback_Response__c> responses = (List<Feedback_Response__c>) Database.queryWithBinds(
+      'SELECT ' +
+        RESPONSE_FIELDS +
+        ', Contact__r.Email, Booking__r.TravelDesigner__r.Name, Booking__r.Region__c,' +
+        ' toLabel(Booking__r.DestinationCountry__c), Booking__r.Start_Date__c,' +
+        ' Booking__r.End_Date__c, Public_Review_Prompted__c' +
+        ' FROM Feedback_Response__c' +
+        whereOf(clauses) +
+        ' ORDER BY ' +
+        orderOf(sortBy) +
+        ' LIMIT ' +
+        maxExport,
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    out.rows = responses.size();
+
+    Map<Id, ExportRatings> ratings = new Map<Id, ExportRatings>();
+    for (Feedback_Response__c r : responses) {
+      ratings.put(r.Id, new ExportRatings());
+    }
+    Set<Id> ids = ratings.keySet();
+    // A query loop, so thousands of ratings never sit in memory at once.
+    for (Feedback_Rating__c rating : [
+      SELECT
+        Feedback_Response__c,
+        Category__c,
+        Sub_Category__c,
+        Item_Name__c,
+        Reservation__c,
+        Score__c,
+        Comment__c
+      FROM Feedback_Rating__c
+      WHERE Feedback_Response__c IN :ids
+      WITH SYSTEM_MODE
+      ORDER BY Feedback_Response__c, CreatedDate, Id
+    ]) {
+      ratings.get(rating.Feedback_Response__c).add(rating);
+    }
+
+    List<String> lines = new List<String>{ csvLine(EXPORT_HEADER) };
+    for (Feedback_Response__c r : responses) {
+      ExportRatings x = ratings.get(r.Id);
+      Integer nps = r.Recommendation_NPS__c?.intValue();
+      lines.add(
+        csvLine(
+          new List<String>{
+            r.Name,
+            r.Submitted_On__c?.format('yyyy-MM-dd HH:mm'),
+            r.Contact__r?.Name,
+            r.Contact__r?.Email,
+            r.Booking__r?.BookingNumber__c,
+            r.Booking__r?.Region__c,
+            r.Booking__r?.DestinationCountry__c,
+            isoDate(r.Booking__r?.Start_Date__c),
+            isoDate(r.Booking__r?.End_Date__c),
+            r.Booking__r?.TravelDesigner__r?.Name,
+            nps == null ? null : String.valueOf(nps),
+            npsGroupOf(nps),
+            whole(r.Overall_Experience__c),
+            r.Overall_Experience_Comment__c,
+            whole(r.Consultation_Rating__c),
+            r.Consultation_Comment__c,
+            x.service('Airline'),
+            x.service('TransferCompany'),
+            x.service('CarRentalCompany'),
+            x.venues(HOTEL),
+            r.General_Hotel_Comment__c,
+            x.venues(GOLF),
+            r.General_Golf_Comment__c,
+            r.Next_Destination__c,
+            r.Improvement_Suggestions__c,
+            r.General_Feedback__c,
+            r.Public_Review_Prompted__c == true ? 'Yes' : 'No',
+            r.Follow_Up_Status__c,
+            r.Follow_Up_Note__c,
+            r.Follow_Up_By__r?.Name,
+            r.Follow_Up_On__c?.format('yyyy-MM-dd HH:mm')
+          }
+        )
+      );
+    }
+    out.csv = String.join(lines, '\r\n');
+    return out;
+  }
+
+  /**
+   * Guests who were sent the survey and have not answered, newest first:
+   * the people a travel designer might still nudge personally.
+   */
+  @AuraEnabled(cacheable=true)
+  public static WaitingPage findWaiting(
+    String filtersJson,
+    Integer pageNumber
+  ) {
+    Filters f = parse(filtersJson);
+    WaitingPage out = new WaitingPage();
+    out.pageSize = responsePageSize;
+
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = bookingClauses('', f, binds);
+    clauses.add('Survey_Sent_On__c != null');
+    clauses.add('Id NOT IN (SELECT Booking__c FROM Feedback_Response__c)');
+
+    out.total = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Booking__c' + whereOf(clauses),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    Integer lastPage = Math.max(
+      1,
+      Math.ceil((Decimal) out.total / responsePageSize).intValue()
+    );
+    out.page = Math.min(
+      Math.max(pageNumber == null ? 1 : pageNumber, 1),
+      Math.min(lastPage, MAX_OFFSET / responsePageSize + 1)
+    );
+
+    Decimal validity = GxFeedbackSettings.linkValidityDays();
+    Decimal reminderDelay = GxFeedbackSettings.reminderDelayDays();
+    for (
+      Booking__c b : (List<Booking__c>) Database.queryWithBinds(
+        'SELECT Id, BookingNumber__c, MainContact__r.Name, TravelDesigner__r.Name,' +
+          ' Region__c, End_Date__c, Survey_Sent_On__c, Survey_Reminder_Sent__c' +
+          ' FROM Booking__c' +
+          whereOf(clauses) +
+          ' ORDER BY Survey_Sent_On__c DESC, Id DESC' +
+          ' LIMIT ' +
+          responsePageSize +
+          ' OFFSET ' +
+          (out.page - 1) * responsePageSize,
+        binds,
+        AccessLevel.SYSTEM_MODE
+      )
+    ) {
+      WaitingRow row = new WaitingRow();
+      row.bookingId = b.Id;
+      row.bookingNumber = b.BookingNumber__c;
+      row.guest = b.MainContact__r?.Name;
+      row.designer = b.TravelDesigner__r?.Name;
+      row.region = b.Region__c;
+      row.tripEnd = b.End_Date__c;
+      row.lastSent = b.Survey_Sent_On__c;
+      row.reminded = b.Survey_Reminder_Sent__c == true;
+      Date sentOn = b.Survey_Sent_On__c.date();
+      // The link counts from the last time the guest was asked, reminder
+      // included - the same rule the survey itself applies.
+      if (validity != null && validity > 0) {
+        row.expiresOn = sentOn.addDays(validity.intValue());
+      }
+      if (!row.reminded && reminderDelay != null && reminderDelay > 0) {
+        row.reminderDue = sentOn.addDays(reminderDelay.intValue());
+      }
+      if (row.expiresOn != null && Date.today() > row.expiresOn) {
+        row.state = 'expired';
+      } else {
+        row.state = row.reminded ? 'reminded' : 'waiting';
+      }
+      out.rows.add(row);
+    }
+    return out;
+  }
+
+  private static final List<String> EXPORT_HEADER = new List<String>{
+    'Feedback number',
+    'Submitted',
+    'Guest',
+    'Guest email',
+    'Booking',
+    'Region',
+    'Country',
+    'Trip start',
+    'Trip end',
+    'Travel designer',
+    'Would recommend (1-10)',
+    'NPS group',
+    'Overall trip',
+    'Overall comment',
+    'Consultation',
+    'Consultation comment',
+    'Flights',
+    'Transfers',
+    'Rental car',
+    'Hotels',
+    'Hotels in general',
+    'Golf courses',
+    'Golf in general',
+    'Next on their wish list',
+    'Suggestions',
+    'Anything else',
+    'Shown review invitation',
+    'Follow-up status',
+    'Follow-up note',
+    'Follow-up by',
+    'Follow-up on'
+  };
+
+  /** One response's ratings, folded into spreadsheet cells. */
+  private class ExportRatings {
+    Map<String, List<Feedback_Rating__c>> services = new Map<String, List<Feedback_Rating__c>>();
+    Map<String, List<String>> subs = new Map<String, List<String>>();
+    Map<String, List<Feedback_Rating__c>> venues = new Map<String, List<Feedback_Rating__c>>();
+
+    void add(Feedback_Rating__c r) {
+      if (
+        GxFeedbackDashboardController.SUPPLIER_TYPES.contains(r.Category__c)
+      ) {
+        listFor(services, r.Category__c).add(r);
+      } else if (String.isNotBlank(r.Sub_Category__c)) {
+        String key = keyOf(r);
+        if (!subs.containsKey(key)) {
+          subs.put(key, new List<String>());
+        }
+        subs.get(key)
+          .add(
+            r.Sub_Category__c +
+              ' ' +
+              GxFeedbackDashboardController.whole(r.Score__c)
+          );
+      } else {
+        listFor(venues, r.Category__c).add(r);
+      }
+    }
+
+    /** "Lufthansa, Condor: 7 - Verspätet" - one answer, every supplier. */
+    String service(String category) {
+      List<Feedback_Rating__c> rows = services.get(category);
+      if (rows == null || rows.isEmpty()) {
+        return null;
+      }
+      List<String> names = new List<String>();
+      String comment;
+      for (Feedback_Rating__c r : rows) {
+        names.add(r.Item_Name__c);
+        if (String.isBlank(comment)) {
+          comment = r.Comment__c;
+        }
+      }
+      return String.join(names, ', ') +
+        ': ' +
+        GxFeedbackDashboardController.whole(rows[0].Score__c) +
+        (String.isBlank(comment) ? '' : ' - ' + comment);
+    }
+
+    /** "Conrad: 5 (Room 4, Service 6) - Laut; Pine Cliffs: 9" */
+    String venues(String category) {
+      List<Feedback_Rating__c> rows = venues.get(category);
+      if (rows == null || rows.isEmpty()) {
+        return null;
+      }
+      List<String> parts = new List<String>();
+      for (Feedback_Rating__c r : rows) {
+        List<String> detail = subs.get(keyOf(r));
+        parts.add(
+          r.Item_Name__c +
+            ': ' +
+            GxFeedbackDashboardController.whole(r.Score__c) +
+            (detail == null ? '' : ' (' + String.join(detail, ', ') + ')') +
+            (String.isBlank(r.Comment__c) ? '' : ' - ' + r.Comment__c)
+        );
+      }
+      return String.join(parts, '; ');
+    }
+
+    String keyOf(Feedback_Rating__c r) {
+      return r.Reservation__c != null
+        ? String.valueOf(r.Reservation__c)
+        : r.Category__c + '|' + r.Item_Name__c;
+    }
+
+    List<Feedback_Rating__c> listFor(
+      Map<String, List<Feedback_Rating__c>> m,
+      String key
+    ) {
+      if (!m.containsKey(key)) {
+        m.put(key, new List<Feedback_Rating__c>());
+      }
+      return m.get(key);
+    }
+  }
+
+  /**
+   * One CSV line, every cell quoted. Guests write some of these cells, so a
+   * cell Excel would read as a formula (=, +, -, @) is defused with a leading
+   * apostrophe rather than run.
+   */
+  @TestVisible
+  private static String csvLine(List<String> cells) {
+    List<String> out = new List<String>();
+    for (String cell : cells) {
+      String value = cell == null ? '' : cell;
+      if (value.length() > 0 && '=+-@\t\r'.contains(value.left(1))) {
+        value = '\'' + value;
+      }
+      out.add('"' + value.replace('"', '""') + '"');
+    }
+    return String.join(out, ';');
+  }
+
+  private static String whole(Decimal value) {
+    return value == null ? null : String.valueOf(value.intValue());
+  }
+
+  private static String isoDate(Date value) {
+    return value == null
+      ? null
+      : Datetime.newInstance(value, Time.newInstance(0, 0, 0, 0))
+          .format('yyyy-MM-dd');
+  }
+
+  private static String npsGroupOf(Integer nps) {
+    String bucket = bucketFor(nps);
+    if (bucket == 'promoter') {
+      return 'Promoter';
+    }
+    if (bucket == 'passive') {
+      return 'Passive';
+    }
+    return bucket == 'detractor' ? 'Detractor' : null;
+  }
+
+  /** What a response list covers: a search, or the filters; then a group. */
+  private static List<String> listClauses(
+    Filters f,
+    String search,
+    String groupName,
+    Map<String, Object> binds
+  ) {
+    List<String> clauses = new List<String>();
+    String term = String.isBlank(search) ? '' : search.trim();
+    if (term.length() >= 2) {
+      binds.put('term', '%' + escapeLike(term) + '%');
+      clauses.add(
+        '(Contact__r.LastName LIKE :term OR Contact__r.Name LIKE :term' +
+          ' OR Contact__r.Email LIKE :term' +
+          ' OR Booking__r.BookingNumber__c LIKE :term OR Name LIKE :term)'
+      );
+    } else {
+      clauses.addAll(bookingClauses('Booking__r.', f, binds));
+    }
+    String groupClause = groupClause(groupName, binds);
+    if (groupClause != null) {
+      clauses.add(groupClause);
+    }
+    return clauses;
+  }
+
+  private static String orderOf(String sortBy) {
+    return sortBy == 'lowest'
+      ? 'Recommendation_NPS__c ASC NULLS LAST, Overall_Experience__c ASC NULLS LAST, Submitted_On__c DESC'
+      : 'Submitted_On__c DESC NULLS LAST, Id DESC';
   }
 
   /** Per designer: responses, their consultation average, and NPS. */

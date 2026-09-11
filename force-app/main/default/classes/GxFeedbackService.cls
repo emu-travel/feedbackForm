@@ -433,6 +433,9 @@ public without sharing class GxFeedbackService {
       ]
       .Name;
       res.showPublicReview = p.recommendation >= PROMOTER_THRESHOLD;
+      // An unhappy guest reaches their travel designer at once. Published
+      // after commit, so the email goes out only once this answer is saved.
+      GxDetractorAlert.raise(resp.Id, p.recommendation);
       return res;
     } catch (Exception e) {
       Database.rollback(sp);

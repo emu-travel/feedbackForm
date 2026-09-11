@@ -26,7 +26,9 @@ import {
   responseListRows,
   responsesSummary,
   designerRows,
-  shortDate
+  shortDate,
+  waitingRows,
+  exportMessage
 } from "c/gxDashboardView";
 
 describe("number formatting", () => {
@@ -653,5 +655,75 @@ describe("what stood out", () => {
   it("makes the responses tile a way into the list", () => {
     const tile = kpiTiles({ responses: 3 }).find((t) => t.key === "responses");
     expect(tile.target).toBe("responses");
+  });
+});
+
+describe("waiting for an answer", () => {
+  const BASE = {
+    bookingId: "b1",
+    bookingNumber: "GX-TEST-A2",
+    guest: "Ali Haider",
+    designer: "Silke",
+    region: "Costa Navarino",
+    tripEnd: "2026-09-06",
+    lastSent: "2026-09-11T14:02:27.000Z",
+    reminded: false,
+    reminderDue: "2026-09-21",
+    expiresOn: "2026-09-25",
+    state: "waiting"
+  };
+
+  it("says when the guest was asked and when the reminder goes", () => {
+    const [w] = waitingRows([BASE]);
+    expect(w.sentLabel).toBe("Invited 11 Sep 2026");
+    expect(w.stateLabel).toBe("Reminder due 21 Sep 2026");
+    expect(w.stateCls).toBe("wtag wtag_waiting");
+    expect(w.trip).toBe("Costa Navarino · 6 Sep 2026");
+    expect(w.url).toBe("/lightning/r/Booking__c/b1/view");
+  });
+
+  it("says a reminded guest's link is still open, and until when", () => {
+    const [w] = waitingRows([
+      { ...BASE, reminded: true, reminderDue: null, state: "reminded" }
+    ]);
+    expect(w.sentLabel).toBe("Last asked 11 Sep 2026");
+    expect(w.stateLabel).toBe("Reminded · link open until 25 Sep 2026");
+    expect(w.stateCls).toBe("wtag wtag_reminded");
+  });
+
+  it("says when a link has run out", () => {
+    const [w] = waitingRows([{ ...BASE, state: "expired" }]);
+    expect(w.stateLabel).toBe("Link expired 25 Sep 2026");
+    expect(w.stateCls).toBe("wtag wtag_expired");
+  });
+
+  it("makes the response rate tile a way into the list", () => {
+    const tile = kpiTiles({}).find((t) => t.key === "rate");
+    expect(tile.target).toBe("waiting");
+  });
+});
+
+describe("export", () => {
+  it("says how many responses went into which file", () => {
+    expect(
+      exportMessage({ rows: 12, total: 12, fileName: "golf-extra.csv" })
+    ).toBe("12 responses saved to golf-extra.csv.");
+  });
+
+  it("says when the file holds only part of the selection", () => {
+    expect(
+      exportMessage({
+        rows: 1000,
+        total: 1400,
+        capped: true,
+        fileName: "f.csv"
+      })
+    ).toContain("the first 1000 of 1400");
+  });
+
+  it("says so when there is nothing to export", () => {
+    expect(exportMessage({ rows: 0 })).toBe(
+      "There are no responses in this selection to export."
+    );
   });
 });

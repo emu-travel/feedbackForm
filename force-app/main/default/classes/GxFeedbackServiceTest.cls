@@ -637,6 +637,11 @@ private class GxFeedbackServiceTest {
       saved.Public_Review_Prompted__c,
       'No review prompt is recorded'
     );
+    Assert.areEqual(
+      1,
+      GxDetractorAlert.raised.size(),
+      'and the travel designer is alerted straight away'
+    );
   }
 
   @IsTest

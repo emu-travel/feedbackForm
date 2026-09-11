@@ -860,4 +860,128 @@ private class GxFeedbackDashboardControllerTest {
         .designer
     );
   }
+
+  // ------------------------------------------------------------------
+  // Waiting for an answer
+
+  private static void linkRules(Integer validityDays, Integer reminderDays) {
+    GxFeedbackSettings.useForTest(
+      new Gx_Feedback_Setting__mdt(
+        Link_Validity_Days__c = validityDays,
+        Reminder_Delay_Days__c = reminderDays
+      )
+    );
+  }
+
+  @IsTest
+  static void invitedGuestsWhoHaveNotAnsweredAreListed() {
+    linkRules(14, 10);
+
+    GxFeedbackDashboardController.WaitingPage w = GxFeedbackDashboardController.findWaiting(
+      null,
+      1
+    );
+
+    // GXD-6 carries only the old flow's flag and was never sent this survey.
+    Assert.areEqual(1, w.total, 'Only GXD-4 was invited and never answered');
+    GxFeedbackDashboardController.WaitingRow row = w.rows[0];
+    Assert.areEqual('GXD-4', row.bookingNumber);
+    Assert.areEqual('waiting', row.state, 'Its link still works');
+    Date sentOn = row.lastSent.date();
+    Assert.areEqual(sentOn.addDays(10), row.reminderDue, 'Reminder due');
+    Assert.areEqual(sentOn.addDays(14), row.expiresOn, 'Link open until');
+  }
+
+  @IsTest
+  static void aWaitingGuestWhoseLinkRanOutIsMarkedExpired() {
+    linkRules(5, 10);
+    Assert.areEqual(
+      'expired',
+      GxFeedbackDashboardController.findWaiting(null, 1).rows[0].state,
+      'Sent eight days ago, valid for five'
+    );
+  }
+
+  @IsTest
+  static void theWaitingListFollowsTheFilters() {
+    linkRules(14, 10);
+    Assert.areEqual(
+      0,
+      GxFeedbackDashboardController.findWaiting(
+          JSON.serialize(new Map<String, Object>{ 'region' => 'Algarve' }),
+          1
+        )
+        .total,
+      'GXD-4 went to Mallorca'
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Export
+
+  private static GxFeedbackDashboardController.ExportResult export(
+    String search
+  ) {
+    return GxFeedbackDashboardController.exportResponses(
+      null,
+      search,
+      null,
+      null
+    );
+  }
+
+  @IsTest
+  static void anExportHasAHeaderAndOneRowPerResponse() {
+    GxFeedbackDashboardController.ExportResult x = export(null);
+    List<String> lines = x.csv.split('\r\n');
+
+    Assert.areEqual(5, lines.size(), 'A header and four responses');
+    Assert.isTrue(
+      lines[0].startsWith('"Feedback number";"Submitted";"Guest"'),
+      'Semicolons, quoted: ' + lines[0].left(60)
+    );
+    Assert.areEqual(4, x.rows);
+    Assert.isFalse(x.capped, 'Everything fitted');
+    Assert.isTrue(x.fileName.endsWith('.csv'), x.fileName);
+  }
+
+  @IsTest
+  static void anExportFoldsEachAnswerIntoReadableCells() {
+    String line = export('GXD-2').csv.split('\r\n')[1];
+
+    Assert.isTrue(
+      line.contains(
+        '"Conrad Algarve: 5 (Room 4, Service 6, Catering 7, Cleanliness 5) - Laut"'
+      ),
+      'The hotel, its detail ratings and its comment: ' + line
+    );
+    Assert.isTrue(line.contains('"Lufthansa: 6 - Verspätet"'), 'The flight');
+    Assert.isTrue(line.contains('"Detractor"'), 'The NPS group');
+    Assert.isTrue(line.contains('"Zu laut"'), 'The suggestion');
+  }
+
+  @IsTest
+  static void anExportFollowsTheSearch() {
+    Assert.areEqual(1, export('GXD-2').rows, 'Only the one searched for');
+  }
+
+  @IsTest
+  static void anExportStopsAtItsLimitAndSaysSo() {
+    GxFeedbackDashboardController.maxExport = 2;
+    GxFeedbackDashboardController.ExportResult x = export(null);
+    Assert.areEqual(2, x.rows, 'Two rows in the file');
+    Assert.areEqual(4, x.total, 'of four in the selection');
+    Assert.isTrue(x.capped, 'and the page is told');
+  }
+
+  @IsTest
+  static void aGuestCannotSlipAFormulaIntoTheSpreadsheet() {
+    Assert.areEqual(
+      '"\'=HYPERLINK(""http://x"")";"fine";"\'@SUM(A1)"',
+      GxFeedbackDashboardController.csvLine(
+        new List<String>{ '=HYPERLINK("http://x")', 'fine', '@SUM(A1)' }
+      ),
+      'Formula starters are defused with an apostrophe; quotes are doubled'
+    );
+  }
 }

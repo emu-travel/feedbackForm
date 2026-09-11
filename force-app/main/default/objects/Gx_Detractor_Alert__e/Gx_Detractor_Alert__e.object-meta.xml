@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description
+  >Raised when a guest submits feedback with a recommendation score of 6 or below. Published after commit, so a submission that fails raises nothing; GxDetractorAlertTrigger sends the alert email outside the guest user's context.</description>
+    <eventType>HighVolume</eventType>
+    <label>Gx Detractor Alert</label>
+    <pluralLabel>Gx Detractor Alerts</pluralLabel>
+    <publishBehavior>PublishAfterCommit</publishBehavior>
+</CustomObject>

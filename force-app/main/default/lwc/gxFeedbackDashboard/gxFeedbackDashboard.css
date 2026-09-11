@@ -836,3 +836,61 @@ button.kpi:focus-visible,
     justify-self: start;
   }
 }
+
+/* ---------- export and waiting ---------- */
+
+.export-btn {
+  margin-left: auto;
+}
+
+.wrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--gx-line);
+}
+
+.wrow:last-child {
+  border-bottom: 0;
+}
+
+.wstate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.wsent {
+  color: var(--gx-muted);
+}
+
+.wtag {
+  font-weight: 600;
+}
+
+.wtag_waiting {
+  color: var(--gx-ink-soft);
+}
+
+.wtag_reminded {
+  color: var(--gx-mid);
+}
+
+.wtag_expired {
+  color: var(--gx-bad);
+}
+
+@media (max-width: 40rem) {
+  .wrow {
+    grid-template-columns: 1fr;
+  }
+  .wstate {
+    align-items: flex-start;
+    text-align: left;
+  }
+}

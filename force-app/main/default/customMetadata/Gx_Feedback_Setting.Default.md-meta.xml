@@ -7,6 +7,10 @@
     <label>Default</label>
     <protected>false</protected>
     <values>
+        <field>Detractor_Alerts_On__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
         <field>Trustpilot_URL__c</field>
         <value
       xsi:type="xsd:string"

@@ -6,6 +6,8 @@ import GxResponseModal from "c/gxResponseModal";
 import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDashboard";
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
 import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findResponses";
+import findWaiting from "@salesforce/apex/GxFeedbackDashboardController.findWaiting";
+import exportResponses from "@salesforce/apex/GxFeedbackDashboardController.exportResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
 import updateFollowUp from "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp";
 import {
@@ -28,7 +30,10 @@ import {
   SORT_OPTIONS,
   responseListRows,
   responsesSummary,
-  designerRows
+  designerRows,
+  waitingRows,
+  exportMessage,
+  plural
 } from "c/gxDashboardView";
 
 /** How long typing pauses before the search runs. */
@@ -69,6 +74,12 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   responses;
   responsesLoading = true;
   wiredResponsesResult;
+  exporting = false;
+
+  // Invited guests who have not answered yet.
+  waitingPage = 1;
+  waiting;
+  wiredWaitingResult;
 
   showHandled = false;
   lowOnly = false;
@@ -135,6 +146,19 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   get countryOptions() {
     return withAll(this.options.countries, "All countries");
+  }
+
+  @wire(findWaiting, {
+    filtersJson: "$filtersJson",
+    pageNumber: "$waitingPage"
+  })
+  wiredWaiting(result) {
+    this.wiredWaitingResult = result;
+    if (result.data) {
+      this.waiting = result.data;
+    } else if (result.error) {
+      this.waiting = undefined;
+    }
   }
 
   get travelTypeOptions() {
@@ -213,6 +237,93 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   handleResponsePage(event) {
     this.responsePage = event.detail.page;
     this.scrollToSection("responses");
+  }
+
+  get exportDisabled() {
+    return this.exporting || this.responsesTotal === 0;
+  }
+
+  get exportLabel() {
+    return this.exporting ? "Exporting…" : "Export to Excel";
+  }
+
+  /**
+   * Everything the list is showing - all pages of it - as a spreadsheet.
+   * The byte order mark tells Excel the file is UTF-8, so umlauts survive.
+   */
+  async handleExport() {
+    this.exporting = true;
+    try {
+      const result = await exportResponses({
+        filtersJson: this.filtersJson,
+        search: this.searchTerm,
+        groupName: this.responseGroup,
+        sortBy: this.responseSort
+      });
+      if (result && result.rows) {
+        this.download(result.fileName, result.csv);
+      }
+      this.toast(
+        result && result.capped ? "Export cut short" : "Exported",
+        exportMessage(result),
+        result && result.capped ? "warning" : "success"
+      );
+    } catch (e) {
+      this.toast("Couldn't export", messageOf(e), "error");
+    } finally {
+      this.exporting = false;
+    }
+  }
+
+  download(fileName, csv) {
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8"
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Revoked a moment later: some browsers still need it as the save begins.
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  // ------------------------------------------------------------------
+  // Waiting for an answer
+
+  get waitingList() {
+    return waitingRows(this.waiting && this.waiting.rows);
+  }
+
+  get hasWaiting() {
+    return this.waitingList.length > 0;
+  }
+
+  get waitingTotal() {
+    return (this.waiting && this.waiting.total) || 0;
+  }
+
+  get waitingPageNo() {
+    return (this.waiting && this.waiting.page) || 1;
+  }
+
+  get waitingPageSize() {
+    return (this.waiting && this.waiting.pageSize) || 10;
+  }
+
+  get waitingSummary() {
+    return this.waitingTotal
+      ? `${plural(this.waitingTotal, "guest", "guests")} not answered yet`
+      : "";
+  }
+
+  handleWaitingPage(event) {
+    this.waitingPage = event.detail.page;
+    this.scrollToSection("waiting");
   }
 
   // ------------------------------------------------------------------
@@ -488,6 +599,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
       this.drill = undefined;
       this.pages = {};
       this.responsePage = 1;
+      this.waitingPage = 1;
       this.filtersJson = json;
     }
   }
@@ -497,7 +609,8 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     try {
       await Promise.all([
         refreshApex(this.wiredDashboard),
-        refreshApex(this.wiredResponsesResult)
+        refreshApex(this.wiredResponsesResult),
+        refreshApex(this.wiredWaitingResult)
       ]);
     } finally {
       this.loading = false;

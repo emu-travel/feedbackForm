@@ -202,7 +202,9 @@ export function kpiTiles(kpis) {
       key: "rate",
       label: "Response rate",
       value: formatPercent(k.responseRate),
-      note: `${Math.max((k.invited || 0) - (k.answeredInvitations || 0), 0)} still open`
+      note: `${Math.max((k.invited || 0) - (k.answeredInvitations || 0), 0)} still open`,
+      target: "waiting",
+      hint: "See who has not answered yet"
     },
     {
       key: "nps",
@@ -698,4 +700,59 @@ export function designerRows(rows, activeId) {
     active: d.id === activeId,
     rowCls: d.id === activeId ? "drow drow_active" : "drow"
   }));
+}
+
+// ------------------------------------------------------------------
+// Waiting for an answer
+
+const WAITING_STATES = {
+  waiting: "wtag wtag_waiting",
+  reminded: "wtag wtag_reminded",
+  expired: "wtag wtag_expired"
+};
+
+/**
+ * Invited guests who have not answered: who, which trip, when they were last
+ * asked, and what happens next - a reminder, or nothing, because the link
+ * has run out.
+ */
+export function waitingRows(rows) {
+  return (rows || []).map((w) => {
+    const sent = shortDate(String(w.lastSent || "").slice(0, 10));
+    let stateLabel;
+    if (w.state === "expired") {
+      stateLabel = `Link expired ${shortDate(w.expiresOn)}`;
+    } else if (w.state === "reminded") {
+      stateLabel = w.expiresOn
+        ? `Reminded · link open until ${shortDate(w.expiresOn)}`
+        : "Reminded";
+    } else {
+      stateLabel = w.reminderDue
+        ? `Reminder due ${shortDate(w.reminderDue)}`
+        : "No reminder planned";
+    }
+    return {
+      key: w.bookingId,
+      guest: w.guest || "Guest",
+      bookingNumber: w.bookingNumber,
+      url: bookingUrl(w.bookingId),
+      designer: w.designer || null,
+      trip: [w.region, shortDate(w.tripEnd)].filter(Boolean).join(" · "),
+      sentLabel: `${w.reminded ? "Last asked" : "Invited"} ${sent}`,
+      stateLabel,
+      stateCls: WAITING_STATES[w.state] || WAITING_STATES.waiting
+    };
+  });
+}
+
+/** What the export did, for the toast. */
+export function exportMessage(result) {
+  const r = result || {};
+  if (!r.rows) {
+    return "There are no responses in this selection to export.";
+  }
+  const saved = `${plural(r.rows, "response", "responses")} saved to ${r.fileName}.`;
+  return r.capped
+    ? `${saved} That is the first ${r.rows} of ${r.total}; narrow the dates or search to export the rest.`
+    : saved;
 }
