@@ -42,6 +42,7 @@ export default class GxFeedbackDashboard extends LightningElement {
   followUpOptions = FOLLOW_UP_OPTIONS;
 
   showHandled = false;
+  lowOnly = false;
   drafts = {};
   savingId;
 
@@ -170,7 +171,33 @@ export default class GxFeedbackDashboard extends LightningElement {
   }
 
   get comments() {
-    return commentRows(this.data && this.data.comments);
+    const rows = commentRows(this.data && this.data.comments);
+    return this.lowOnly ? rows.filter((c) => c.low) : rows;
+  }
+
+  get lowOnlyLabel() {
+    return this.lowOnly ? "Show all comments" : "Only low scores";
+  }
+
+  get commentsEmptyText() {
+    return this.lowOnly
+      ? "No low-scoring comments in this selection."
+      : "No comments in this selection.";
+  }
+
+  toggleLowOnly() {
+    this.lowOnly = !this.lowOnly;
+  }
+
+  handleKpiClick(event) {
+    this.scrollToSection(event.currentTarget.dataset.target);
+  }
+
+  scrollToSection(name) {
+    const section = this.template.querySelector(`[data-section="${name}"]`);
+    if (section && section.scrollIntoView) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   get hasComments() {
@@ -229,9 +256,21 @@ export default class GxFeedbackDashboard extends LightningElement {
   // ------------------------------------------------------------------
   // Drill-down
 
-  async handleVenueSelect(event) {
+  handleVenueSelect(event) {
     const { name, category } = event.detail;
+    this.openDrill(name, category);
+  }
+
+  /** The hotel names in the detail grid open the same drill-down. */
+  handleHeatSelect(event) {
+    const { name, category } = event.currentTarget.dataset;
+    this.openDrill(name, category);
+  }
+
+  async openDrill(name, category) {
     this.drill = { name, category, rows: [], loading: true };
+    // Opened from further down the page, the panel would appear off screen.
+    Promise.resolve().then(() => this.scrollToSection("drill"));
     try {
       const rows = await getVenueDetail({
         filtersJson: this.filtersJson,
@@ -276,6 +315,19 @@ export default class GxFeedbackDashboard extends LightningElement {
     const id = event.currentTarget.dataset.id;
     const row = this.followUps.find((r) => r.key === id);
     if (!row) {
+      return;
+    }
+    // Saving what is already saved would stamp a new name and date on the
+    // case and make it look worked on when nothing happened.
+    const unchanged =
+      row.draftStatus === row.status &&
+      (row.draftNote || "") === (row.followUpNote || "");
+    if (unchanged) {
+      this.toast(
+        "Nothing to save",
+        "Change the status or add a note first.",
+        "info"
+      );
       return;
     }
     this.savingId = id;

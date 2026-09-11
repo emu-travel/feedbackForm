@@ -88,10 +88,26 @@
       <template lwc:if={data}>
         <section class="kpis" aria-label="Headline numbers">
           <template for:each={kpis} for:item="k">
-            <div key={k.key} class={k.cls}>
-              <div class="kpi-label">{k.label}</div>
-              <div class="kpi-value">{k.value}</div>
-              <div class="kpi-note">{k.note}</div>
+            <div key={k.key} class="kpi-cell">
+              <template lwc:if={k.target}>
+                <button
+                  class={k.cls}
+                  data-target={k.target}
+                  title={k.hint}
+                  onclick={handleKpiClick}
+                >
+                  <span class="kpi-label">{k.label}</span>
+                  <span class="kpi-value">{k.value}</span>
+                  <span class="kpi-note">{k.note}</span>
+                </button>
+              </template>
+              <template lwc:else>
+                <div class={k.cls}>
+                  <span class="kpi-label">{k.label}</span>
+                  <span class="kpi-value">{k.value}</span>
+                  <span class="kpi-note">{k.note}</span>
+                </div>
+              </template>
             </div>
           </template>
         </section>
@@ -178,7 +194,12 @@
             </div>
 
             <template lwc:if={drill}>
-              <div class="drill" role="region" aria-label={drillTitle}>
+              <div
+                class="drill"
+                data-section="drill"
+                role="region"
+                aria-label={drillTitle}
+              >
                 <div class="drill-head">
                   <div>
                     <h3 class="drill-title">{drillTitle}</h3>
@@ -199,9 +220,10 @@
                     <div key={r.key} class="drill-row">
                       <span class={r.cls}>{r.score}</span>
                       <div class="drill-main">
-                        <div class="drill-who">
+                        <div class="meta drill-who">
                           <a href={r.url}>{r.bookingNumber}</a>
-                          <span> · {r.guest}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{r.guest}</span>
                         </div>
                         <template lwc:if={r.comment}>
                           <div class="drill-comment">{r.comment}</div>
@@ -251,7 +273,17 @@
                   <tbody>
                     <template for:each={hotelDetail} for:item="row">
                       <tr key={row.key}>
-                        <th scope="row" class="heat-hotel">{row.hotel}</th>
+                        <th scope="row" class="heat-hotel">
+                          <button
+                            class="link-btn"
+                            data-name={row.hotel}
+                            data-category="Hotel"
+                            title="Show every rating for this hotel"
+                            onclick={handleHeatSelect}
+                          >
+                            {row.hotel}
+                          </button>
+                        </th>
                         <template for:each={row.cells} for:item="c">
                           <td key={c.key} class={c.cls} title={c.title}>
                             {c.value}
@@ -267,7 +299,7 @@
 
           <div class="two">
             <!-- Follow-up -->
-            <section class="panel">
+            <section class="panel" data-section="followups">
               <div class="panel-head">
                 <h2 class="panel-title">Unhappy guests to follow up</h2>
                 <lightning-button
@@ -281,15 +313,17 @@
                   <div key={r.key} class="fu">
                     <div class="fu-top">
                       <span class="pill pill_bad">{r.npsLabel}</span>
-                      <div class="fu-who">
+                      <div class="meta fu-who">
                         <a href={r.url}>{r.bookingNumber}</a>
-                        <span> · {r.detail}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{r.detail}</span>
                       </div>
                     </div>
                     <p class="fu-comment">{r.comment}</p>
                     <template lwc:if={r.followUpBy}>
-                      <p class="fu-meta">
-                        {r.status} by {r.followUpBy},
+                      <p class="meta fu-meta">
+                        <span>{r.updatedLabel}</span>
+                        <span aria-hidden="true">·</span>
                         <lightning-formatted-date-time
                           value={r.followUpOn}
                           year="numeric"
@@ -345,8 +379,10 @@
                   <template for:each={destinations} for:item="d">
                     <li key={d.key} class="dest-row">
                       <span class="dest-wish">{d.wish}</span>
-                      <span class="dest-who">
-                        {d.guest} · <a href={d.url}>{d.bookingNumber}</a>
+                      <span class="meta dest-who">
+                        <span>{d.guest}</span>
+                        <span aria-hidden="true">·</span>
+                        <a href={d.url}>{d.bookingNumber}</a>
                       </span>
                       <template lwc:if={d.promoter}>
                         <span class="pill pill_good">{d.npsLabel}</span>
@@ -370,6 +406,11 @@
           <section class="panel">
             <div class="panel-head">
               <h2 class="panel-title">What guests wrote</h2>
+              <lightning-button
+                variant="base"
+                label={lowOnlyLabel}
+                onclick={toggleLowOnly}
+              ></lightning-button>
             </div>
             <template lwc:if={hasComments}>
               <ul class="comments">
@@ -383,8 +424,11 @@
                     </template>
                     <div class="comment-main">
                       <p class="comment-text">{c.text}</p>
-                      <p class="comment-meta">
-                        {c.about} · {c.guest} ·
+                      <p class="meta comment-meta">
+                        <span>{c.about}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{c.guest}</span>
+                        <span aria-hidden="true">·</span>
                         <a href={c.url}>{c.bookingNumber}</a>
                       </p>
                     </div>
@@ -393,7 +437,7 @@
               </ul>
             </template>
             <template lwc:else>
-              <p class="panel-note">No comments in this selection.</p>
+              <p class="panel-note">{commentsEmptyText}</p>
             </template>
           </section>
         </template>

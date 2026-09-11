@@ -237,7 +237,10 @@ export function kpiTiles(kpis) {
         (k.openFollowUps || 0) === 1
           ? "unhappy guest not yet contacted"
           : "unhappy guests not yet contacted",
-      alert: (k.openFollowUps || 0) > 0
+      alert: (k.openFollowUps || 0) > 0,
+      // The one tile that is also a to-do list: it takes you there.
+      target: "followups",
+      hint: "Go to the unhappy guests to follow up"
     }
   ];
 }
@@ -314,6 +317,7 @@ export function followUpRows(rows, showHandled) {
       url: bookingUrl(r.bookingId),
       status: r.followUpStatus || "Open",
       handled: !isOpenFollowUp(r.followUpStatus),
+      updatedLabel: r.followUpBy ? `Last updated by ${r.followUpBy}` : null,
       comment: r.comment || "No comment left."
     }));
 }
@@ -336,11 +340,16 @@ export function commentRows(rows) {
     text: c.text,
     about: c.about,
     score: commentScoreLabel(c),
-    cls: `pill pill_${c.scoreKind === "nps" ? npsToneFor(c.score) : toneFor(c.score)}`,
+    cls: `pill pill_${commentTone(c)}`,
+    low: commentTone(c) === "bad",
     guest: c.guest || "Guest",
     bookingNumber: c.bookingNumber,
     url: bookingUrl(c.bookingId)
   }));
+}
+
+function commentTone(c) {
+  return c.scoreKind === "nps" ? npsToneFor(c.score) : toneFor(c.score);
 }
 
 function commentScoreLabel(c) {

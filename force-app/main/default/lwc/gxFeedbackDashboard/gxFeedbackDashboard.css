@@ -578,3 +578,62 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- meta lines ---------- */
+
+/*
+ * Separators are their own elements, spaced by the gap. Relying on the
+ * whitespace around them failed: wherever a line wrapped before a link,
+ * the space was dropped and "Guest ·GX-..." ran together.
+ */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.35rem;
+}
+
+/* ---------- clickable tile and links ---------- */
+
+.kpi-cell {
+  display: flex;
+}
+
+.kpi-cell > .kpi {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+button.kpi {
+  border: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.kpi:hover {
+  box-shadow: inset 0 0 0 1px var(--gx-bad);
+}
+
+button.kpi:focus-visible,
+.link-btn:focus-visible {
+  outline: 2px solid var(--gx-gold);
+  outline-offset: 2px;
+}
+
+.link-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--gx-forest);
+  text-decoration: underline;
+}

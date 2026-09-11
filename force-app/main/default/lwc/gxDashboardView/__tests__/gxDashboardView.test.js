@@ -327,3 +327,35 @@ describe("copy and labelling fixes from the first review", () => {
     expect(rating.cls).toBe("pill pill_good");
   });
 });
+
+describe("usability pass", () => {
+  it("marks low-scoring comments, whichever scale the number is on", () => {
+    const rows = commentRows([
+      { key: "a", text: "x", score: 5, scoreKind: "nps" },
+      { key: "b", text: "x", score: 7, scoreKind: "score" },
+      { key: "c", text: "x", score: 5, scoreKind: "score" },
+      { key: "d", text: "x", score: null }
+    ]);
+    expect(rows.map((r) => r.low)).toEqual([true, false, true, false]);
+  });
+
+  it("makes the open follow-ups tile a way into the list", () => {
+    const tile = kpiTiles({ openFollowUps: 2 }).find(
+      (t) => t.key === "followups"
+    );
+    expect(tile.target).toBe("followups");
+    expect(tile.hint).toBeTruthy();
+  });
+
+  it("says who last touched a follow-up, and nothing when nobody has", () => {
+    const [touched, untouched] = followUpRows(
+      [
+        { responseId: "a", nps: 3, followUpBy: "Ali Haider" },
+        { responseId: "b", nps: 4 }
+      ],
+      true
+    );
+    expect(touched.updatedLabel).toBe("Last updated by Ali Haider");
+    expect(untouched.updatedLabel).toBeNull();
+  });
+});

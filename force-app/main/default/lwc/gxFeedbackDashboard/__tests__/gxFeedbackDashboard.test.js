@@ -276,3 +276,81 @@ describe("c-gx-feedback-dashboard", () => {
     );
   });
 });
+
+describe("c-gx-feedback-dashboard usability", () => {
+  const originalScroll = Element.prototype.scrollIntoView;
+
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = jest.fn();
+  });
+
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScroll;
+    while (document.body.firstChild) {
+      document.body.removeChild(document.body.firstChild);
+    }
+    jest.clearAllMocks();
+  });
+
+  it("does not stamp a follow-up that nothing was changed on", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    await flush();
+
+    const save = [...el.shadowRoot.querySelectorAll("lightning-button")].find(
+      (b) => b.label === "Save"
+    );
+    save.click();
+    await flush();
+
+    expect(updateFollowUp).not.toHaveBeenCalled();
+  });
+
+  it("takes you to the follow-up list from the open follow-ups tile", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    await flush();
+
+    el.shadowRoot.querySelector("button.kpi").click();
+    await flush();
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("opens a hotel from the detail grid as well as the leaderboard", async () => {
+    getVenueDetail.mockResolvedValue([]);
+    const el = mount();
+    getDashboard.emit(DATA);
+    await flush();
+
+    el.shadowRoot.querySelector("button.link-btn").click();
+    await flush();
+
+    expect(getVenueDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "Hotel", itemName: "Conrad Algarve" })
+    );
+  });
+
+  it("filters the comments down to the low scores on request", async () => {
+    const el = mount();
+    getDashboard.emit({
+      ...DATA,
+      comments: [
+        { key: "low", text: "Laut", score: 4, scoreKind: "score" },
+        { key: "high", text: "Toll", score: 9, scoreKind: "score" }
+      ]
+    });
+    await flush();
+    expect(el.shadowRoot.querySelectorAll("li.comment").length).toBe(2);
+
+    const toggle = [...el.shadowRoot.querySelectorAll("lightning-button")].find(
+      (b) => b.label === "Only low scores"
+    );
+    toggle.click();
+    await flush();
+
+    const left = [...el.shadowRoot.querySelectorAll("li.comment")];
+    expect(left.length).toBe(1);
+    expect(left[0].textContent).toContain("Laut");
+  });
+});

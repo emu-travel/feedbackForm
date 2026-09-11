@@ -36,7 +36,7 @@
 
 .venue {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 5rem 3.25rem 4.5rem;
+  grid-template-columns: minmax(0, 1fr) 5rem 3.25rem 4.5rem 0.75rem;
   align-items: center;
   gap: 0.625rem;
   width: 100%;
@@ -62,7 +62,7 @@
 }
 
 .venue_unranked {
-  grid-template-columns: minmax(0, 1fr) 3.25rem 4.5rem;
+  grid-template-columns: minmax(0, 1fr) 3.25rem 4.5rem 0.75rem;
   color: #3d5148;
 }
 
@@ -100,4 +100,17 @@
   color: #5a6b62;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Rows open the drill-down; the chevron says so before anyone hovers. */
+.chev {
+  color: #c3cec8;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: right;
+}
+
+.venue:hover .chev,
+.venue:focus-visible .chev {
+  color: #0f3822;
 }
