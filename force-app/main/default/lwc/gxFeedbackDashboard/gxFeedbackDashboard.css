@@ -47,20 +47,32 @@
 
 /* ---------- filters ---------- */
 
+/*
+ * Filters line up along the top. A focused date field shows a "Format: ..."
+ * hint under itself; lined up along the bottom, that pushed its label above
+ * all the others. The date fields also keep the hint's room reserved, so the
+ * hint (or a date error) appears without moving the row or the page below.
+ */
 .filters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.75rem;
-  align-items: end;
-  padding: 1rem 0;
+  align-items: start;
+  padding: 1rem 0 0.5rem;
   border-bottom: 1px solid var(--gx-line);
 }
 
+.filters lightning-input {
+  min-height: 5rem;
+}
+
+/* Level with the input boxes: below the label row, as tall as a field. */
 .filter-actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  padding-bottom: 0.25rem;
+  min-height: 2rem;
+  margin-top: 1.5rem;
 }
 
 .body {
