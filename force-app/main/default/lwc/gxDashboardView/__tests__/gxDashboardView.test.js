@@ -18,7 +18,11 @@ import {
   bookingUrl,
   monthLabel,
   plural,
-  npsToneFor
+  npsToneFor,
+  pageOf,
+  rangeLabel,
+  responseView,
+  tripDates
 } from "c/gxDashboardView";
 
 describe("number formatting", () => {
@@ -357,5 +361,165 @@ describe("usability pass", () => {
     );
     expect(touched.updatedLabel).toBe("Last updated by Ali Haider");
     expect(untouched.updatedLabel).toBeNull();
+  });
+});
+
+describe("paging", () => {
+  const rows = Array.from({ length: 25 }, (_, i) => ({ key: `r${i + 1}` }));
+
+  it("cuts a list into pages of ten", () => {
+    const p = pageOf(rows, 2);
+    expect(p.rows.map((r) => r.key)).toEqual([
+      "r11",
+      "r12",
+      "r13",
+      "r14",
+      "r15",
+      "r16",
+      "r17",
+      "r18",
+      "r19",
+      "r20"
+    ]);
+    expect(p.pages).toBe(3);
+    expect(p.total).toBe(25);
+  });
+
+  it("never lands on a page the list no longer has", () => {
+    expect(pageOf(rows.slice(0, 5), 3).page).toBe(1);
+    expect(pageOf(rows, 99).page).toBe(3);
+    expect(pageOf(rows, undefined).page).toBe(1);
+    expect(pageOf(undefined, 2)).toEqual({
+      rows: [],
+      page: 1,
+      pages: 1,
+      total: 0
+    });
+  });
+
+  it("says which rows are showing", () => {
+    expect(rangeLabel(2, 57)).toBe("11–20 of 57");
+    expect(rangeLabel(6, 57)).toBe("51–57 of 57");
+    expect(rangeLabel(1, 0)).toBe("0 of 0");
+  });
+});
+
+describe("one whole response", () => {
+  const DETAIL = {
+    responseId: "a01",
+    reference: "FB-00013",
+    guest: "Ali Haider",
+    bookingId: "b01",
+    bookingNumber: "GX-TEST-A1",
+    region: "Algarve",
+    country: "Portugal",
+    tripStart: "2026-08-30",
+    tripEnd: "2026-09-08",
+    overall: 6,
+    overallComment: "Zu viel Programm",
+    consultation: 9,
+    services: [
+      { category: "Airline", name: "Lufthansa, Condor", score: 7 },
+      { category: "TransferCompany", name: "Algarve Chauffeurs", score: 10 }
+    ],
+    hotels: [
+      {
+        name: "Conrad Algarve",
+        score: 5,
+        comment: "Laut",
+        subScores: [
+          { subCategory: "Room", average: 4 },
+          { subCategory: "Cleanliness", average: 9 }
+        ]
+      }
+    ],
+    golf: [],
+    generalHotelComment: "   ",
+    recommendation: 4,
+    npsCategory: "Detractor",
+    nextDestination: "Schottland",
+    improvementSuggestions: null,
+    followUpStatus: "Contacted",
+    followUpNote: "Angerufen",
+    followUpBy: "Kaan"
+  };
+
+  it("lays the answer out screen by screen, leaving out screens the trip did not have", () => {
+    const v = responseView(DETAIL);
+    expect(v.sections.map((s) => s.key)).toEqual([
+      "overall",
+      "services",
+      "hotels",
+      "close"
+    ]);
+    expect(v.title).toBe("FB-00013 · Ali Haider");
+    expect(v.tripLine).toBe(
+      "GX-TEST-A1 · Algarve, Portugal · 30 Aug – 8 Sep 2026"
+    );
+  });
+
+  it("colours each score and keeps the comment beside it", () => {
+    const [overall, consult] = responseView(DETAIL).sections[0].items;
+    expect(overall.score).toBe("6.0");
+    expect(overall.cls).toBe("pill pill_bad");
+    expect(overall.comment).toBe("Zu viel Programm");
+    expect(consult.cls).toBe("pill pill_good");
+    expect(consult.comment).toBeNull();
+  });
+
+  it("names each travel service and who provided it", () => {
+    const services = responseView(DETAIL).sections[1].items;
+    expect(services.map((s) => s.label)).toEqual([
+      "Airline · Lufthansa, Condor",
+      "Transfer · Algarve Chauffeurs"
+    ]);
+  });
+
+  it("puts a hotel's detail ratings underneath it", () => {
+    const [hotel] = responseView(DETAIL).sections[2].items;
+    expect(hotel.subs.map((s) => `${s.label} ${s.value}`)).toEqual([
+      "Room 4.0",
+      "Cleanliness 9.0"
+    ]);
+  });
+
+  it("keeps only the free text the guest actually wrote", () => {
+    const v = responseView(DETAIL);
+    expect(v.sections[2].texts).toEqual([]);
+    expect(v.sections[3].texts.map((t) => t.label)).toEqual([
+      "Next on their wish list"
+    ]);
+  });
+
+  it("gives the recommendation its NPS group", () => {
+    const [nps] = responseView(DETAIL).sections[3].items;
+    expect(nps.score).toBe("4");
+    expect(nps.tag).toBe("Detractor");
+    expect(nps.cls).toBe("pill pill_bad");
+  });
+
+  it("shows what the team did about it, when they did something", () => {
+    expect(responseView(DETAIL).followUp).toEqual({
+      status: "Contacted",
+      note: "Angerufen",
+      by: "Kaan",
+      on: null
+    });
+    expect(
+      responseView({ ...DETAIL, followUpStatus: null, followUpNote: null })
+        .followUp
+    ).toBeNull();
+  });
+
+  it("writes trip dates briefly", () => {
+    expect(tripDates("2026-08-30", "2026-09-08")).toBe("30 Aug – 8 Sep 2026");
+    expect(tripDates("2026-12-28", "2027-01-04")).toBe(
+      "28 Dec 2026 – 4 Jan 2027"
+    );
+    expect(tripDates(null, null)).toBe("");
+  });
+
+  it("has nothing to show for nothing", () => {
+    expect(responseView(null)).toBeNull();
   });
 });

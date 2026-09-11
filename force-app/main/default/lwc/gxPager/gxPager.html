@@ -1,0 +1,28 @@
+<template>
+  <template lwc:if={visible}>
+    <nav class="pager" aria-label={label}>
+      <span class="range">{range}</span>
+      <span class="controls">
+        <lightning-button-icon
+          icon-name="utility:chevronleft"
+          alternative-text="Previous page"
+          title="Previous page"
+          variant="border-filled"
+          size="small"
+          disabled={atStart}
+          onclick={handlePrevious}
+        ></lightning-button-icon>
+        <span class="page" aria-live="polite">{pageText}</span>
+        <lightning-button-icon
+          icon-name="utility:chevronright"
+          alternative-text="Next page"
+          title="Next page"
+          variant="border-filled"
+          size="small"
+          disabled={atEnd}
+          onclick={handleNext}
+        ></lightning-button-icon>
+      </span>
+    </nav>
+  </template>
+</template>

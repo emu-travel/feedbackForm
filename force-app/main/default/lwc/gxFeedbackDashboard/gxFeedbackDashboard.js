@@ -1,6 +1,8 @@
 import { LightningElement, wire } from "lwc";
 import { refreshApex } from "@salesforce/apex";
+import { NavigationMixin } from "lightning/navigation";
 import { ShowToastEvent } from "lightning/platformShowToastEvent";
+import GxResponseModal from "c/gxResponseModal";
 import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDashboard";
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
@@ -19,7 +21,8 @@ import {
   destinationRows,
   commentRows,
   drillRows,
-  categoryLabel
+  categoryLabel,
+  pageOf
 } from "c/gxDashboardView";
 
 /**
@@ -27,9 +30,13 @@ import {
  *
  * The team's view of post-trip feedback. Everything is computed by
  * GxFeedbackDashboardController in one call per filter change; this component
- * only holds the filters, the follow-up drafts and the open drill-down.
+ * only holds the filters, the follow-up drafts, the open drill-down and which
+ * page each list is on. Every list pages ten rows at a time, and every
+ * response it shows opens in full in gxResponseModal.
  */
-export default class GxFeedbackDashboard extends LightningElement {
+export default class GxFeedbackDashboard extends NavigationMixin(
+  LightningElement
+) {
   filters = defaultFilters();
   filtersJson = filtersPayload(this.filters);
 
@@ -47,6 +54,9 @@ export default class GxFeedbackDashboard extends LightningElement {
   savingId;
 
   drill;
+
+  /** Which page each list is on, by list name. Missing means page 1. */
+  pages = {};
 
   wiredDashboard;
 
@@ -133,6 +143,10 @@ export default class GxFeedbackDashboard extends LightningElement {
     return this.hotelDetail.length > 0;
   }
 
+  get heatPage() {
+    return pageOf(this.hotelDetail, this.pages.heat);
+  }
+
   get followUps() {
     return followUpRows(this.data && this.data.followUps, this.showHandled).map(
       (r) => {
@@ -150,6 +164,19 @@ export default class GxFeedbackDashboard extends LightningElement {
 
   get hasFollowUps() {
     return this.followUps.length > 0;
+  }
+
+  get followUpPage() {
+    return pageOf(this.followUps, this.pages.followups);
+  }
+
+  /** Said only when the server sent fewer cases than the selection holds. */
+  get followUpCapNote() {
+    const total = (this.data && this.data.followUpsTotal) || 0;
+    const sent = ((this.data && this.data.followUps) || []).length;
+    return total > sent
+      ? `Showing ${sent} of ${total} unhappy guests, open cases first. Narrow the dates to reach the rest.`
+      : null;
   }
 
   get followUpEmptyText() {
@@ -170,6 +197,16 @@ export default class GxFeedbackDashboard extends LightningElement {
     return this.destinations.length > 0;
   }
 
+  get destinationPage() {
+    return pageOf(this.destinations, this.pages.destinations);
+  }
+
+  get destinationsCapNote() {
+    return this.data && this.data.destinationsCapped
+      ? "From the most recent responses. Narrow the dates to see older wishes."
+      : null;
+  }
+
   get comments() {
     const rows = commentRows(this.data && this.data.comments);
     return this.lowOnly ? rows.filter((c) => c.low) : rows;
@@ -177,6 +214,16 @@ export default class GxFeedbackDashboard extends LightningElement {
 
   get lowOnlyLabel() {
     return this.lowOnly ? "Show all comments" : "Only low scores";
+  }
+
+  get commentPage() {
+    return pageOf(this.comments, this.pages.comments);
+  }
+
+  get commentsCapNote() {
+    return this.data && this.data.commentsCapped
+      ? "The most recent comments. Narrow the dates to see older ones."
+      : null;
   }
 
   get commentsEmptyText() {
@@ -187,6 +234,7 @@ export default class GxFeedbackDashboard extends LightningElement {
 
   toggleLowOnly() {
     this.lowOnly = !this.lowOnly;
+    this.setPage("comments", 1);
   }
 
   handleKpiClick(event) {
@@ -218,6 +266,51 @@ export default class GxFeedbackDashboard extends LightningElement {
     return n === 1 ? "1 guest" : `${n} guests`;
   }
 
+  get drillPage() {
+    return pageOf(this.drill ? this.drill.rows : [], this.pages.drill);
+  }
+
+  // ------------------------------------------------------------------
+  // Paging and full responses
+
+  handlePage(event) {
+    const list = event.currentTarget.dataset.list;
+    this.setPage(list, event.detail.page);
+    // Paging from the foot of a long list would leave the reader looking at
+    // the end of the new page; bring its top back into view.
+    const section = this.template.querySelector(`[data-section="${list}"]`);
+    if (
+      section &&
+      section.scrollIntoView &&
+      section.getBoundingClientRect().top < 0
+    ) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  setPage(list, page) {
+    this.pages = { ...this.pages, [list]: page };
+  }
+
+  async handleOpenResponse(event) {
+    const responseId = event.currentTarget.dataset.responseId;
+    if (!responseId) {
+      return;
+    }
+    const result = await GxResponseModal.open({
+      size: "medium",
+      label: "Feedback response",
+      description: "The guest's whole answer, screen by screen",
+      responseId
+    });
+    if (result && result.navigate) {
+      this[NavigationMixin.Navigate]({
+        type: "standard__recordPage",
+        attributes: { recordId: result.navigate, actionName: "view" }
+      });
+    }
+  }
+
   // ------------------------------------------------------------------
   // Filters
 
@@ -240,6 +333,7 @@ export default class GxFeedbackDashboard extends LightningElement {
     if (json !== this.filtersJson) {
       this.loading = true;
       this.drill = undefined;
+      this.pages = {};
       this.filtersJson = json;
     }
   }
@@ -269,6 +363,7 @@ export default class GxFeedbackDashboard extends LightningElement {
 
   async openDrill(name, category) {
     this.drill = { name, category, rows: [], loading: true };
+    this.setPage("drill", 1);
     // Opened from further down the page, the panel would appear off screen.
     Promise.resolve().then(() => this.scrollToSection("drill"));
     try {
@@ -293,6 +388,7 @@ export default class GxFeedbackDashboard extends LightningElement {
 
   toggleHandled() {
     this.showHandled = !this.showHandled;
+    this.setPage("followups", 1);
   }
 
   handleStatusChange(event) {

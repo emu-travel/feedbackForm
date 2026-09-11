@@ -325,6 +325,7 @@ export function followUpRows(rows, showHandled) {
 export function destinationRows(rows) {
   return (rows || []).map((r) => ({
     key: r.responseId,
+    responseId: r.responseId,
     guest: r.guest || "Guest",
     wish: r.nextDestination,
     npsLabel: `NPS ${r.nps}`,
@@ -337,6 +338,7 @@ export function destinationRows(rows) {
 export function commentRows(rows) {
   return (rows || []).map((c) => ({
     key: c.key,
+    responseId: c.responseId,
     text: c.text,
     about: c.about,
     score: commentScoreLabel(c),
@@ -364,6 +366,7 @@ function commentScoreLabel(c) {
 export function drillRows(rows) {
   return (rows || []).map((r) => ({
     key: r.responseId,
+    responseId: r.responseId,
     guest: r.guest || "Guest",
     bookingNumber: r.bookingNumber,
     url: bookingUrl(r.bookingId),
@@ -376,4 +379,194 @@ export function drillRows(rows) {
       value: formatScore(s.average)
     }))
   }));
+}
+
+// ------------------------------------------------------------------
+// Paging
+
+/** Every list on the dashboard shows this many rows at a time. */
+export const PAGE_SIZE = 10;
+
+/**
+ * One page of a list, with the page number clamped to what exists - so a
+ * list that shrinks (a filter, "Hide handled") never lands on an empty page.
+ */
+export function pageOf(rows, page, size = PAGE_SIZE) {
+  const all = rows || [];
+  const pages = Math.max(1, Math.ceil(all.length / size));
+  const current = Math.min(Math.max(1, Number(page) || 1), pages);
+  return {
+    rows: all.slice((current - 1) * size, current * size),
+    page: current,
+    pages,
+    total: all.length
+  };
+}
+
+/** "11–20 of 57" */
+export function rangeLabel(page, total, size = PAGE_SIZE) {
+  if (!total) {
+    return "0 of 0";
+  }
+  const from = (page - 1) * size + 1;
+  const to = Math.min(page * size, total);
+  return `${from}–${to} of ${total}`;
+}
+
+// ------------------------------------------------------------------
+// One whole response
+
+/** "30 Aug – 8 Sep 2026" from two ISO dates. */
+export function tripDates(start, end) {
+  const parse = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m
+      ? { y: m[1], mo: MONTHS[Number(m[2]) - 1], d: Number(m[3]) }
+      : null;
+  };
+  const a = parse(start);
+  const b = parse(end);
+  if (a && b) {
+    return a.y === b.y
+      ? `${a.d} ${a.mo} – ${b.d} ${b.mo} ${b.y}`
+      : `${a.d} ${a.mo} ${a.y} – ${b.d} ${b.mo} ${b.y}`;
+  }
+  const one = a || b;
+  return one ? `${one.d} ${one.mo} ${one.y}` : "";
+}
+
+function scored(key, label, score, comment, extra = {}) {
+  return {
+    key,
+    label,
+    score: formatScore(score),
+    cls: `pill pill_${toneFor(score)}`,
+    comment: comment || null,
+    subs: [],
+    ...extra
+  };
+}
+
+/**
+ * A response laid out the way the guest filled it in: one section per survey
+ * screen, skipping the screens their trip did not have.
+ */
+export function responseView(detail) {
+  if (!detail) {
+    return null;
+  }
+  const d = detail;
+  const sections = [];
+
+  sections.push({
+    key: "overall",
+    title: "Overall impression",
+    items: [
+      scored("overall", "The trip overall", d.overall, d.overallComment),
+      scored(
+        "consult",
+        "Our consultation and product choice",
+        d.consultation,
+        d.consultationComment
+      )
+    ],
+    texts: []
+  });
+
+  if ((d.services || []).length) {
+    sections.push({
+      key: "services",
+      title: "Flights, transfers and rental cars",
+      items: d.services.map((s, i) =>
+        scored(
+          `service-${i}`,
+          `${categoryLabel(s.category)} · ${s.name}`,
+          s.score,
+          s.comment
+        )
+      ),
+      texts: []
+    });
+  }
+
+  if ((d.hotels || []).length || d.generalHotelComment) {
+    sections.push({
+      key: "hotels",
+      title: "Hotels",
+      items: (d.hotels || []).map((h, i) =>
+        scored(`hotel-${i}`, h.name, h.score, h.comment, {
+          subs: (h.subScores || []).map((c) => ({
+            key: `hotel-${i}-${c.subCategory}`,
+            label: SUB_LABELS[c.subCategory] || c.subCategory,
+            value: formatScore(c.average)
+          }))
+        })
+      ),
+      texts: textRows([["About the hotels in general", d.generalHotelComment]])
+    });
+  }
+
+  if ((d.golf || []).length || d.generalGolfComment) {
+    sections.push({
+      key: "golf",
+      title: "Golf courses",
+      items: (d.golf || []).map((g, i) =>
+        scored(`golf-${i}`, g.name, g.score, g.comment)
+      ),
+      texts: textRows([["About the golf in general", d.generalGolfComment]])
+    });
+  }
+
+  const nps =
+    d.recommendation === null || d.recommendation === undefined
+      ? null
+      : Math.round(d.recommendation);
+  sections.push({
+    key: "close",
+    title: "Conclusion",
+    items: [
+      {
+        key: "nps",
+        label: "Would recommend golf.extra",
+        score: nps === null ? "—" : String(nps),
+        cls: `pill pill_${npsToneFor(nps)}`,
+        comment: null,
+        subs: [],
+        tag: d.npsCategory || null
+      }
+    ],
+    texts: textRows([
+      ["Next on their wish list", d.nextDestination],
+      ["Suggestions and personal notes", d.improvementSuggestions],
+      ["Anything else", d.generalFeedback]
+    ])
+  });
+
+  const where = [d.region, d.country].filter(Boolean).join(", ");
+  return {
+    title: `${d.reference || "Feedback"} · ${d.guest || "Guest"}`,
+    tripLine: [d.bookingNumber, where, tripDates(d.tripStart, d.tripEnd)]
+      .filter(Boolean)
+      .join(" · "),
+    submittedOn: d.submittedOn,
+    bookingId: d.bookingId,
+    responseId: d.responseId,
+    reviewPrompted: Boolean(d.publicReviewPrompted),
+    sections,
+    followUp:
+      d.followUpStatus || d.followUpNote
+        ? {
+            status: d.followUpStatus || "Open",
+            note: d.followUpNote || null,
+            by: d.followUpBy || null,
+            on: d.followUpOn || null
+          }
+        : null
+  };
+}
+
+function textRows(pairs) {
+  return pairs
+    .filter(([, text]) => text && String(text).trim())
+    .map(([label, text], i) => ({ key: `text-${i}-${label}`, label, text }));
 }

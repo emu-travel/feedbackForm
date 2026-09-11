@@ -496,4 +496,152 @@ private class GxFeedbackDashboardControllerTest {
     }
     Assert.areEqual(4, total, 'All four responses are in the trend');
   }
+
+  // ------------------------------------------------------------------
+  // Volume
+
+  @IsTest
+  static void listsWithinTheirCapsSayNothingWasLeftOut() {
+    GxFeedbackDashboardController.Dashboard d = load(null);
+    Assert.isFalse(d.commentsCapped, 'Every comment was sent');
+    Assert.isFalse(d.destinationsCapped, 'Every wish was sent');
+    Assert.areEqual(
+      d.kpis.detractors,
+      d.followUpsTotal,
+      'The follow-up total is every detractor in the selection'
+    );
+  }
+
+  @IsTest
+  static void listsBeyondTheirCapsAreCutAndSaySo() {
+    GxFeedbackDashboardController.maxComments = 1;
+    GxFeedbackDashboardController.maxDestinations = 1;
+
+    GxFeedbackDashboardController.Dashboard d = load(null);
+
+    Assert.areEqual(1, d.comments.size(), 'Comments stop at the cap');
+    Assert.isTrue(d.commentsCapped, 'and the page is told more exist');
+    Assert.areEqual(1, d.nextDestinations.size(), 'Wishes stop at the cap');
+    Assert.areEqual(
+      'Schottland',
+      d.nextDestinations[0].nextDestination,
+      'The happiest guest is the one kept'
+    );
+    Assert.isTrue(d.destinationsCapped, 'and the page is told more exist');
+  }
+
+  @IsTest
+  static void aSelectionTooLargeToTotalIsRefusedRatherThanHalfDone() {
+    GxFeedbackDashboardController.maxRatingsInView = 5;
+    try {
+      load(null);
+      Assert.fail('Too many ratings to total must be refused up front');
+    } catch (AuraHandledException e) {
+      Assert.isNotNull(e.getMessage(), 'It says what to do instead');
+    }
+  }
+
+  @IsTest
+  static void openCasesComeBeforeHandledOnes() {
+    Feedback_Response__c handled = [
+      SELECT Id
+      FROM Feedback_Response__c
+      WHERE Booking__r.BookingNumber__c = 'GXD-1'
+    ];
+    handled.Recommendation_NPS__c = 2;
+    handled.Follow_Up_Status__c = 'Resolved';
+    // The follow-up fields are only ever written in system mode, as the
+    // controller does; a plain update is refused them.
+    Database.update(handled, AccessLevel.SYSTEM_MODE);
+
+    List<GxFeedbackDashboardController.ResponseRow> rows = load(null).followUps;
+
+    Assert.areEqual(2, rows.size(), 'Both detractors are listed');
+    Assert.areEqual('GXD-2', rows[0].bookingNumber, 'The open case first');
+    Assert.areEqual('GXD-1', rows[1].bookingNumber, 'The resolved one after');
+  }
+
+  @IsTest
+  static void everyCommentKnowsWhichResponseItCameFrom() {
+    for (GxFeedbackDashboardController.CommentRow c : load(null).comments) {
+      Assert.isNotNull(c.responseId, c.text + ' can open its full response');
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Full response
+
+  private static Id responseOf(String bookingNumber) {
+    return [
+      SELECT Id
+      FROM Feedback_Response__c
+      WHERE Booking__r.BookingNumber__c = :bookingNumber
+    ]
+    .Id;
+  }
+
+  @IsTest
+  static void aResponseOpensInFullScreenByScreen() {
+    GxFeedbackDashboardController.ResponseDetail d = GxFeedbackDashboardController.getResponseDetail(
+      responseOf('GXD-2')
+    );
+
+    Assert.areEqual('GXD-2', d.bookingNumber, 'Its booking');
+    Assert.areEqual(5, d.overall, 'Screen 1: overall');
+    Assert.areEqual(6, d.consultation, 'Screen 1: consultation');
+    Assert.areEqual(3, d.recommendation, 'Screen 5: recommendation');
+    Assert.areEqual('Detractor', d.npsCategory, 'and what that makes them');
+    Assert.areEqual('Zu laut', d.improvementSuggestions, 'Screen 5: words');
+
+    Assert.areEqual(1, d.services.size(), 'Screen 2: the flight');
+    Assert.areEqual('Airline', d.services[0].category, 'is the airline');
+    Assert.areEqual('Verspätet', d.services[0].comment, 'with its comment');
+
+    Assert.areEqual(1, d.hotels.size(), 'Screen 3: one hotel');
+    Assert.areEqual(CONRAD, d.hotels[0].name, 'by name');
+    Assert.areEqual(5, d.hotels[0].score, 'with its score');
+    Assert.areEqual('Laut', d.hotels[0].comment, 'and comment');
+    Assert.areEqual(
+      4,
+      d.hotels[0].subScores.size(),
+      'and its four detail ratings underneath'
+    );
+
+    Assert.areEqual(1, d.golf.size(), 'Screen 4: one course');
+    Assert.areEqual(QUINTA, d.golf[0].name, 'by name');
+  }
+
+  @IsTest
+  static void aServiceSavedPerSupplierReadsAsTheOneAnswerItWas() {
+    Id responseId = responseOf('GXD-1');
+    insert new Feedback_Rating__c(
+      Feedback_Response__c = responseId,
+      Category__c = 'Airline',
+      Item_Name__c = 'Condor',
+      Score__c = 8
+    );
+
+    GxFeedbackDashboardController.ResponseDetail d = GxFeedbackDashboardController.getResponseDetail(
+      responseId
+    );
+
+    Assert.areEqual(1, d.services.size(), 'One flight question, one line');
+    Assert.areEqual(
+      LUFTHANSA + ', Condor',
+      d.services[0].name,
+      'naming every airline it covered'
+    );
+  }
+
+  @IsTest
+  static void aResponseThatIsGoneIsReportedNotBlank() {
+    Id responseId = responseOf('GXD-3');
+    delete new Feedback_Response__c(Id = responseId);
+    try {
+      GxFeedbackDashboardController.getResponseDetail(responseId);
+      Assert.fail('A missing response must be reported');
+    } catch (AuraHandledException e) {
+      Assert.isNotNull(e.getMessage(), 'It says why');
+    }
+  }
 }

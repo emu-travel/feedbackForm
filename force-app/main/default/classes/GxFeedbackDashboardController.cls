@@ -8,10 +8,11 @@
  * Golf_Extra_Feedback_Admin permission set, which is where access to guest
  * comments and names is actually decided.
  *
- * Venue scores are aggregated in SOQL rather than loaded row by row, because
- * ratings multiply - a dozen per response - and the dashboard has to keep
- * working at thousands of responses. Responses themselves are one per trip
- * and are loaded as rows.
+ * Every number is counted or averaged in SOQL rather than from loaded rows, so
+ * it stays right however many responses a selection covers. Rows are loaded
+ * only for what has to be read - follow-ups, next destinations, comments -
+ * and each of those is capped, with the cap reported so the page can say so.
+ * The page pages through what it receives.
  *
  * Every filter narrows the bookings, and every number follows from the
  * bookings. The one exception is category, which only narrows the venue
@@ -32,8 +33,25 @@ public with sharing class GxFeedbackDashboardController {
   /** A comment box only opens at 8 or below, so this bounds the search. */
   private static final Integer COMMENT_SCORE_MAX = 8;
 
-  private static final Integer MAX_COMMENTS = 60;
+  /** Caps on rows sent to the page. The page pages through them 10 at a time. */
+  @TestVisible
+  private static Integer maxComments = 300;
+  @TestVisible
+  private static Integer maxFollowUps = 500;
+  @TestVisible
+  private static Integer maxDestinations = 500;
+
+  /** Newest responses read for their free text (comments, next destinations). */
   private static final Integer MAX_RESPONSES = 2000;
+
+  /**
+   * Averages count every rating they cover against the 50,000-row limit per
+   * request. Beyond this many in one selection the page asks for narrower
+   * dates rather than failing half way. At ~10 ratings per response this is
+   * about 4,000 responses in one view.
+   */
+  @TestVisible
+  private static Integer maxRatingsInView = 40000;
 
   private static final String HOTEL = 'Hotel';
   private static final String GOLF = 'Golfclub';
@@ -92,6 +110,16 @@ public with sharing class GxFeedbackDashboardController {
     public List<CommentRow> comments = new List<CommentRow>();
     @AuraEnabled
     public Integer minRatings = MIN_RATINGS;
+
+    /** Every detractor in the selection; followUps may hold fewer. */
+    @AuraEnabled
+    public Integer followUpsTotal = 0;
+    /** True when there were more comments than were sent. */
+    @AuraEnabled
+    public Boolean commentsCapped = false;
+    /** True when older next-destination wishes were left out. */
+    @AuraEnabled
+    public Boolean destinationsCapped = false;
   }
 
   public class Kpis {
@@ -206,6 +234,8 @@ public with sharing class GxFeedbackDashboardController {
     @AuraEnabled
     public String key;
     @AuraEnabled
+    public Id responseId;
+    @AuraEnabled
     public String text;
     @AuraEnabled
     public String about;
@@ -248,6 +278,92 @@ public with sharing class GxFeedbackDashboardController {
     public List<HeatCell> subScores = new List<HeatCell>();
   }
 
+  /** One whole survey answer, in the order the guest filled it in. */
+  public class ResponseDetail {
+    @AuraEnabled
+    public Id responseId;
+    @AuraEnabled
+    public String reference;
+    @AuraEnabled
+    public Datetime submittedOn;
+    @AuraEnabled
+    public String language;
+    @AuraEnabled
+    public String guest;
+    @AuraEnabled
+    public Id bookingId;
+    @AuraEnabled
+    public String bookingNumber;
+    @AuraEnabled
+    public String region;
+    @AuraEnabled
+    public String country;
+    @AuraEnabled
+    public Date tripStart;
+    @AuraEnabled
+    public Date tripEnd;
+
+    // Screen 1
+    @AuraEnabled
+    public Decimal overall;
+    @AuraEnabled
+    public String overallComment;
+    @AuraEnabled
+    public Decimal consultation;
+    @AuraEnabled
+    public String consultationComment;
+
+    // Screens 2-4
+    @AuraEnabled
+    public List<DetailRating> services = new List<DetailRating>();
+    @AuraEnabled
+    public List<DetailRating> hotels = new List<DetailRating>();
+    @AuraEnabled
+    public String generalHotelComment;
+    @AuraEnabled
+    public List<DetailRating> golf = new List<DetailRating>();
+    @AuraEnabled
+    public String generalGolfComment;
+
+    // Screen 5
+    @AuraEnabled
+    public Decimal recommendation;
+    @AuraEnabled
+    public String npsCategory;
+    @AuraEnabled
+    public Boolean publicReviewPrompted;
+    @AuraEnabled
+    public String nextDestination;
+    @AuraEnabled
+    public String improvementSuggestions;
+    @AuraEnabled
+    public String generalFeedback;
+
+    // What the team did about it
+    @AuraEnabled
+    public String followUpStatus;
+    @AuraEnabled
+    public String followUpNote;
+    @AuraEnabled
+    public String followUpBy;
+    @AuraEnabled
+    public Datetime followUpOn;
+  }
+
+  public class DetailRating {
+    @AuraEnabled
+    public String category;
+    /** A venue, or for travel services every supplier rated together. */
+    @AuraEnabled
+    public String name;
+    @AuraEnabled
+    public Decimal score;
+    @AuraEnabled
+    public String comment;
+    @AuraEnabled
+    public List<HeatCell> subScores = new List<HeatCell>();
+  }
+
   public class Option {
     @AuraEnabled
     public String label;
@@ -275,13 +391,108 @@ public with sharing class GxFeedbackDashboardController {
   public static Dashboard getDashboard(String filtersJson) {
     Filters f = parse(filtersJson);
     Dashboard d = new Dashboard();
+    guardVolume(f);
 
-    List<Feedback_Response__c> responses = loadResponses(f);
-    applyResponses(d, responses);
+    applyKpis(d.kpis, f);
+    d.trend = trend(f);
     countInvitations(d.kpis, f);
     applyVenues(d, f);
     d.hotelDetail = hotelDetail(f);
-    d.comments = comments(f, responses);
+
+    d.followUps = followUps(f);
+    d.followUpsTotal = d.kpis.detractors;
+
+    List<Feedback_Response__c> recent = loadResponses(f);
+    applyDestinations(d, recent, d.kpis.responses > recent.size());
+    applyComments(d, f, recent);
+    return d;
+  }
+
+  /**
+   * The whole of one guest's answer, laid out screen by screen. `with sharing`
+   * decides whether the user may see it at all.
+   */
+  @AuraEnabled(cacheable=true)
+  public static ResponseDetail getResponseDetail(Id responseId) {
+    List<Feedback_Response__c> found = [
+      SELECT
+        Id,
+        Name,
+        Submitted_On__c,
+        Language__c,
+        Contact__r.Name,
+        Booking__c,
+        Booking__r.BookingNumber__c,
+        toLabel(Booking__r.Region__c),
+        toLabel(Booking__r.DestinationCountry__c),
+        Booking__r.Start_Date__c,
+        Booking__r.End_Date__c,
+        Overall_Experience__c,
+        Overall_Experience_Comment__c,
+        Consultation_Rating__c,
+        Consultation_Comment__c,
+        General_Hotel_Comment__c,
+        General_Golf_Comment__c,
+        Recommendation_NPS__c,
+        NPS_Category__c,
+        Public_Review_Prompted__c,
+        Next_Destination__c,
+        Improvement_Suggestions__c,
+        General_Feedback__c,
+        Follow_Up_Status__c,
+        Follow_Up_Note__c,
+        Follow_Up_By__r.Name,
+        Follow_Up_On__c,
+        (
+          SELECT
+            Category__c,
+            Sub_Category__c,
+            Item_Name__c,
+            Reservation__c,
+            Score__c,
+            Comment__c
+          FROM Feedback_Ratings__r
+          ORDER BY CreatedDate, Id
+        )
+      FROM Feedback_Response__c
+      WHERE Id = :responseId
+    ];
+    if (found.isEmpty()) {
+      throw new AuraHandledException(
+        'This feedback could not be found, or you do not have access to it.'
+      );
+    }
+    Feedback_Response__c r = found[0];
+
+    ResponseDetail d = new ResponseDetail();
+    d.responseId = r.Id;
+    d.reference = r.Name;
+    d.submittedOn = r.Submitted_On__c;
+    d.language = r.Language__c;
+    d.guest = r.Contact__r?.Name;
+    d.bookingId = r.Booking__c;
+    d.bookingNumber = r.Booking__r?.BookingNumber__c;
+    d.region = r.Booking__r?.Region__c;
+    d.country = r.Booking__r?.DestinationCountry__c;
+    d.tripStart = r.Booking__r?.Start_Date__c;
+    d.tripEnd = r.Booking__r?.End_Date__c;
+    d.overall = r.Overall_Experience__c;
+    d.overallComment = r.Overall_Experience_Comment__c;
+    d.consultation = r.Consultation_Rating__c;
+    d.consultationComment = r.Consultation_Comment__c;
+    d.generalHotelComment = r.General_Hotel_Comment__c;
+    d.generalGolfComment = r.General_Golf_Comment__c;
+    d.recommendation = r.Recommendation_NPS__c;
+    d.npsCategory = r.NPS_Category__c;
+    d.publicReviewPrompted = r.Public_Review_Prompted__c;
+    d.nextDestination = r.Next_Destination__c;
+    d.improvementSuggestions = r.Improvement_Suggestions__c;
+    d.generalFeedback = r.General_Feedback__c;
+    d.followUpStatus = r.Follow_Up_Status__c;
+    d.followUpNote = r.Follow_Up_Note__c;
+    d.followUpBy = r.Follow_Up_By__r?.Name;
+    d.followUpOn = r.Follow_Up_On__c;
+    applyDetailRatings(d, r.Feedback_Ratings__r);
     return d;
   }
 
@@ -407,20 +618,23 @@ public with sharing class GxFeedbackDashboardController {
   // ------------------------------------------------------------------
   // Responses: KPIs, trend, follow-ups, next destinations
 
+  private static final String RESPONSE_FIELDS =
+    'Id, Name, Overall_Experience__c, Consultation_Rating__c, ' +
+    'Recommendation_NPS__c, Next_Destination__c, Improvement_Suggestions__c, ' +
+    'Overall_Experience_Comment__c, Consultation_Comment__c, ' +
+    'General_Hotel_Comment__c, General_Golf_Comment__c, General_Feedback__c, ' +
+    'Follow_Up_Status__c, Follow_Up_Note__c, Follow_Up_On__c, Follow_Up_By__r.Name, ' +
+    'Submitted_On__c, Contact__r.Name, Booking__c, Booking__r.BookingNumber__c';
+
+  /** The newest responses, read for their free text. */
   private static List<Feedback_Response__c> loadResponses(Filters f) {
     Map<String, Object> binds = new Map<String, Object>();
     List<String> clauses = bookingClauses('Booking__r.', f, binds);
     return (List<Feedback_Response__c>) Database.queryWithBinds(
-      'SELECT Id, Name, Overall_Experience__c, Consultation_Rating__c, ' +
-        'Recommendation_NPS__c, Next_Destination__c, Improvement_Suggestions__c, ' +
-        'Overall_Experience_Comment__c, Consultation_Comment__c, ' +
-        'General_Hotel_Comment__c, General_Golf_Comment__c, General_Feedback__c, ' +
-        'Follow_Up_Status__c, Follow_Up_Note__c, Follow_Up_On__c, Follow_Up_By__r.Name, ' +
-        'Submitted_On__c, Contact__r.Name, Booking__c, Booking__r.BookingNumber__c, ' +
-        'Booking__r.End_Date__c, Booking__r.Survey_Sent_On__c, ' +
-        'Booking__r.Survey_Reminder_Sent__c ' +
-        'FROM Feedback_Response__c' +
-        (clauses.isEmpty() ? '' : ' WHERE ' + String.join(clauses, ' AND ')) +
+      'SELECT ' +
+        RESPONSE_FIELDS +
+        ' FROM Feedback_Response__c' +
+        whereOf(clauses) +
         ' ORDER BY Submitted_On__c DESC LIMIT ' +
         MAX_RESPONSES,
       binds,
@@ -428,109 +642,335 @@ public with sharing class GxFeedbackDashboardController {
     );
   }
 
-  private static void applyResponses(
-    Dashboard d,
-    List<Feedback_Response__c> responses
+  /**
+   * Refuses a selection too large to total in one request, with a message the
+   * page can show, instead of hitting the row limit part way through.
+   */
+  private static void guardVolume(Filters f) {
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = bookingClauses(
+      'Feedback_Response__r.Booking__r.',
+      f,
+      binds
+    );
+    Integer ratings = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Feedback_Rating__c' + whereOf(clauses),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    if (ratings > maxRatingsInView) {
+      throw new AuraHandledException(
+        'This selection covers ' +
+          ratings +
+          ' ratings, more than the dashboard can total at once. ' +
+          'Narrow the dates, or pick a region or country.'
+      );
+    }
+  }
+
+  /**
+   * Headline numbers, each counted by the database. COUNT() costs one row
+   * whatever it counts, so these stay cheap at any volume.
+   */
+  private static void applyKpis(Kpis k, Filters f) {
+    k.responses = countResponses(f, null, null);
+    k.promoters = countResponses(
+      f,
+      'Recommendation_NPS__c >= :promoterMin',
+      new Map<String, Object>{ 'promoterMin' => PROMOTER_MIN }
+    );
+    k.detractors = countResponses(
+      f,
+      'Recommendation_NPS__c <= :detractorMax',
+      new Map<String, Object>{ 'detractorMax' => DETRACTOR_MAX }
+    );
+    k.passives = countResponses(
+      f,
+      'Recommendation_NPS__c > :detractorMax AND Recommendation_NPS__c < :promoterMin',
+      new Map<String, Object>{
+        'detractorMax' => DETRACTOR_MAX,
+        'promoterMin' => PROMOTER_MIN
+      }
+    );
+    k.answeredInvitations = countResponses(
+      f,
+      'Booking__r.Survey_Sent_On__c != null',
+      null
+    );
+    // Reminders only ever go to guests who had not answered, so any answer
+    // on a reminded booking arrived after the reminder.
+    k.answeredAfterReminder = countResponses(
+      f,
+      'Booking__r.Survey_Reminder_Sent__c = true',
+      null
+    );
+    k.openFollowUps = countResponses(
+      f,
+      'Recommendation_NPS__c <= :detractorMax AND ' +
+      '(Follow_Up_Status__c = null OR Follow_Up_Status__c NOT IN :closed)',
+      new Map<String, Object>{
+        'detractorMax' => DETRACTOR_MAX,
+        'closed' => CLOSED_STATUSES
+      }
+    );
+    k.nps = npsOf(k.promoters, k.detractors, k.responses);
+
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = bookingClauses('Booking__r.', f, binds);
+    AggregateResult avg = ((List<AggregateResult>) Database.queryWithBinds(
+      'SELECT AVG(Overall_Experience__c) overall, ' +
+        'AVG(Consultation_Rating__c) consult ' +
+        'FROM Feedback_Response__c' +
+        whereOf(clauses),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    ))[0];
+    k.avgOverall = scaled((Decimal) avg.get('overall'));
+    k.avgConsultation = scaled((Decimal) avg.get('consult'));
+  }
+
+  private static Integer countResponses(
+    Filters f,
+    String extra,
+    Map<String, Object> extraBinds
   ) {
-    Kpis k = d.kpis;
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = bookingClauses('Booking__r.', f, binds);
+    if (extra != null) {
+      clauses.add(extra);
+      binds.putAll(extraBinds == null ? new Map<String, Object>() : extraBinds);
+    }
+    return Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Feedback_Response__c' + whereOf(clauses),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+  }
+
+  /** One point per trip month, each bucket counted by the database. */
+  private static List<MonthPoint> trend(Filters f) {
     Map<String, MonthPoint> months = new Map<String, MonthPoint>();
-    Decimal overallSum = 0, consultSum = 0;
-    Integer overallN = 0, consultN = 0;
+    addMonthCounts(months, f, null, null, 'total');
+    addMonthCounts(
+      months,
+      f,
+      'Recommendation_NPS__c >= :promoterMin',
+      new Map<String, Object>{ 'promoterMin' => PROMOTER_MIN },
+      'promoter'
+    );
+    addMonthCounts(
+      months,
+      f,
+      'Recommendation_NPS__c <= :detractorMax',
+      new Map<String, Object>{ 'detractorMax' => DETRACTOR_MAX },
+      'detractor'
+    );
+    addMonthCounts(
+      months,
+      f,
+      'Recommendation_NPS__c > :detractorMax AND Recommendation_NPS__c < :promoterMin',
+      new Map<String, Object>{
+        'detractorMax' => DETRACTOR_MAX,
+        'promoterMin' => PROMOTER_MIN
+      },
+      'passive'
+    );
 
-    for (Feedback_Response__c r : responses) {
-      k.responses++;
-      Integer score = r.Recommendation_NPS__c == null
-        ? null
-        : r.Recommendation_NPS__c.intValue();
-      String bucket = bucketFor(score);
-      if (bucket == 'promoter') {
-        k.promoters++;
-      } else if (bucket == 'passive') {
-        k.passives++;
+    List<String> keys = new List<String>(months.keySet());
+    keys.sort();
+    List<MonthPoint> points = new List<MonthPoint>();
+    for (String key : keys) {
+      MonthPoint m = months.get(key);
+      m.nps = npsOf(m.promoters, m.detractors, m.total);
+      points.add(m);
+    }
+    return points;
+  }
+
+  private static void addMonthCounts(
+    Map<String, MonthPoint> months,
+    Filters f,
+    String extra,
+    Map<String, Object> extraBinds,
+    String bucket
+  ) {
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = bookingClauses('Booking__r.', f, binds);
+    clauses.add('Booking__r.End_Date__c != null');
+    if (extra != null) {
+      clauses.add(extra);
+      binds.putAll(extraBinds);
+    }
+    for (
+      AggregateResult ar : (List<AggregateResult>) Database.queryWithBinds(
+        'SELECT CALENDAR_YEAR(Booking__r.End_Date__c) y, ' +
+          'CALENDAR_MONTH(Booking__r.End_Date__c) m, COUNT(Id) n ' +
+          'FROM Feedback_Response__c' +
+          whereOf(clauses) +
+          ' GROUP BY CALENDAR_YEAR(Booking__r.End_Date__c), ' +
+          'CALENDAR_MONTH(Booking__r.End_Date__c)',
+        binds,
+        AccessLevel.SYSTEM_MODE
+      )
+    ) {
+      Integer year = (Integer) ar.get('y');
+      Integer month = (Integer) ar.get('m');
+      String key =
+        String.valueOf(year) +
+        '-' +
+        String.valueOf(month).leftPad(2, '0');
+      MonthPoint point = months.get(key);
+      if (point == null) {
+        point = new MonthPoint();
+        point.key = key;
+        point.year = year;
+        point.month = month;
+        months.put(key, point);
+      }
+      Integer n = (Integer) ar.get('n');
+      if (bucket == 'total') {
+        point.total = n;
+      } else if (bucket == 'promoter') {
+        point.promoters = n;
       } else if (bucket == 'detractor') {
-        k.detractors++;
+        point.detractors = n;
+      } else {
+        point.passives = n;
       }
+    }
+  }
 
-      if (r.Overall_Experience__c != null) {
-        overallSum += r.Overall_Experience__c;
-        overallN++;
-      }
-      if (r.Consultation_Rating__c != null) {
-        consultSum += r.Consultation_Rating__c;
-        consultN++;
-      }
-      if (r.Booking__r?.Survey_Sent_On__c != null) {
-        k.answeredInvitations++;
-      }
-      // Reminders only ever go to guests who had not answered, so any answer
-      // on a reminded booking arrived after the reminder.
-      if (r.Booking__r?.Survey_Reminder_Sent__c == true) {
-        k.answeredAfterReminder++;
-      }
+  /**
+   * Unhappy guests: open cases first (the picklist sorts Open before
+   * Contacted and Resolved, and blank first of all), newest first within.
+   */
+  private static List<ResponseRow> followUps(Filters f) {
+    Map<String, Object> binds = new Map<String, Object>{
+      'detractorMax' => DETRACTOR_MAX
+    };
+    List<String> clauses = bookingClauses('Booking__r.', f, binds);
+    clauses.add('Recommendation_NPS__c <= :detractorMax');
+    List<ResponseRow> rows = new List<ResponseRow>();
+    for (
+      Feedback_Response__c r : (List<Feedback_Response__c>) Database.queryWithBinds(
+        'SELECT ' +
+          RESPONSE_FIELDS +
+          ' FROM Feedback_Response__c' +
+          whereOf(clauses) +
+          ' ORDER BY Follow_Up_Status__c NULLS FIRST, Submitted_On__c DESC' +
+          ' LIMIT ' +
+          maxFollowUps,
+        binds,
+        AccessLevel.SYSTEM_MODE
+      )
+    ) {
+      rows.add(toRow(r));
+    }
+    return rows;
+  }
 
-      addToMonth(months, r, bucket);
-
-      if (
-        bucket == 'detractor' &&
-        !CLOSED_STATUSES.contains(r.Follow_Up_Status__c)
-      ) {
-        k.openFollowUps++;
-      }
-      if (bucket == 'detractor') {
-        d.followUps.add(toRow(r));
-      }
+  /**
+   * Next-destination wishes, happiest guests first: they are the warmest
+   * leads. Long text cannot be filtered in SOQL, so this reads the newest
+   * responses and keeps the ones with a wish.
+   */
+  private static void applyDestinations(
+    Dashboard d,
+    List<Feedback_Response__c> recent,
+    Boolean olderLeftOut
+  ) {
+    for (Feedback_Response__c r : recent) {
       if (String.isNotBlank(r.Next_Destination__c)) {
         d.nextDestinations.add(toRow(r));
       }
     }
-
-    k.nps = npsOf(k.promoters, k.detractors, k.responses);
-    k.avgOverall = overallN == 0 ? null : (overallSum / overallN).setScale(1);
-    k.avgConsultation = consultN == 0
-      ? null
-      : (consultSum / consultN).setScale(1);
-
-    List<String> keys = new List<String>(months.keySet());
-    keys.sort();
-    for (String key : keys) {
-      MonthPoint m = months.get(key);
-      m.nps = npsOf(m.promoters, m.detractors, m.total);
-      d.trend.add(m);
-    }
-
-    // Promoters first: they are the warmest leads for a next trip.
     d.nextDestinations.sort(new ByNpsDescending());
+    d.destinationsCapped = olderLeftOut;
+    while (d.nextDestinations.size() > maxDestinations) {
+      d.nextDestinations.remove(d.nextDestinations.size() - 1);
+      d.destinationsCapped = true;
+    }
   }
 
-  private static void addToMonth(
-    Map<String, MonthPoint> months,
-    Feedback_Response__c r,
-    String bucket
+  /**
+   * Ratings arranged the way the form asked for them. Travel services are
+   * saved once per supplier with the same score, so they are folded back into
+   * one line per service; hotel sub-ratings join the hotel they belong to.
+   */
+  private static void applyDetailRatings(
+    ResponseDetail d,
+    List<Feedback_Rating__c> ratings
   ) {
-    Date tripEnd = r.Booking__r?.End_Date__c;
-    if (tripEnd == null) {
-      return;
+    Map<String, DetailRating> services = new Map<String, DetailRating>();
+    Map<String, DetailRating> hotels = new Map<String, DetailRating>();
+    List<Feedback_Rating__c> subs = new List<Feedback_Rating__c>();
+
+    for (Feedback_Rating__c r : ratings) {
+      if (String.isNotBlank(r.Sub_Category__c)) {
+        subs.add(r);
+        continue;
+      }
+      DetailRating item = new DetailRating();
+      item.category = r.Category__c;
+      item.name = r.Item_Name__c;
+      item.score = r.Score__c;
+      item.comment = r.Comment__c;
+
+      if (SUPPLIER_TYPES.contains(r.Category__c)) {
+        DetailRating existing = services.get(r.Category__c);
+        if (existing == null) {
+          services.put(r.Category__c, item);
+        } else {
+          existing.name += ', ' + r.Item_Name__c;
+          if (String.isBlank(existing.comment)) {
+            existing.comment = r.Comment__c;
+          }
+        }
+      } else if (r.Category__c == HOTEL) {
+        hotels.put(venueKey(r), item);
+        d.hotels.add(item);
+      } else if (r.Category__c == GOLF) {
+        d.golf.add(item);
+      }
     }
-    String key =
-      String.valueOf(tripEnd.year()) +
-      '-' +
-      String.valueOf(tripEnd.month()).leftPad(2, '0');
-    MonthPoint m = months.get(key);
-    if (m == null) {
-      m = new MonthPoint();
-      m.key = key;
-      m.year = tripEnd.year();
-      m.month = tripEnd.month();
-      months.put(key, m);
+
+    for (
+      String type : new List<String>{
+        'Airline',
+        'TransferCompany',
+        'CarRentalCompany'
+      }
+    ) {
+      if (services.containsKey(type)) {
+        d.services.add(services.get(type));
+      }
     }
-    m.total++;
-    if (bucket == 'promoter') {
-      m.promoters++;
-    } else if (bucket == 'passive') {
-      m.passives++;
-    } else if (bucket == 'detractor') {
-      m.detractors++;
+
+    for (Feedback_Rating__c s : subs) {
+      DetailRating hotel = hotels.get(venueKey(s));
+      if (hotel == null) {
+        continue;
+      }
+      HeatCell c = new HeatCell();
+      c.subCategory = s.Sub_Category__c;
+      c.average = s.Score__c;
+      c.ratings = 1;
+      hotel.subScores.add(c);
     }
+  }
+
+  private static String venueKey(Feedback_Rating__c r) {
+    return r.Reservation__c != null
+      ? String.valueOf(r.Reservation__c)
+      : r.Item_Name__c;
+  }
+
+  private static Decimal scaled(Decimal value) {
+    return value == null ? null : value.setScale(1);
+  }
+
+  private static String whereOf(List<String> clauses) {
+    return clauses.isEmpty() ? '' : ' WHERE ' + String.join(clauses, ' AND ');
   }
 
   /**
@@ -684,7 +1124,8 @@ public with sharing class GxFeedbackDashboardController {
    * here; ratings are narrowed to 8 and below first, since a comment box only
    * opens at those scores.
    */
-  private static List<CommentRow> comments(
+  private static void applyComments(
+    Dashboard d,
     Filters f,
     List<Feedback_Response__c> responses
   ) {
@@ -750,7 +1191,7 @@ public with sharing class GxFeedbackDashboardController {
     for (
       Feedback_Rating__c r : (List<Feedback_Rating__c>) Database.queryWithBinds(
         'SELECT Id, Item_Name__c, Sub_Category__c, Score__c, Comment__c, ' +
-          'Feedback_Response__r.Booking__c, ' +
+          'Feedback_Response__c, Feedback_Response__r.Booking__c, ' +
           'Feedback_Response__r.Booking__r.BookingNumber__c, ' +
           'Feedback_Response__r.Contact__r.Name, ' +
           'Feedback_Response__r.Submitted_On__c ' +
@@ -766,6 +1207,7 @@ public with sharing class GxFeedbackDashboardController {
       }
       CommentRow c = new CommentRow();
       c.key = r.Id;
+      c.responseId = r.Feedback_Response__c;
       c.text = r.Comment__c;
       c.about = String.isBlank(r.Sub_Category__c)
         ? r.Item_Name__c
@@ -780,10 +1222,11 @@ public with sharing class GxFeedbackDashboardController {
     }
 
     rows.sort(new ByNewest());
-    while (rows.size() > MAX_COMMENTS) {
+    while (rows.size() > maxComments) {
       rows.remove(rows.size() - 1);
+      d.commentsCapped = true;
     }
-    return rows;
+    d.comments = rows;
   }
 
   private static void addComment(
@@ -799,6 +1242,7 @@ public with sharing class GxFeedbackDashboardController {
     }
     CommentRow c = new CommentRow();
     c.key = r.Id + '-' + suffix;
+    c.responseId = r.Id;
     c.text = text;
     c.about = about;
     c.score = score;

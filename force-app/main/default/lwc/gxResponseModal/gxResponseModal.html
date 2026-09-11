@@ -1,0 +1,119 @@
+<template>
+  <lightning-modal-header label={heading}>
+    <template lwc:if={view}>
+      <p class="trip">{view.tripLine}</p>
+      <p class="submitted">
+        <span>Submitted</span>
+        <lightning-formatted-date-time
+          value={view.submittedOn}
+          year="numeric"
+          month="short"
+          day="numeric"
+          hour="2-digit"
+          minute="2-digit"
+        ></lightning-formatted-date-time>
+      </p>
+    </template>
+  </lightning-modal-header>
+
+  <lightning-modal-body>
+    <template lwc:if={loading}>
+      <div class="loading">
+        <lightning-spinner
+          alternative-text="Loading the response"
+          size="small"
+        ></lightning-spinner>
+      </div>
+    </template>
+
+    <template lwc:if={error}>
+      <p class="notice" role="alert">{error}</p>
+    </template>
+
+    <template lwc:if={view}>
+      <template lwc:if={view.followUp}>
+        <div class="followup">
+          <span class="followup-status">Follow-up: {view.followUp.status}</span>
+          <template lwc:if={view.followUp.note}>
+            <p class="followup-note">{view.followUp.note}</p>
+          </template>
+          <template lwc:if={view.followUp.by}>
+            <p class="followup-by">
+              <span>Last updated by {view.followUp.by}</span>
+              <lightning-formatted-date-time
+                value={view.followUp.on}
+                year="numeric"
+                month="short"
+                day="numeric"
+              ></lightning-formatted-date-time>
+            </p>
+          </template>
+        </div>
+      </template>
+
+      <template for:each={view.sections} for:item="section">
+        <section key={section.key} class="section">
+          <h3 class="section-title">{section.title}</h3>
+          <ul class="items">
+            <template for:each={section.items} for:item="item">
+              <li key={item.key} class="item">
+                <span class={item.cls}>{item.score}</span>
+                <div class="item-main">
+                  <p class="item-label">
+                    <span>{item.label}</span>
+                    <template lwc:if={item.tag}>
+                      <span class="tag">{item.tag}</span>
+                    </template>
+                  </p>
+                  <template lwc:if={item.comment}>
+                    <p class="item-comment">{item.comment}</p>
+                  </template>
+                  <div class="subs">
+                    <template for:each={item.subs} for:item="s">
+                      <span key={s.key} class="sub">
+                        <span>{s.label}</span>
+                        <span class="sub-value">{s.value}</span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </li>
+            </template>
+          </ul>
+          <template for:each={section.texts} for:item="t">
+            <div key={t.key} class="text">
+              <p class="text-label">{t.label}</p>
+              <p class="text-body">{t.text}</p>
+            </div>
+          </template>
+        </section>
+      </template>
+
+      <template lwc:if={view.reviewPrompted}>
+        <p class="footnote">
+          Shown the Trustpilot and Google review invitation after submitting.
+        </p>
+      </template>
+    </template>
+  </lightning-modal-body>
+
+  <lightning-modal-footer>
+    <div class="actions">
+      <lightning-button
+        label="Open booking"
+        disabled={noRecord}
+        onclick={handleOpenBooking}
+      ></lightning-button>
+      <lightning-button
+        label="Open response record"
+        disabled={noRecord}
+        onclick={handleOpenRecord}
+      ></lightning-button>
+      <lightning-button
+        variant="brand"
+        label="Close"
+        onclick={handleClose}
+      ></lightning-button>
+    </div>
+  </lightning-modal-footer>
+</template>

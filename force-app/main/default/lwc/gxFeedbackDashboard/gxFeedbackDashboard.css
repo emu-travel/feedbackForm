@@ -335,7 +335,7 @@
   border-bottom: 1px solid var(--gx-line);
 }
 
-.drill-row:last-child {
+.drill-row:last-of-type {
   border-bottom: 0;
 }
 
@@ -468,7 +468,7 @@
   border-bottom: 1px solid var(--gx-line);
 }
 
-.fu:last-child {
+.fu:last-of-type {
   border-bottom: 0;
 }
 
@@ -648,4 +648,16 @@ button.kpi:focus-visible,
 .link-btn:hover {
   color: var(--gx-forest);
   text-decoration: underline;
+}
+
+/* "Full response": quiet, but plainly a link. */
+.full-btn {
+  color: var(--gx-forest);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fu-top .full-btn {
+  margin-left: auto;
+  font-size: 0.8125rem;
 }

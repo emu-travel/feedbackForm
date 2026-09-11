@@ -8,7 +8,7 @@
 
     <template lwc:if={hasRanked}>
       <ol class="list">
-        <template for:each={ranked} for:item="v">
+        <template for:each={rankedPage.rows} for:item="v">
           <li key={v.key}>
             <button
               class="venue"
@@ -39,6 +39,12 @@
           </li>
         </template>
       </ol>
+      <c-gx-pager
+        label="Pages of ranked venues"
+        total={rankedPage.total}
+        page={rankedPage.page}
+        onpagechange={handleRankedPage}
+      ></c-gx-pager>
     </template>
 
     <template lwc:if={hasUnranked}>
@@ -47,7 +53,7 @@
       </template>
       <p class="board-sub">Not enough ratings to rank yet</p>
       <ul class="list">
-        <template for:each={unranked} for:item="v">
+        <template for:each={unrankedPage.rows} for:item="v">
           <li key={v.key}>
             <button
               class="venue venue_unranked"
@@ -64,6 +70,12 @@
           </li>
         </template>
       </ul>
+      <c-gx-pager
+        label="Pages of venues not yet ranked"
+        total={unrankedPage.total}
+        page={unrankedPage.page}
+        onpagechange={handleUnrankedPage}
+      ></c-gx-pager>
     </template>
   </div>
 </template>

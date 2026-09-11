@@ -4,6 +4,7 @@ import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDash
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
 import updateFollowUp from "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp";
+import GxResponseModal from "c/gxResponseModal";
 
 jest.mock(
   "@salesforce/apex/GxFeedbackDashboardController.getDashboard",
@@ -29,6 +30,11 @@ jest.mock(
 jest.mock(
   "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp",
   () => ({ default: jest.fn() }),
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/GxFeedbackDashboardController.getResponseDetail",
+  () => ({ default: jest.fn(() => Promise.resolve(null)) }),
   { virtual: true }
 );
 jest.mock(
@@ -352,5 +358,112 @@ describe("c-gx-feedback-dashboard usability", () => {
     const left = [...el.shadowRoot.querySelectorAll("li.comment")];
     expect(left.length).toBe(1);
     expect(left[0].textContent).toContain("Laut");
+  });
+});
+
+describe("c-gx-feedback-dashboard at volume", () => {
+  afterEach(() => {
+    while (document.body.firstChild) {
+      document.body.removeChild(document.body.firstChild);
+    }
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+  });
+
+  const manyComments = Array.from({ length: 23 }, (_, i) => ({
+    key: `c${i + 1}`,
+    responseId: `r${i + 1}`,
+    text: `Kommentar ${i + 1}`,
+    score: 5,
+    scoreKind: "score"
+  }));
+
+  it("shows a long list ten at a time", async () => {
+    const el = mount();
+    getDashboard.emit({ ...DATA, comments: manyComments });
+    await flush();
+
+    expect(el.shadowRoot.querySelectorAll("li.comment")).toHaveLength(10);
+    const pager = el.shadowRoot.querySelector(
+      'c-gx-pager[data-list="comments"]'
+    );
+    expect(pager.total).toBe(23);
+
+    pager.dispatchEvent(new CustomEvent("pagechange", { detail: { page: 3 } }));
+    await flush();
+
+    const shown = [...el.shadowRoot.querySelectorAll("li.comment")];
+    expect(shown).toHaveLength(3);
+    expect(shown[0].textContent).toContain("Kommentar 21");
+  });
+
+  it("starts every list again on page one when a filter changes", async () => {
+    const el = mount();
+    getDashboard.emit({ ...DATA, comments: manyComments });
+    await flush();
+    el.shadowRoot
+      .querySelector('c-gx-pager[data-list="comments"]')
+      .dispatchEvent(new CustomEvent("pagechange", { detail: { page: 3 } }));
+    await flush();
+
+    const region = [
+      ...el.shadowRoot.querySelectorAll("lightning-combobox")
+    ].find((c) => c.dataset.field === "region");
+    region.dispatchEvent(
+      new CustomEvent("change", { detail: { value: "Algarve" } })
+    );
+    getDashboard.emit({ ...DATA, comments: manyComments });
+    await flush();
+
+    expect(
+      el.shadowRoot.querySelector('c-gx-pager[data-list="comments"]').page
+    ).toBe(1);
+  });
+
+  it("says when a list was cut short, and where the rest are", async () => {
+    const el = mount();
+    getDashboard.emit({
+      ...DATA,
+      followUpsTotal: 612,
+      commentsCapped: true,
+      destinationsCapped: true
+    });
+    await flush();
+
+    expect(text(el)).toContain("Showing 1 of 612 unhappy guests");
+    expect(text(el)).toContain("The most recent comments.");
+    expect(text(el)).toContain("From the most recent responses.");
+  });
+
+  it("says nothing about caps when nothing was left out", async () => {
+    const el = mount();
+    getDashboard.emit({ ...DATA, followUpsTotal: 1 });
+    await flush();
+    expect(text(el)).not.toContain("Narrow the dates to");
+  });
+
+  it("opens the whole response behind a follow-up, a comment or a wish", async () => {
+    const open = jest
+      .spyOn(GxResponseModal, "open")
+      .mockResolvedValue(undefined);
+    const el = mount();
+    getDashboard.emit({
+      ...DATA,
+      comments: [{ ...DATA.comments[0], responseId: "a09" }]
+    });
+    await flush();
+
+    const buttons = [...el.shadowRoot.querySelectorAll("button.full-btn")];
+    expect(buttons.map((b) => b.dataset.responseId)).toEqual([
+      "a01",
+      "a02",
+      "a09"
+    ]);
+
+    buttons[0].click();
+    await flush();
+    expect(open).toHaveBeenCalledWith(
+      expect.objectContaining({ responseId: "a01", size: "medium" })
+    );
   });
 });

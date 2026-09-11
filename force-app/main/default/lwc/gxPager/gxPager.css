@@ -1,0 +1,28 @@
+:host {
+  display: block;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--gx-line, #dde3df);
+  font-size: 0.75rem;
+  color: var(--gx-muted, #5a6b62);
+  font-variant-numeric: tabular-nums;
+}
+
+.controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page {
+  min-width: 5.5rem;
+  text-align: center;
+}
