@@ -640,7 +640,7 @@ private class GxFeedbackServiceTest {
   }
 
   @IsTest
-  static void submitAcceptsARecommendationOfZero() {
+  static void submitRejectsARecommendationOfZero() {
     Map<String, Object> payload = basePayload();
     payload.put('recommendation', 0);
 
@@ -648,14 +648,12 @@ private class GxFeedbackServiceTest {
       JSON.serialize(payload)
     );
 
-    Assert.isTrue(r.ok, 'NPS runs 0-10, so 0 is a real answer');
-    Feedback_Response__c saved = [
-      SELECT Recommendation_NPS__c, NPS_Category__c
-      FROM Feedback_Response__c
-      LIMIT 1
-    ];
-    Assert.areEqual(0, saved.Recommendation_NPS__c, 'Stored as 0, not blank');
-    Assert.areEqual('Detractor', saved.NPS_Category__c, 'A 0 is a Detractor');
+    Assert.isFalse(r.ok, 'Every rating, the recommendation included, is 1-10');
+    Assert.areEqual(
+      0,
+      [SELECT COUNT() FROM Feedback_Response__c],
+      'Nothing is stored'
+    );
   }
 
   @IsTest
@@ -742,7 +740,7 @@ private class GxFeedbackServiceTest {
     zeroOverall.put('overallExperience', 0);
     Assert.isFalse(
       GxFeedbackService.submit(JSON.serialize(zeroOverall)).ok,
-      'Only the recommendation scale starts at 0; the ratings start at 1'
+      'Ratings start at 1'
     );
 
     Assert.areEqual(

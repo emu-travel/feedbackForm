@@ -11,7 +11,7 @@
     <div class="track-wrap">
       <input
         type="range"
-        min={min}
+        min="1"
         max="10"
         step="1"
         class={trackClass}
@@ -20,10 +20,11 @@
         aria-label={ariaLabel}
         onchange={handleSlider}
         oninput={handleSlider}
+        onclick={handleSliderClick}
       />
 
       <div
-        class={buttonsClass}
+        class="buttons"
         role="group"
         aria-label={ariaLabel}
         aria-invalid={showInvalid}

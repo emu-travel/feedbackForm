@@ -1,6 +1,7 @@
 import { LightningElement, api } from "lwc";
 import { shouldShowComment } from "c/gxSurveyFlow";
 
+const MIN = 1;
 const MAX = 10;
 
 /**
@@ -10,8 +11,8 @@ const MAX = 10;
  * button row, and a follow-up comment box that appears once the score drops to
  * 8 or below.
  *
- * It starts empty - nothing is selected until the guest chooses - and runs
- * from `min` (1, or 0 for the recommendation question) to 10.
+ * It starts empty - nothing is selected until the guest chooses. Every scale
+ * in the survey, the recommendation question included, runs 1 to 10.
  *
  * Emits `valuechange` and `commentchange`; it holds no state of its own, so the
  * container stays the single source of truth for the guest's answers.
@@ -33,17 +34,7 @@ export default class GxRatingScale extends LightningElement {
   /** Set by the container when the guest tried to move on without choosing. */
   @api invalid = false;
 
-  _min = 1;
   _value = null;
-
-  /** Lowest score on offer: 1, or 0 for the 0-10 recommendation scale. */
-  @api
-  get min() {
-    return this._min;
-  }
-  set min(incoming) {
-    this._min = Number(incoming) === 0 ? 0 : 1;
-  }
 
   @api
   get value() {
@@ -57,11 +48,8 @@ export default class GxRatingScale extends LightningElement {
     this._value = Number.isInteger(parsed) ? parsed : null;
   }
 
-  /** Checked against min on read, since min may arrive after the value. */
   get hasValue() {
-    return (
-      this._value !== null && this._value >= this._min && this._value <= MAX
-    );
+    return this._value !== null && this._value >= MIN && this._value <= MAX;
   }
 
   get valueLabel() {
@@ -78,7 +66,7 @@ export default class GxRatingScale extends LightningElement {
 
   get choices() {
     const out = [];
-    for (let value = this._min; value <= MAX; value++) {
+    for (let value = MIN; value <= MAX; value++) {
       const selected = this.hasValue && value === this._value;
       out.push({
         value,
@@ -89,13 +77,8 @@ export default class GxRatingScale extends LightningElement {
     return out;
   }
 
-  /** Eleven buttons (0-10) wrap as six and five on a phone, not five-five-one. */
-  get buttonsClass() {
-    return this._min === 0 ? "buttons buttons_eleven" : "buttons";
-  }
-
   get rangeValue() {
-    return this.hasValue ? this._value : this._min;
+    return this.hasValue ? this._value : MIN;
   }
 
   /** Until a score is chosen the slider shows no thumb and no fill. */
@@ -105,7 +88,7 @@ export default class GxRatingScale extends LightningElement {
 
   get trackStyle() {
     const percent = this.hasValue
-      ? ((this._value - this._min) / (MAX - this._min)) * 100
+      ? ((this._value - MIN) / (MAX - MIN)) * 100
       : 0;
     return `--gx-fill: ${percent}%`;
   }
@@ -137,6 +120,16 @@ export default class GxRatingScale extends LightningElement {
 
   handleSlider(event) {
     this.publishValue(Number(event.target.value));
+  }
+
+  /**
+   * An empty slider rests at 1, and tapping the spot it already rests on fires
+   * no change event. A click still arrives, so take the value from that.
+   */
+  handleSliderClick(event) {
+    if (!this.hasValue) {
+      this.publishValue(Number(event.target.value));
+    }
   }
 
   handleChoice(event) {

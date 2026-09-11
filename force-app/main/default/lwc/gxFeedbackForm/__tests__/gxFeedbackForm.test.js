@@ -356,7 +356,7 @@ describe("c-gx-feedback-form", () => {
       );
     });
 
-    it("runs the recommendation question from 0, as NPS does", async () => {
+    it("sends the recommendation on the same 1-10 scale as every rating", async () => {
       const element = mount();
       withUrl();
       await flush();
@@ -365,17 +365,15 @@ describe("c-gx-feedback-form", () => {
       const scale = element.shadowRoot.querySelector(
         'c-gx-rating-scale[data-field="recommendation"]'
       );
-      expect(scale.min).toBe(0);
-
       scale.dispatchEvent(
-        new CustomEvent("valuechange", { detail: { value: 0 } })
+        new CustomEvent("valuechange", { detail: { value: 1 } })
       );
       await flush();
       nextButton(element).click();
       await flush();
 
       const payload = JSON.parse(submit.mock.calls[0][0].payloadJson);
-      expect(payload.recommendation).toBe(0);
+      expect(payload.recommendation).toBe(1);
     });
   });
 

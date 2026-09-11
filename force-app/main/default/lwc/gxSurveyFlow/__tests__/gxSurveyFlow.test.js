@@ -11,7 +11,7 @@ import {
   earnsPublicReview,
   buildPayload,
   germanDate,
-  isNps,
+  isScore,
   unansweredOn
 } from "c/gxSurveyFlow";
 
@@ -182,16 +182,14 @@ describe("conditional reveals", () => {
   it("ignores values that are not scores", () => {
     [undefined, null, 0, 11, "9"].forEach((v) => {
       expect(shouldShowComment(v)).toBe(false);
-    });
-    [undefined, null, -1, 11, "9"].forEach((v) => {
       expect(earnsPublicReview(v)).toBe(false);
     });
   });
 
-  it("takes 0 as a real recommendation, as NPS does, but not as a rating", () => {
-    expect(isNps(0)).toBe(true);
-    expect(earnsPublicReview(0)).toBe(false);
-    expect(shouldShowComment(0)).toBe(false);
+  it("uses one 1-10 scale for every question", () => {
+    expect(isScore(1)).toBe(true);
+    expect(isScore(10)).toBe(true);
+    expect(isScore(0)).toBe(false);
   });
 });
 
@@ -245,12 +243,12 @@ describe("payload assembly", () => {
     expect(p.rentalCar).toBeNull();
   });
 
-  it("sends a recommendation of 0 as 0, not as missing", () => {
+  it("never sends a recommendation outside 1-10", () => {
     const p = buildPayload({
       ...base,
       answers: { ...base.answers, recommendation: 0 }
     });
-    expect(p.recommendation).toBe(0);
+    expect(p.recommendation).toBeNull();
   });
 
   it("keeps an explicit low score rather than defaulting it", () => {
@@ -387,12 +385,15 @@ describe("ratings still to choose", () => {
     ).toEqual([]);
   });
 
-  it("accepts 0 for the recommendation, but needs an answer", () => {
+  it("needs a 1-10 answer to the recommendation question", () => {
     expect(unansweredOn(SCREEN.CONCLUSION, FULL, {})).toEqual([
       "recommendation"
     ]);
     expect(
       unansweredOn(SCREEN.CONCLUSION, FULL, { recommendation: 0 })
+    ).toEqual(["recommendation"]);
+    expect(
+      unansweredOn(SCREEN.CONCLUSION, FULL, { recommendation: 1 })
     ).toEqual([]);
   });
 

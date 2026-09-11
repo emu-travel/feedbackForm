@@ -45,9 +45,6 @@ export const PROMOTER_THRESHOLD = 9;
  */
 export const SCORE_MIN = 1;
 
-/** The recommendation question is a standard 0-10 NPS scale; the rest are 1-10. */
-export const NPS_MIN = 0;
-
 /**
  * The hotel detail panel's four scales. Keys are the Sub_Category__c picklist
  * values, so they live here with the payload contract rather than in the card
@@ -154,19 +151,12 @@ export function shouldExpandHotelDetail(score) {
 }
 
 export function earnsPublicReview(recommendation) {
-  return isNps(recommendation) && recommendation >= PROMOTER_THRESHOLD;
+  return isScore(recommendation) && recommendation >= PROMOTER_THRESHOLD;
 }
 
+/** Every scale in the survey, the recommendation included, runs 1-10. */
 export function isScore(value) {
-  return inRange(value, SCORE_MIN);
-}
-
-export function isNps(value) {
-  return inRange(value, NPS_MIN);
-}
-
-function inRange(value, min) {
-  return Number.isInteger(value) && value >= min && value <= 10;
+  return Number.isInteger(value) && value >= SCORE_MIN && value <= 10;
 }
 
 /**
@@ -215,7 +205,7 @@ export function unansweredOn(screen, context, answers) {
       });
       break;
     case SCREEN.CONCLUSION:
-      if (!isNps(a.recommendation)) {
+      if (!isScore(a.recommendation)) {
         missing.push("recommendation");
       }
       break;
@@ -266,7 +256,7 @@ export function buildPayload({ context, bookingNumber, secret, answers }) {
   // Only what the guest actually chose. Nothing is filled in on their behalf.
   const overall = isScore(a.overallExperience) ? a.overallExperience : null;
   const consultation = isScore(a.consultation) ? a.consultation : null;
-  const recommendation = isNps(a.recommendation) ? a.recommendation : null;
+  const recommendation = isScore(a.recommendation) ? a.recommendation : null;
 
   const payload = {
     bookingNumber,

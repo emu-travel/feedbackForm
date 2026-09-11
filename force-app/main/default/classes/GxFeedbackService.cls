@@ -65,8 +65,6 @@ public without sharing class GxFeedbackService {
 
   private static final Integer SCORE_MIN = 1;
   private static final Integer SCORE_MAX = 10;
-  /** The recommendation question is standard NPS: 0-10, not 1-10. */
-  private static final Integer NPS_MIN = 0;
   private static final Integer PROMOTER_THRESHOLD = 9;
   private static final Integer COMMENT_MAX_LEN = 2000;
   private static final Integer ITEM_NAME_MAX_LEN = 255;
@@ -649,11 +647,7 @@ public without sharing class GxFeedbackService {
     if (!isValidScore(p.overallExperience)) {
       return 'Bitte bewerten Sie Ihren Gesamteindruck.';
     }
-    if (
-      p.recommendation == null ||
-      p.recommendation < NPS_MIN ||
-      p.recommendation > SCORE_MAX
-    ) {
+    if (!isValidScore(p.recommendation)) {
       return 'Bitte beantworten Sie die Weiterempfehlungsfrage.';
     }
     if (p.consultation != null && !isValidScore(p.consultation)) {

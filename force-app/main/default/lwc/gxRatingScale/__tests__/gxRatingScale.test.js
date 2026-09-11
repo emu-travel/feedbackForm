@@ -58,19 +58,15 @@ describe("c-gx-rating-scale", () => {
     );
   });
 
-  it("offers 0 to 10 when it starts at 0, as the recommendation question does", () => {
-    const element = mount({ min: 0 });
-    const labels = choices(element).map((b) => b.textContent.trim());
-    expect(labels).toHaveLength(11);
-    expect(labels[0]).toBe("0");
-    expect(element.shadowRoot.querySelector(".buttons").classList).toContain(
-      "buttons_eleven"
-    );
-
+  it("takes a tap on an empty bar as a choice, even where the bar rests", () => {
+    const element = mount();
     const handler = jest.fn();
     element.addEventListener("valuechange", handler);
-    choices(element)[0].click();
-    expect(handler.mock.calls[0][0].detail).toEqual({ value: 0 });
+
+    // An empty bar rests at 1; tapping there fires a click but no change.
+    element.shadowRoot.querySelector("input.track").click();
+
+    expect(handler.mock.calls[0][0].detail).toEqual({ value: 1 });
   });
 
   it("asks for a choice when marked as missing, and stops once one is made", () => {
