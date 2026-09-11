@@ -10,9 +10,9 @@ import {
   shouldExpandHotelDetail,
   earnsPublicReview,
   buildPayload,
-  DEFAULT_SCORE,
-  DEFAULT_SUB_SCORE,
-  germanDate
+  germanDate,
+  isNps,
+  unansweredOn
 } from "c/gxSurveyFlow";
 
 const context = (overrides = {}) => ({
@@ -182,8 +182,16 @@ describe("conditional reveals", () => {
   it("ignores values that are not scores", () => {
     [undefined, null, 0, 11, "9"].forEach((v) => {
       expect(shouldShowComment(v)).toBe(false);
+    });
+    [undefined, null, -1, 11, "9"].forEach((v) => {
       expect(earnsPublicReview(v)).toBe(false);
     });
+  });
+
+  it("takes 0 as a real recommendation, as NPS does, but not as a rating", () => {
+    expect(isNps(0)).toBe(true);
+    expect(earnsPublicReview(0)).toBe(false);
+    expect(shouldShowComment(0)).toBe(false);
   });
 });
 
@@ -214,38 +222,35 @@ describe("payload assembly", () => {
   });
 
   /**
-   * A guest who is happy clicks straight through without moving a slider. The
-   * cards read 10/10 from the moment they render, so that is their answer -
-   * and it has to survive into the payload. It did not: hotel and golf scores
-   * came through undefined and were dropped on the way into Salesforce, which
-   * only showed up in a real end-to-end submission.
+   * Nothing is pre-selected any more, so nothing may be invented here either:
+   * a rating the guest never chose is left out, not sent as a 10.
    */
-  it("records the score a card is already showing when the guest never touches it", () => {
+  it("sends no score for a rating the guest never chose", () => {
     const p = buildPayload({
       ...base,
       answers: {
         overallExperience: 10,
-        consultation: 10,
+        consultation: null,
         recommendation: 10,
         hotels: {},
         golfCourses: {}
       }
     });
 
-    expect(p.hotels[0].score).toBe(DEFAULT_SCORE);
-    expect(p.golfCourses[0].score).toBe(DEFAULT_SCORE);
-    expect(p.flight.score).toBe(DEFAULT_SCORE);
-    expect(p.transfer.score).toBe(DEFAULT_SCORE);
-    expect(p.rentalCar.score).toBe(DEFAULT_SCORE);
+    expect(p.consultation).toBeNull();
+    expect(p.hotels).toEqual([]);
+    expect(p.golfCourses).toEqual([]);
+    expect(p.flight).toBeNull();
+    expect(p.transfer).toBeNull();
+    expect(p.rentalCar).toBeNull();
   });
 
-  it("does not treat a defaulted score as a low score", () => {
+  it("sends a recommendation of 0 as 0, not as missing", () => {
     const p = buildPayload({
       ...base,
-      answers: { ...base.answers, hotels: {}, golfCourses: {} }
+      answers: { ...base.answers, recommendation: 0 }
     });
-    expect(p.hotels[0].comment).toBeUndefined();
-    expect(p.hotels[0].sub).toBeUndefined();
+    expect(p.recommendation).toBe(0);
   });
 
   it("keeps an explicit low score rather than defaulting it", () => {
@@ -329,33 +334,18 @@ describe("payload assembly", () => {
     expect(p.improvementSuggestions).toBe("St Andrews");
   });
 
-  /**
-   * This assertion used to expect an undefined score, on the reading that a
-   * hotel the guest never touched was "unscored". There is no such state: the
-   * card shows 10/10 as soon as it renders, so an untouched card has an answer
-   * and the entry must carry it, paired with its reservation.
-   */
-  /**
-   * The same defect as the main scores, one level down: once a hotel scores
-   * below 9 all four sub-scales are on screen showing a value, and an unhappy
-   * guest who does not drag them was losing the entire breakdown. Found by
-   * submitting the real form with a hotel at 5 and getting no sub rows.
-   */
-  it("saves the whole hotel detail panel even when no sub-scale is touched", () => {
+  /** The detail panel is optional: an untouched sub-scale is not a score. */
+  it("sends no sub-ratings when none were chosen", () => {
     const p = buildPayload({
       ...base,
       answers: { ...base.answers, hotels: { h1: { score: 5 } } }
     });
 
-    expect(p.hotels[0].sub).toEqual({
-      Room: DEFAULT_SUB_SCORE,
-      Service: DEFAULT_SUB_SCORE,
-      Catering: DEFAULT_SUB_SCORE,
-      Cleanliness: DEFAULT_SUB_SCORE
-    });
+    expect(p.hotels[0].score).toBe(5);
+    expect(p.hotels[0].sub).toBeUndefined();
   });
 
-  it("keeps the sub-scores the guest did set, and defaults only the rest", () => {
+  it("sends only the sub-ratings the guest chose", () => {
     const p = buildPayload({
       ...base,
       answers: {
@@ -364,21 +354,52 @@ describe("payload assembly", () => {
       }
     });
 
-    expect(p.hotels[0].sub).toEqual({
-      Room: 2,
-      Service: DEFAULT_SUB_SCORE,
-      Catering: 9,
-      Cleanliness: DEFAULT_SUB_SCORE
-    });
+    expect(p.hotels[0].sub).toEqual({ Room: 2, Catering: 9 });
+  });
+});
+
+describe("ratings still to choose", () => {
+  it("names both screen-1 questions until they are answered", () => {
+    expect(unansweredOn(SCREEN.OVERALL, FULL, {})).toEqual([
+      "overallExperience",
+      "consultation"
+    ]);
+    expect(
+      unansweredOn(SCREEN.OVERALL, FULL, {
+        overallExperience: 6,
+        consultation: 9
+      })
+    ).toEqual([]);
   });
 
-  it("pairs every hotel entry with its reservation and a real score", () => {
-    const p = buildPayload({
-      ...base,
-      answers: { ...base.answers, hotels: {} }
-    });
-    expect(p.hotels[0].reservationId).toBe("h1");
-    expect(p.hotels[0].score).toBe(DEFAULT_SCORE);
+  it("asks only about the mobility services that were booked", () => {
+    expect(
+      unansweredOn(SCREEN.MOBILITY, { ...FULL, hasRentalCar: false }, {})
+    ).toEqual(["flight", "transfer"]);
+  });
+
+  it("names each unrated hotel and course by its reservation", () => {
+    expect(unansweredOn(SCREEN.HOTELS, FULL, { hotels: {} })).toEqual([
+      "hotel:h1"
+    ]);
+    expect(
+      unansweredOn(SCREEN.GOLF, FULL, { golfCourses: { g1: { score: 8 } } })
+    ).toEqual([]);
+  });
+
+  it("accepts 0 for the recommendation, but needs an answer", () => {
+    expect(unansweredOn(SCREEN.CONCLUSION, FULL, {})).toEqual([
+      "recommendation"
+    ]);
+    expect(
+      unansweredOn(SCREEN.CONCLUSION, FULL, { recommendation: 0 })
+    ).toEqual([]);
+  });
+
+  it("never asks about the hotel sub-ratings or any comment", () => {
+    expect(
+      unansweredOn(SCREEN.HOTELS, FULL, { hotels: { h1: { score: 4 } } })
+    ).toEqual([]);
   });
 });
 

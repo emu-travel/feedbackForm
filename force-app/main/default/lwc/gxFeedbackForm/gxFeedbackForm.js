@@ -11,7 +11,7 @@ import {
   progressFor,
   earnsPublicReview,
   buildPayload,
-  DEFAULT_SCORE
+  unansweredOn
 } from "c/gxSurveyFlow";
 
 /**
@@ -43,20 +43,24 @@ export default class GxFeedbackForm extends LightningElement {
   submitError;
   reference;
 
+  /** Set once the guest has pressed Weiter on this screen with ratings missing. */
+  checked = false;
+
   @track ctx;
+  // Every rating starts empty: nothing is chosen on the guest's behalf.
   @track answers = {
-    overallExperience: DEFAULT_SCORE,
+    overallExperience: null,
     overallExperienceComment: "",
-    consultation: DEFAULT_SCORE,
+    consultation: null,
     consultationComment: "",
-    flight: { score: DEFAULT_SCORE, comment: "" },
-    transfer: { score: DEFAULT_SCORE, comment: "" },
-    rentalCar: { score: DEFAULT_SCORE, comment: "" },
+    flight: { score: null, comment: "" },
+    transfer: { score: null, comment: "" },
+    rentalCar: { score: null, comment: "" },
     hotels: {},
     golfCourses: {},
     generalHotelComment: "",
     generalGolfComment: "",
-    recommendation: DEFAULT_SCORE,
+    recommendation: null,
     nextDestination: "",
     improvementSuggestions: ""
   };
@@ -227,24 +231,50 @@ export default class GxFeedbackForm extends LightningElement {
   /** Hotels and courses paired with whatever the guest has answered so far. */
   get hotelCards() {
     const items = (this.ctx && this.ctx.hotels) || [];
+    const invalid = this.invalidMap;
     return items.map((hotel) => ({
       key: hotel.reservationId,
       hotel,
-      answer: this.answers.hotels[hotel.reservationId] || {
-        score: DEFAULT_SCORE
-      }
+      answer: this.answers.hotels[hotel.reservationId] || {},
+      invalid: invalid[`hotel:${hotel.reservationId}`]
     }));
   }
 
   get courseCards() {
     const items = (this.ctx && this.ctx.golfCourses) || [];
+    const invalid = this.invalidMap;
     return items.map((course) => ({
       key: course.reservationId,
       course,
-      answer: this.answers.golfCourses[course.reservationId] || {
-        score: DEFAULT_SCORE
-      }
+      answer: this.answers.golfCourses[course.reservationId] || {},
+      invalid: invalid[`golf:${course.reservationId}`]
     }));
+  }
+
+  // ------------------------------------------------------------------
+  // Unanswered ratings
+
+  /** Ratings still missing on this screen - only once the guest tried to go on. */
+  get missing() {
+    return this.checked
+      ? unansweredOn(this.screen, this.ctx, this.answers)
+      : [];
+  }
+
+  get showMissingNote() {
+    return this.missing.length > 0;
+  }
+
+  /**
+   * Missing keys mapped to true; anything answered is simply absent, so the
+   * template's data-missing attribute disappears rather than reading "false".
+   */
+  get invalidMap() {
+    const map = {};
+    this.missing.forEach((key) => {
+      map[key] = true;
+    });
+    return map;
   }
 
   // ------------------------------------------------------------------
@@ -339,9 +369,7 @@ export default class GxFeedbackForm extends LightningElement {
     if (!reservationId) {
       return;
     }
-    const existing = this.answers[collection][reservationId] || {
-      score: DEFAULT_SCORE
-    };
+    const existing = this.answers[collection][reservationId] || {};
     this.answers[collection] = {
       ...this.answers[collection],
       [reservationId]: { ...existing, ...patch }
@@ -354,12 +382,19 @@ export default class GxFeedbackForm extends LightningElement {
   handleBack() {
     const previous = previousScreen(this.screen, this.ctx);
     if (previous !== null) {
+      this.checked = false;
       this.screen = previous;
       this.scrollToTop();
     }
   }
 
   handleNext() {
+    if (unansweredOn(this.screen, this.ctx, this.answers).length) {
+      this.checked = true;
+      this.scrollToFirstMissing();
+      return;
+    }
+    this.checked = false;
     if (this.isFinalStep) {
       this.send();
       return;
@@ -399,6 +434,16 @@ export default class GxFeedbackForm extends LightningElement {
     } finally {
       this.submitting = false;
     }
+  }
+
+  /** After the re-render that marks them, bring the first gap into view. */
+  scrollToFirstMissing() {
+    Promise.resolve().then(() => {
+      const first = this.template.querySelector("[data-missing]");
+      if (first && first.scrollIntoView) {
+        first.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
   }
 
   scrollToTop() {

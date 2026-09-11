@@ -39,12 +39,48 @@ describe("c-gx-rating-scale", () => {
     ]);
   });
 
-  it("defaults to 10, matching the prototype", () => {
+  it("starts empty, with nothing chosen for the guest", () => {
     const element = mount();
-    expect(element.value).toBe(10);
+    expect(element.value).toBeNull();
+    expect(element.shadowRoot.querySelector(".badge")).toBeNull();
+    expect(
+      choices(element).filter((b) => b.getAttribute("aria-pressed") === "true")
+    ).toHaveLength(0);
+    expect(element.shadowRoot.querySelector("input.track").classList).toContain(
+      "track_unset"
+    );
+  });
+
+  it("shows the chosen score once there is one", () => {
+    const element = mount({ value: 10 });
     expect(element.shadowRoot.querySelector(".badge").textContent).toContain(
       "10 / 10"
     );
+  });
+
+  it("offers 0 to 10 when it starts at 0, as the recommendation question does", () => {
+    const element = mount({ min: 0 });
+    const labels = choices(element).map((b) => b.textContent.trim());
+    expect(labels).toHaveLength(11);
+    expect(labels[0]).toBe("0");
+    expect(element.shadowRoot.querySelector(".buttons").classList).toContain(
+      "buttons_eleven"
+    );
+
+    const handler = jest.fn();
+    element.addEventListener("valuechange", handler);
+    choices(element)[0].click();
+    expect(handler.mock.calls[0][0].detail).toEqual({ value: 0 });
+  });
+
+  it("asks for a choice when marked as missing, and stops once one is made", () => {
+    const element = mount({ invalid: true });
+    expect(element.shadowRoot.querySelector(".invalid-note")).not.toBeNull();
+
+    element.value = 7;
+    return Promise.resolve().then(() => {
+      expect(element.shadowRoot.querySelector(".invalid-note")).toBeNull();
+    });
   });
 
   it("marks only the selected score as pressed", () => {
@@ -58,9 +94,9 @@ describe("c-gx-rating-scale", () => {
     });
   });
 
-  it("falls back to 10 when handed a value outside the scale", () => {
-    [0, 11, -3, "abc", null, undefined].forEach((bad) => {
-      expect(mount({ value: bad }).value).toBe(10);
+  it("shows nothing chosen when handed a value outside the scale", () => {
+    [0, 11, -3, "abc", null, undefined, ""].forEach((bad) => {
+      expect(mount({ value: bad }).value).toBeNull();
     });
   });
 

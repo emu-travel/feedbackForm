@@ -1,9 +1,5 @@
 import { LightningElement, api } from "lwc";
-import {
-  shouldExpandHotelDetail,
-  SUB_CATEGORIES,
-  DEFAULT_SUB_SCORE
-} from "c/gxSurveyFlow";
+import { shouldExpandHotelDetail, SUB_CATEGORIES } from "c/gxSurveyFlow";
 
 /**
  * gxHotelCard
@@ -15,8 +11,8 @@ import {
  * Stateless - the container owns the answers and passes them back down.
  */
 
-/** Labels only. The keys and the default live in gxSurveyFlow, which has to
- * agree with them when it builds the payload. */
+/** Labels only. The keys live in gxSurveyFlow, which has to agree with them
+ * when it builds the payload. */
 const SUB_LABELS = {
   Room: "Zimmer und Ausstattung",
   Service: "Hotelservice und Betreuung vor Ort",
@@ -31,8 +27,12 @@ export default class GxHotelCard extends LightningElement {
   /** { score, comment, sub: { Room, Service, Catering, Cleanliness } } */
   @api answer;
 
+  /** Set when the guest tried to move on without rating this hotel. */
+  @api invalid = false;
+
+  /** Empty until the guest chooses; nothing is pre-selected. */
   get score() {
-    return this.answer && this.answer.score ? this.answer.score : 10;
+    return this.answer && this.answer.score ? this.answer.score : null;
   }
 
   get comment() {
@@ -72,7 +72,7 @@ export default class GxHotelCard extends LightningElement {
     return SUB_CATEGORIES.map((key) => ({
       key,
       label: SUB_LABELS[key],
-      value: given[key] || DEFAULT_SUB_SCORE
+      value: given[key] || null
     }));
   }
 

@@ -66,16 +66,55 @@ const nextButton = (el) => el.shadowRoot.querySelector(".btn_primary");
 const backButton = (el) => el.shadowRoot.querySelector(".btn_ghost");
 
 /**
- * Steps to the final question screen. The clicks are deliberately sequential -
- * each screen only exists once the previous one has advanced.
+ * Chooses a score on every main rating of the current screen, as a guest must
+ * before Weiter moves on. Nothing is pre-selected any more.
+ */
+function answerScreen(element, score = 10) {
+  const root = element.shadowRoot;
+  root
+    .querySelectorAll("c-gx-rating-scale")
+    .forEach((scale) =>
+      scale.dispatchEvent(
+        new CustomEvent("valuechange", { detail: { value: score } })
+      )
+    );
+  root.querySelectorAll("c-gx-hotel-card").forEach((card) =>
+    card.dispatchEvent(
+      new CustomEvent("scorechange", {
+        detail: { reservationId: card.hotel.reservationId, score }
+      })
+    )
+  );
+  root.querySelectorAll("c-gx-course-card").forEach((card) =>
+    card.dispatchEvent(
+      new CustomEvent("scorechange", {
+        detail: { reservationId: card.course.reservationId, score }
+      })
+    )
+  );
+}
+
+/** Answers the current screen, then presses Weiter. */
+async function next(element) {
+  answerScreen(element);
+  await flush();
+  nextButton(element).click();
+  await flush();
+}
+
+/**
+ * Steps to the final question screen and answers it. The clicks are
+ * deliberately sequential - each screen only exists once the previous one has
+ * advanced.
  */
 async function walkToEnd(element) {
   /* eslint-disable no-await-in-loop */
   for (let i = 0; i < 4; i++) {
-    nextButton(element).click();
-    await flush();
+    await next(element);
   }
   /* eslint-enable no-await-in-loop */
+  answerScreen(element);
+  await flush();
 }
 
 describe("c-gx-feedback-form", () => {
@@ -165,20 +204,16 @@ describe("c-gx-feedback-form", () => {
       await flush();
 
       // flight only, no transfer or rental car
-      nextButton(element).click();
-      await flush();
+      await next(element);
       expect(title(element)).toBe("Transfer- und Mobilitätsleistungen");
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
       expect(title(element)).toBe("Hotel und Unterkunft");
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
       expect(title(element)).toBe("Golfplätze");
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
       expect(title(element)).toBe("Fazit");
     });
 
@@ -192,8 +227,7 @@ describe("c-gx-feedback-form", () => {
       withUrl();
       await flush();
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
       expect(title(element)).toBe("Hotel und Unterkunft");
     });
 
@@ -220,10 +254,8 @@ describe("c-gx-feedback-form", () => {
       withUrl();
       await flush();
 
-      nextButton(element).click();
-      await flush();
-      nextButton(element).click();
-      await flush();
+      await next(element);
+      await next(element);
       expect(title(element)).toBe("Hotel und Unterkunft");
 
       backButton(element).click();
@@ -237,8 +269,7 @@ describe("c-gx-feedback-form", () => {
       await flush();
       expect(backButton(element)).toBeNull();
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
       expect(backButton(element)).not.toBeNull();
     });
 
@@ -258,12 +289,93 @@ describe("c-gx-feedback-form", () => {
       const element = mount();
       withUrl();
       await flush();
+      await next(element);
+      await next(element);
+
+      expect(title(element)).toBe("Hotel und Unterkunft");
+    });
+  });
+
+  describe("nothing is answered for the guest", () => {
+    it("starts every rating empty", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+
+      const scales = element.shadowRoot.querySelectorAll("c-gx-rating-scale");
+      expect(scales).toHaveLength(2);
+      scales.forEach((s) => expect(s.value).toBeNull());
+    });
+
+    it("keeps the guest on the screen and marks what is missing", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+
       nextButton(element).click();
+      await flush();
+
+      expect(title(element)).toBe("Gesamteindruck Ihrer Golfreise");
+      expect(element.shadowRoot.querySelector(".missing-note")).not.toBeNull();
+      const scales = [
+        ...element.shadowRoot.querySelectorAll("c-gx-rating-scale")
+      ];
+      expect(scales.map((s) => s.invalid)).toEqual([true, true]);
+    });
+
+    it("clears the mark as soon as the rating is chosen", async () => {
+      const element = mount();
+      withUrl();
       await flush();
       nextButton(element).click();
       await flush();
 
+      answerScreen(element, 7);
+      await flush();
+
+      expect(element.shadowRoot.querySelector(".missing-note")).toBeNull();
+      nextButton(element).click();
+      await flush();
+      expect(title(element)).toBe("Transfer- und Mobilitätsleistungen");
+    });
+
+    it("asks for a hotel rating before leaving the hotel screen", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+      await next(element);
+      await next(element);
       expect(title(element)).toBe("Hotel und Unterkunft");
+
+      nextButton(element).click();
+      await flush();
+
+      expect(title(element)).toBe("Hotel und Unterkunft");
+      expect(element.shadowRoot.querySelector("c-gx-hotel-card").invalid).toBe(
+        true
+      );
+    });
+
+    it("runs the recommendation question from 0, as NPS does", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+      await walkToEnd(element);
+
+      const scale = element.shadowRoot.querySelector(
+        'c-gx-rating-scale[data-field="recommendation"]'
+      );
+      expect(scale.min).toBe(0);
+
+      scale.dispatchEvent(
+        new CustomEvent("valuechange", { detail: { value: 0 } })
+      );
+      await flush();
+      nextButton(element).click();
+      await flush();
+
+      const payload = JSON.parse(submit.mock.calls[0][0].payloadJson);
+      expect(payload.recommendation).toBe(0);
     });
   });
 
@@ -272,17 +384,14 @@ describe("c-gx-feedback-form", () => {
       const element = mount();
       withUrl();
       await flush();
-      nextButton(element).click();
-      await flush();
-      nextButton(element).click();
-      await flush();
+      await next(element);
+      await next(element);
 
       expect(
         element.shadowRoot.querySelectorAll("c-gx-hotel-card")
       ).toHaveLength(1);
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
       expect(
         element.shadowRoot.querySelectorAll("c-gx-course-card")
       ).toHaveLength(1);
@@ -292,8 +401,7 @@ describe("c-gx-feedback-form", () => {
       const element = mount();
       withUrl();
       await flush();
-      nextButton(element).click();
-      await flush();
+      await next(element);
 
       expect(element.shadowRoot.querySelector(".badge").textContent).toBe(
         "AERTicket.de"
@@ -308,8 +416,7 @@ describe("c-gx-feedback-form", () => {
       await flush();
       await walkToEnd(element);
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
 
       expect(submit).toHaveBeenCalledTimes(1);
       const payload = JSON.parse(submit.mock.calls[0][0].payloadJson);
@@ -327,8 +434,7 @@ describe("c-gx-feedback-form", () => {
       await flush();
       await walkToEnd(element);
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
 
       const payload = JSON.parse(submit.mock.calls[0][0].payloadJson);
       expect(payload.flight).toBeDefined();
@@ -342,11 +448,12 @@ describe("c-gx-feedback-form", () => {
       await flush();
       await walkToEnd(element);
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
 
       expect(title(element)).toBe("Vielen Dank!");
       expect(text(element)).toContain("FB-00007");
+      // Said once, in the heading - not again in the first and last lines.
+      expect(text(element).match(/Vielen Dank/g)).toHaveLength(1);
     });
 
     it("offers the public review cards to a promoter", async () => {
@@ -355,8 +462,7 @@ describe("c-gx-feedback-form", () => {
       await flush();
       await walkToEnd(element);
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
 
       const links = element.shadowRoot.querySelectorAll(".review-card");
       expect(links).toHaveLength(2);
@@ -392,8 +498,7 @@ describe("c-gx-feedback-form", () => {
       await flush();
       await walkToEnd(element);
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
 
       expect(title(element)).toBe("Fazit");
       expect(element.shadowRoot.querySelector(".error").textContent).toBe(
@@ -408,8 +513,7 @@ describe("c-gx-feedback-form", () => {
       await flush();
       await walkToEnd(element);
 
-      nextButton(element).click();
-      await flush();
+      await next(element);
 
       expect(title(element)).toBe("Fazit");
       expect(text(element)).toContain("nicht gesendet werden");

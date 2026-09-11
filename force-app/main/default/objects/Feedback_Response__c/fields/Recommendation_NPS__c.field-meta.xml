@@ -2,7 +2,7 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Recommendation_NPS__c</fullName>
     <description
-  >Screen 5: likelihood of recommending golf.extra, 1-10. Scores of 9 or 10 trigger the public review invitation.</description>
+  >Screen 5: likelihood of recommending golf.extra, 0-10 (standard NPS). Scores of 9 or 10 trigger the public review invitation.</description>
     <externalId>false</externalId>
     <label>Recommendation (NPS)</label>
     <precision>2</precision>

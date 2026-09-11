@@ -1,0 +1,16 @@
+/*
+ * Your global styles here
+ */
+html,
+body {
+  height: 100%;
+}
+
+/* Matches the survey's own backdrop, so no band of another shade shows around it. */
+html {
+  background: #fafafa;
+}
+
+body {
+  margin: 0;
+}

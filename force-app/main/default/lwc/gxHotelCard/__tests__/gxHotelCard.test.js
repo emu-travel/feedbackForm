@@ -77,12 +77,20 @@ describe("c-gx-hotel-card", () => {
     ]);
   });
 
-  it("defaults sub-ratings to 8, not 10", () => {
+  it("starts the hotel rating empty", () => {
+    expect(scales(mount())[0].value).toBeNull();
+  });
+
+  it("starts the sub-ratings empty too", () => {
     const element = mount({ answer: { score: 6 } });
     // the first scale is the overall rating; the rest are sub-categories
     const subs = scales(element).slice(1);
     expect(subs).toHaveLength(4);
-    subs.forEach((s) => expect(s.value).toBe(8));
+    subs.forEach((s) => expect(s.value).toBeNull());
+  });
+
+  it("passes the missing-rating mark to its scale", () => {
+    expect(scales(mount({ invalid: true }))[0].invalid).toBe(true);
   });
 
   it("shows sub-ratings the guest already gave", () => {
@@ -91,7 +99,7 @@ describe("c-gx-hotel-card", () => {
     });
     const subs = scales(element).slice(1);
     expect(subs[0].value).toBe(3); // Room
-    expect(subs[1].value).toBe(8); // Service, untouched
+    expect(subs[1].value).toBeNull(); // Service, untouched
     expect(subs[3].value).toBe(9); // Cleanliness
   });
 

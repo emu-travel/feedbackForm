@@ -1,26 +1,33 @@
 <template>
-  <div class="scale" data-compact={compact}>
+  <div class={scaleClass} data-compact={compact}>
     <div class="ends">
       <span class="end-label">{minLabel}</span>
-      <span class="badge">{valueLabel}</span>
+      <template lwc:if={hasValue}>
+        <span class="badge">{valueLabel}</span>
+      </template>
       <span class="end-label end-label_max">{maxLabel}</span>
     </div>
 
     <div class="track-wrap">
       <input
         type="range"
-        min="1"
+        min={min}
         max="10"
         step="1"
-        class="track"
+        class={trackClass}
         style={trackStyle}
-        value={currentValue}
+        value={rangeValue}
         aria-label={ariaLabel}
         onchange={handleSlider}
         oninput={handleSlider}
       />
 
-      <div class="buttons" role="group" aria-label={ariaLabel}>
+      <div
+        class={buttonsClass}
+        role="group"
+        aria-label={ariaLabel}
+        aria-invalid={showInvalid}
+      >
         <template for:each={choices} for:item="choice">
           <button
             key={choice.value}
@@ -35,6 +42,10 @@
         </template>
       </div>
     </div>
+
+    <template lwc:if={showInvalid}>
+      <p class="invalid-note" role="alert">Bitte wählen Sie eine Bewertung.</p>
+    </template>
 
     <template lwc:if={showComment}>
       <div class="comment">

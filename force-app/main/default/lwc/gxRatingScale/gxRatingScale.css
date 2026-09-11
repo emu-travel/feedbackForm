@@ -87,6 +87,15 @@
   cursor: pointer;
 }
 
+/* Nothing chosen yet: an empty rail, no thumb suggesting a score. */
+.track_unset::-webkit-slider-thumb {
+  opacity: 0;
+}
+
+.track_unset::-moz-range-thumb {
+  opacity: 0;
+}
+
 .track:focus-visible {
   outline: 2px solid var(--gx-forest);
   outline-offset: 2px;
@@ -96,6 +105,23 @@
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 0.25rem;
+}
+
+.buttons_eleven {
+  grid-template-columns: repeat(11, 1fr);
+}
+
+/* The guest tried to move on without choosing here. */
+.scale_invalid .track-wrap {
+  border-color: #f87171;
+  background: #fef2f2;
+}
+
+.invalid-note {
+  margin: 0.375rem 0.25rem 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #b91c1c;
 }
 
 .choice {
@@ -191,6 +217,9 @@
   .scale[data-compact="true"] .buttons {
     grid-template-columns: repeat(5, 1fr);
     gap: 0.375rem;
+  }
+  .buttons.buttons_eleven {
+    grid-template-columns: repeat(6, 1fr);
   }
   .choice,
   .scale[data-compact="true"] .choice {

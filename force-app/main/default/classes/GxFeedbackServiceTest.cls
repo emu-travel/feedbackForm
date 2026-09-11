@@ -640,6 +640,25 @@ private class GxFeedbackServiceTest {
   }
 
   @IsTest
+  static void submitAcceptsARecommendationOfZero() {
+    Map<String, Object> payload = basePayload();
+    payload.put('recommendation', 0);
+
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(payload)
+    );
+
+    Assert.isTrue(r.ok, 'NPS runs 0-10, so 0 is a real answer');
+    Feedback_Response__c saved = [
+      SELECT Recommendation_NPS__c, NPS_Category__c
+      FROM Feedback_Response__c
+      LIMIT 1
+    ];
+    Assert.areEqual(0, saved.Recommendation_NPS__c, 'Stored as 0, not blank');
+    Assert.areEqual('Detractor', saved.NPS_Category__c, 'A 0 is a Detractor');
+  }
+
+  @IsTest
   static void submitRejectsSecondResponseForTheSameBooking() {
     GxFeedbackService.submit(JSON.serialize(basePayload()));
 
@@ -710,6 +729,20 @@ private class GxFeedbackServiceTest {
     Assert.isFalse(
       GxFeedbackService.submit(JSON.serialize(noRecommendation)).ok,
       'The recommendation score is required'
+    );
+
+    Map<String, Object> negative = basePayload();
+    negative.put('recommendation', -1);
+    Assert.isFalse(
+      GxFeedbackService.submit(JSON.serialize(negative)).ok,
+      'A recommendation below 0 is rejected'
+    );
+
+    Map<String, Object> zeroOverall = basePayload();
+    zeroOverall.put('overallExperience', 0);
+    Assert.isFalse(
+      GxFeedbackService.submit(JSON.serialize(zeroOverall)).ok,
+      'Only the recommendation scale starts at 0; the ratings start at 1'
     );
 
     Assert.areEqual(

@@ -37,24 +37,23 @@ export const HOTEL_DETAIL_THRESHOLD = 9;
 export const PROMOTER_THRESHOLD = 9;
 
 /**
- * What every scale reads before the guest touches it. Defined here, next to the
- * payload builder, because the two have to agree: the cards show this number
- * from the moment they render, so a guest who is happy and clicks straight
- * through has answered 10 - and their answer must be recorded, not dropped for
- * never having moved a slider.
+ * Every scale starts empty. A pre-selected 10 let a guest click straight
+ * through and "answer" 10 to everything, and made a real 10 impossible to tell
+ * from an untouched one. So a rating only exists once the guest has chosen it:
+ * the main ratings on each screen must be chosen before Weiter moves on (see
+ * unansweredOn), and anything left empty is simply not sent.
  */
-export const DEFAULT_SCORE = 10;
+export const SCORE_MIN = 1;
+
+/** The recommendation question is a standard 0-10 NPS scale; the rest are 1-10. */
+export const NPS_MIN = 0;
 
 /**
- * The hotel detail panel's four scales, and what they read before the guest
- * touches them. Keys are the Sub_Category__c picklist values, so they live here
- * with the payload contract rather than in the card that draws them - the card
- * supplies the German labels.
+ * The hotel detail panel's four scales. Keys are the Sub_Category__c picklist
+ * values, so they live here with the payload contract rather than in the card
+ * that draws them - the card supplies the German labels. They are optional.
  */
 export const SUB_CATEGORIES = ["Room", "Service", "Catering", "Cleanliness"];
-
-/** The spec defaults sub-ratings to 8, not 10. */
-export const DEFAULT_SUB_SCORE = 8;
 
 export function hasMobility(context) {
   if (!context) {
@@ -155,11 +154,75 @@ export function shouldExpandHotelDetail(score) {
 }
 
 export function earnsPublicReview(recommendation) {
-  return isScore(recommendation) && recommendation >= PROMOTER_THRESHOLD;
+  return isNps(recommendation) && recommendation >= PROMOTER_THRESHOLD;
 }
 
-function isScore(value) {
-  return typeof value === "number" && value >= 1 && value <= 10;
+export function isScore(value) {
+  return inRange(value, SCORE_MIN);
+}
+
+export function isNps(value) {
+  return inRange(value, NPS_MIN);
+}
+
+function inRange(value, min) {
+  return Number.isInteger(value) && value >= min && value <= 10;
+}
+
+/**
+ * The main ratings on a screen the guest has not chosen yet, as keys the form
+ * can mark: a field name, or "hotel:<reservationId>" / "golf:<reservationId>".
+ * The hotel sub-ratings and every comment stay optional.
+ */
+export function unansweredOn(screen, context, answers) {
+  const a = answers || {};
+  const ctx = context || {};
+  const missing = [];
+  const chosen = (entry) => (entry ? entry.score : null);
+
+  switch (screen) {
+    case SCREEN.OVERALL:
+      if (!isScore(a.overallExperience)) {
+        missing.push("overallExperience");
+      }
+      if (!isScore(a.consultation)) {
+        missing.push("consultation");
+      }
+      break;
+    case SCREEN.MOBILITY:
+      [
+        ["hasFlight", "flight"],
+        ["hasTransfers", "transfer"],
+        ["hasRentalCar", "rentalCar"]
+      ].forEach(([flag, field]) => {
+        if (ctx[flag] && !isScore(chosen(a[field]))) {
+          missing.push(field);
+        }
+      });
+      break;
+    case SCREEN.HOTELS:
+      (ctx.hotels || []).forEach((h) => {
+        if (!isScore(chosen((a.hotels || {})[h.reservationId]))) {
+          missing.push(`hotel:${h.reservationId}`);
+        }
+      });
+      break;
+    case SCREEN.GOLF:
+      (ctx.golfCourses || []).forEach((c) => {
+        if (!isScore(chosen((a.golfCourses || {})[c.reservationId]))) {
+          missing.push(`golf:${c.reservationId}`);
+        }
+      });
+      break;
+    case SCREEN.CONCLUSION:
+      if (!isNps(a.recommendation)) {
+        missing.push("recommendation");
+      }
+      break;
+    default:
+      break;
+  }
+  return missing;
 }
 
 const GERMAN_MONTHS = [
@@ -200,11 +263,10 @@ export function germanDate(iso) {
  */
 export function buildPayload({ context, bookingNumber, secret, answers }) {
   const a = answers || {};
-  // Every scale on screen has an answer from the moment it renders, so nothing
-  // here may fall back to undefined just because a slider was never moved.
-  const overall = orDefault(a.overallExperience, DEFAULT_SCORE);
-  const consultation = orDefault(a.consultation, DEFAULT_SCORE);
-  const recommendation = orDefault(a.recommendation, DEFAULT_SCORE);
+  // Only what the guest actually chose. Nothing is filled in on their behalf.
+  const overall = isScore(a.overallExperience) ? a.overallExperience : null;
+  const consultation = isScore(a.consultation) ? a.consultation : null;
+  const recommendation = isNps(a.recommendation) ? a.recommendation : null;
 
   const payload = {
     bookingNumber,
@@ -250,33 +312,29 @@ export function buildPayload({ context, bookingNumber, secret, answers }) {
   return payload;
 }
 
-/** An untouched scale still has the answer it is showing. */
 function scoreOf(entry) {
-  return orDefault(entry && entry.score, DEFAULT_SCORE);
+  const score = entry ? entry.score : null;
+  return isScore(score) ? score : null;
 }
 
-function orDefault(value, fallback) {
-  return value === undefined || value === null ? fallback : value;
-}
-
-/**
- * The whole detail panel, whether or not the guest moved its scales. Once a
- * hotel scores low enough to open the panel, all four scales are on screen
- * showing a value - and an unhappy guest's breakdown is the most useful thing
- * in the survey, so none of it may depend on their having touched a slider.
- */
+/** The sub-ratings the guest chose; the ones left empty are not sent. */
 function subScores(given) {
   const g = given || {};
   const out = {};
   SUB_CATEGORIES.forEach((key) => {
-    out[key] = orDefault(g[key], DEFAULT_SUB_SCORE);
+    if (isScore(g[key])) {
+      out[key] = g[key];
+    }
   });
-  return out;
+  return Object.keys(out).length ? out : null;
 }
 
 function singleRating(entry) {
   const e = entry || {};
   const score = scoreOf(e);
+  if (score === null) {
+    return null;
+  }
   const rating = { score };
   if (shouldShowComment(score)) {
     rating.comment = emptyToNull(e.comment);
@@ -290,7 +348,10 @@ function itemRatings(items, answersByReservation, withSubRatings) {
   }
   const byReservation = answersByReservation || {};
 
-  return items.map((item) => {
+  const rated = items.filter(
+    (item) => scoreOf(byReservation[item.reservationId]) !== null
+  );
+  return rated.map((item) => {
     const given = byReservation[item.reservationId] || {};
     const score = scoreOf(given);
     const entry = {
@@ -302,7 +363,8 @@ function itemRatings(items, answersByReservation, withSubRatings) {
     if (shouldShowComment(score)) {
       entry.comment = emptyToNull(given.comment);
     }
-    if (withSubRatings && shouldExpandHotelDetail(score)) {
+    const sub = withSubRatings && shouldExpandHotelDetail(score);
+    if (sub && subScores(given.sub)) {
       entry.sub = subScores(given.sub);
     }
     return entry;

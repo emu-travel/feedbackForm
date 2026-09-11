@@ -18,8 +18,12 @@ export default class GxCourseCard extends LightningElement {
   /** { score, comment } */
   @api answer;
 
+  /** Set when the guest tried to move on without rating this course. */
+  @api invalid = false;
+
+  /** Empty until the guest chooses; nothing is pre-selected. */
   get score() {
-    return this.answer && this.answer.score ? this.answer.score : 10;
+    return this.answer && this.answer.score ? this.answer.score : null;
   }
 
   get comment() {

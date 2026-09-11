@@ -1,0 +1,33 @@
+{
+  "type": "sfdc_cms__themeLayout",
+  "title": "Scoped Header and Footer",
+  "contentBody": {
+    "component": {
+      "attributes": {
+        "hideThemeFooter": true,
+        "showThemeFooterAtBottom": true,
+        "stickyThemeHeader": false
+      },
+      "children": [
+        {
+          "children": [],
+          "id": "5c84672b-e86e-4cbf-9155-79e836a2aa6d",
+          "name": "header",
+          "title": "Theme Header",
+          "type": "region"
+        },
+        {
+          "children": [],
+          "id": "64ce0e13-25c0-43e2-bb23-434b49183b81",
+          "name": "footer",
+          "title": "Theme Footer",
+          "type": "region"
+        }
+      ],
+      "definition": "community_byo:scopedHeaderAndFooter",
+      "id": "892043c7-3d27-49ff-b502-93a8b2f9f884",
+      "type": "component"
+    }
+  },
+  "urlName": "scoped-header-and-footer"
+}

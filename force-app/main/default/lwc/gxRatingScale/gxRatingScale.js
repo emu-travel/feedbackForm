@@ -1,15 +1,17 @@
 import { LightningElement, api } from "lwc";
 import { shouldShowComment } from "c/gxSurveyFlow";
 
-const CHOICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const DEFAULT_SCORE = 10;
+const MAX = 10;
 
 /**
  * gxRatingScale
  *
- * The 1-10 scale used on every screen of the survey: a slider paired with a
+ * The rating scale used on every screen of the survey: a slider paired with a
  * button row, and a follow-up comment box that appears once the score drops to
  * 8 or below.
+ *
+ * It starts empty - nothing is selected until the guest chooses - and runs
+ * from `min` (1, or 0 for the recommendation question) to 10.
  *
  * Emits `valuechange` and `commentchange`; it holds no state of its own, so the
  * container stays the single source of truth for the guest's answers.
@@ -28,42 +30,83 @@ export default class GxRatingScale extends LightningElement {
   /** Suppresses the comment box even below 9, for scales that take no comment. */
   @api noComment = false;
 
-  _value = DEFAULT_SCORE;
+  /** Set by the container when the guest tried to move on without choosing. */
+  @api invalid = false;
+
+  _min = 1;
+  _value = null;
+
+  /** Lowest score on offer: 1, or 0 for the 0-10 recommendation scale. */
+  @api
+  get min() {
+    return this._min;
+  }
+  set min(incoming) {
+    this._min = Number(incoming) === 0 ? 0 : 1;
+  }
 
   @api
   get value() {
-    return this._value;
+    return this.hasValue ? this._value : null;
   }
   set value(incoming) {
-    const parsed = Number(incoming);
-    this._value =
-      Number.isFinite(parsed) && parsed >= 1 && parsed <= 10
-        ? Math.round(parsed)
-        : DEFAULT_SCORE;
+    const parsed =
+      incoming === null || incoming === undefined || incoming === ""
+        ? NaN
+        : Number(incoming);
+    this._value = Number.isInteger(parsed) ? parsed : null;
   }
 
-  get currentValue() {
-    return this._value;
+  /** Checked against min on read, since min may arrive after the value. */
+  get hasValue() {
+    return (
+      this._value !== null && this._value >= this._min && this._value <= MAX
+    );
   }
 
   get valueLabel() {
-    return `${this._value} / 10`;
+    return `${this._value} / ${MAX}`;
+  }
+
+  get showInvalid() {
+    return Boolean(this.invalid) && !this.hasValue;
+  }
+
+  get scaleClass() {
+    return this.showInvalid ? "scale scale_invalid" : "scale";
   }
 
   get choices() {
-    return CHOICES.map((value) => {
-      const selected = value === this._value;
-      return {
+    const out = [];
+    for (let value = this._min; value <= MAX; value++) {
+      const selected = this.hasValue && value === this._value;
+      out.push({
         value,
         selected,
         className: selected ? "choice choice_selected" : "choice"
-      };
-    });
+      });
+    }
+    return out;
   }
 
-  /** Fills the slider track up to the current score. */
+  /** Eleven buttons (0-10) wrap as six and five on a phone, not five-five-one. */
+  get buttonsClass() {
+    return this._min === 0 ? "buttons buttons_eleven" : "buttons";
+  }
+
+  get rangeValue() {
+    return this.hasValue ? this._value : this._min;
+  }
+
+  /** Until a score is chosen the slider shows no thumb and no fill. */
+  get trackClass() {
+    return this.hasValue ? "track" : "track track_unset";
+  }
+
   get trackStyle() {
-    const percent = ((this._value - 1) / 9) * 100;
+    const percent = this.hasValue
+      ? ((this._value - this._min) / (MAX - this._min)) * 100
+      : 0;
     return `--gx-fill: ${percent}%`;
   }
 
@@ -71,6 +114,7 @@ export default class GxRatingScale extends LightningElement {
     return (
       !this.noComment &&
       Boolean(this.commentPrompt) &&
+      this.hasValue &&
       shouldShowComment(this._value)
     );
   }
@@ -108,7 +152,7 @@ export default class GxRatingScale extends LightningElement {
   }
 
   publishValue(value) {
-    if (!Number.isFinite(value) || value === this._value) {
+    if (!Number.isInteger(value) || (this.hasValue && value === this._value)) {
       return;
     }
     this._value = value;

@@ -76,6 +76,8 @@
               >
               <c-gx-rating-scale
                 data-field="overallExperience"
+                data-missing={invalidMap.overallExperience}
+                invalid={invalidMap.overallExperience}
                 value={answers.overallExperience}
                 comment={answers.overallExperienceComment}
                 min-label="Unzureichend"
@@ -95,6 +97,8 @@
               >
               <c-gx-rating-scale
                 data-field="consultation"
+                data-missing={invalidMap.consultation}
+                invalid={invalidMap.consultation}
                 value={answers.consultation}
                 comment={answers.consultationComment}
                 min-label="Sehr unzufrieden"
@@ -127,6 +131,8 @@
                 </div>
                 <c-gx-rating-scale
                   data-field="flight"
+                  data-missing={invalidMap.flight}
+                  invalid={invalidMap.flight}
                   value={answers.flight.score}
                   comment={answers.flight.comment}
                   min-label="Sehr unzufrieden"
@@ -153,6 +159,8 @@
                 </div>
                 <c-gx-rating-scale
                   data-field="transfer"
+                  data-missing={invalidMap.transfer}
+                  invalid={invalidMap.transfer}
                   value={answers.transfer.score}
                   comment={answers.transfer.comment}
                   min-label="Sehr unzufrieden"
@@ -178,6 +186,8 @@
                 </div>
                 <c-gx-rating-scale
                   data-field="rentalCar"
+                  data-missing={invalidMap.rentalCar}
+                  invalid={invalidMap.rentalCar}
                   value={answers.rentalCar.score}
                   comment={answers.rentalCar.comment}
                   min-label="Sehr unzufrieden"
@@ -204,6 +214,8 @@
                   key={card.key}
                   hotel={card.hotel}
                   answer={card.answer}
+                  invalid={card.invalid}
+                  data-missing={card.invalid}
                   onscorechange={handleHotelScore}
                   oncommentchange={handleHotelComment}
                   onsubchange={handleHotelSub}
@@ -238,6 +250,8 @@
                   key={card.key}
                   course={card.course}
                   answer={card.answer}
+                  invalid={card.invalid}
+                  data-missing={card.invalid}
                   onscorechange={handleCourseScore}
                   oncommentchange={handleCourseComment}
                 ></c-gx-course-card>
@@ -273,7 +287,10 @@
               >
               <c-gx-rating-scale
                 data-field="recommendation"
+                data-missing={invalidMap.recommendation}
+                invalid={invalidMap.recommendation}
                 value={answers.recommendation}
+                min="0"
                 min-label="Sehr unwahrscheinlich"
                 max-label="Sehr wahrscheinlich"
                 aria-label="Weiterempfehlung von golf.extra"
@@ -316,6 +333,12 @@
           </section>
         </template>
 
+        <template lwc:if={showMissingNote}>
+          <p class="missing-note" role="alert">
+            Bitte wählen Sie für jede markierte Frage eine Bewertung.
+          </p>
+        </template>
+
         <template lwc:if={submitError}>
           <p class="error" role="alert">{submitError}</p>
         </template>
@@ -348,8 +371,8 @@
           <div class="tick" aria-hidden="true">✓</div>
           <h2 class="title">Vielen Dank!</h2>
           <p class="lead">
-            Vielen Dank, dass Sie sich die Zeit genommen haben, uns Ihr Feedback
-            mitzuteilen.
+            Wir freuen uns sehr, dass Sie sich die Zeit genommen haben, uns Ihr
+            Feedback mitzuteilen.
           </p>
 
           <template lwc:if={showPublicReview}>
@@ -404,8 +427,8 @@
           </template>
 
           <p class="closing">
-            Vielen Dank und hoffentlich bis ganz bald auf einer unserer nächsten
-            Reisen.
+            Wir hoffen, Sie schon bald auf einer unserer nächsten Reisen
+            begleiten zu dürfen.
           </p>
 
           <template lwc:if={reference}>

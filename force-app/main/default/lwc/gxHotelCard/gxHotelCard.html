@@ -9,6 +9,7 @@
 
     <c-gx-rating-scale
       value={score}
+      invalid={invalid}
       min-label="Unzureichend"
       max-label="Ausgezeichnet"
       aria-label={ratingAriaLabel}
@@ -20,7 +21,7 @@
       <div class="detail">
         <p class="detail-intro">
           Vielen Dank für Ihre Offenheit. Damit wir gezielt nachbessern können,
-          bitten wir Sie um eine kurze Einschätzung im Detail.
+          bitten wir Sie um eine kurze Einschätzung im Detail (optional).
         </p>
 
         <template for:each={subRatings} for:item="sub">
