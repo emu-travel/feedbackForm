@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Follow_Up_On__c</fullName>
+    <description
+  >When the follow-up status last changed. Set by the dashboard, not by hand.</description>
+    <externalId>false</externalId>
+    <label>Follow-up On</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>DateTime</type>
+</CustomField>

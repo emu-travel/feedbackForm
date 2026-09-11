@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description
+  >The guest feedback dashboard: NPS, response rate, venue and supplier scores, detractor follow-up and next-destination wishes.</description>
+    <label>Feedback Dashboard</label>
+    <lwcComponent>gxFeedbackDashboard</lwcComponent>
+    <motif>Custom53: Chart</motif>
+</CustomTab>

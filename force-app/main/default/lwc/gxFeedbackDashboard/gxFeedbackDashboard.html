@@ -1,0 +1,397 @@
+<template>
+  <div class="dash">
+    <header class="head">
+      <div>
+        <h1 class="title">Guest feedback</h1>
+        <p class="subtitle">
+          Post-trip survey results, by the date each trip ended
+        </p>
+      </div>
+      <lightning-button-icon
+        icon-name="utility:refresh"
+        alternative-text="Refresh"
+        title="Refresh"
+        onclick={handleRefresh}
+      ></lightning-button-icon>
+    </header>
+
+    <section class="filters" aria-label="Filters">
+      <lightning-input
+        type="date"
+        label="Trips ending from"
+        data-field="fromDate"
+        value={filters.fromDate}
+        onchange={handleFilter}
+      ></lightning-input>
+      <lightning-input
+        type="date"
+        label="To"
+        data-field="toDate"
+        value={filters.toDate}
+        onchange={handleFilter}
+      ></lightning-input>
+      <lightning-combobox
+        label="Region"
+        data-field="region"
+        value={filters.region}
+        options={regionOptions}
+        onchange={handleFilter}
+      ></lightning-combobox>
+      <lightning-combobox
+        label="Country"
+        data-field="country"
+        value={filters.country}
+        options={countryOptions}
+        onchange={handleFilter}
+      ></lightning-combobox>
+      <lightning-combobox
+        label="Travel type"
+        data-field="travelType"
+        value={filters.travelType}
+        options={travelTypeOptions}
+        onchange={handleFilter}
+      ></lightning-combobox>
+      <lightning-combobox
+        label="Category"
+        data-field="category"
+        value={filters.category}
+        options={categoryOptions}
+        onchange={handleFilter}
+        field-level-help="Narrows the venue sections. NPS and response rate always cover the whole trip."
+      ></lightning-combobox>
+      <div class="filter-actions">
+        <lightning-button
+          variant="base"
+          label="All time"
+          onclick={handleAllTime}
+        ></lightning-button>
+        <lightning-button
+          variant="base"
+          label="Reset"
+          onclick={handleReset}
+        ></lightning-button>
+      </div>
+    </section>
+
+    <div class="body">
+      <template lwc:if={loading}>
+        <lightning-spinner
+          alternative-text="Loading feedback"
+          size="medium"
+        ></lightning-spinner>
+      </template>
+
+      <template lwc:if={error}>
+        <div class="notice" role="alert">{error}</div>
+      </template>
+
+      <template lwc:if={data}>
+        <section class="kpis" aria-label="Headline numbers">
+          <template for:each={kpis} for:item="k">
+            <div key={k.key} class={k.cls}>
+              <div class="kpi-label">{k.label}</div>
+              <div class="kpi-value">{k.value}</div>
+              <div class="kpi-note">{k.note}</div>
+            </div>
+          </template>
+        </section>
+
+        <template lwc:if={isEmpty}>
+          <div class="empty">
+            <h2 class="empty-title">No feedback for these trips yet</h2>
+            <p>
+              Invitations go out 36 hours after a trip ends, so recent trips
+              fill in over the following weeks. Try widening the dates or
+              clearing a filter.
+            </p>
+          </div>
+        </template>
+
+        <template lwc:else>
+          <!-- Trend -->
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">NPS by trip month</h2>
+              <div class="legend" aria-hidden="true">
+                <span><i class="sw sw_pro"></i>Promoters</span>
+                <span><i class="sw sw_pas"></i>Passives</span>
+                <span><i class="sw sw_det"></i>Detractors</span>
+              </div>
+            </div>
+            <template lwc:if={hasTrend}>
+              <div class="trend">
+                <template for:each={trend} for:item="m">
+                  <div key={m.key} class="trend-row">
+                    <span class="trend-month">{m.label}</span>
+                    <span class="trend-bar" title={m.summary}>
+                      <span class="seg seg_pro" style={m.promoterStyle}></span>
+                      <span class="seg seg_pas" style={m.passiveStyle}></span>
+                      <span class="seg seg_det" style={m.detractorStyle}></span>
+                    </span>
+                    <span class="trend-nps">{m.nps}</span>
+                    <span class="trend-n">{m.total}</span>
+                  </div>
+                </template>
+              </div>
+              <p class="panel-note">
+                The current month keeps filling in as guests reply.
+              </p>
+            </template>
+            <template lwc:else>
+              <p class="panel-note">
+                No trip dates to chart in this selection.
+              </p>
+            </template>
+          </section>
+
+          <!-- Venues -->
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">How our venues and partners score</h2>
+            </div>
+            <p class="panel-note">{rankingHint}</p>
+            <div class="boards">
+              <c-gx-venue-board
+                title="Hotels"
+                board={hotelBoard}
+                min-ratings={minRatings}
+                onselect={handleVenueSelect}
+              ></c-gx-venue-board>
+              <c-gx-venue-board
+                title="Golf courses"
+                board={golfBoard}
+                min-ratings={minRatings}
+                onselect={handleVenueSelect}
+              ></c-gx-venue-board>
+              <c-gx-venue-board
+                title="Airlines, transfers and rental cars"
+                board={supplierBoard}
+                min-ratings={minRatings}
+                onselect={handleVenueSelect}
+              ></c-gx-venue-board>
+            </div>
+
+            <template lwc:if={drill}>
+              <div class="drill" role="region" aria-label={drillTitle}>
+                <div class="drill-head">
+                  <div>
+                    <h3 class="drill-title">{drillTitle}</h3>
+                    <span class="drill-count">{drillCount}</span>
+                  </div>
+                  <lightning-button-icon
+                    icon-name="utility:close"
+                    alternative-text="Close"
+                    variant="bare"
+                    onclick={closeDrill}
+                  ></lightning-button-icon>
+                </div>
+                <template lwc:if={drill.loading}>
+                  <p class="panel-note">Loading ratings…</p>
+                </template>
+                <template lwc:else>
+                  <template for:each={drill.rows} for:item="r">
+                    <div key={r.key} class="drill-row">
+                      <span class={r.cls}>{r.score}</span>
+                      <div class="drill-main">
+                        <div class="drill-who">
+                          <a href={r.url}>{r.bookingNumber}</a>
+                          <span> · {r.guest}</span>
+                        </div>
+                        <template lwc:if={r.comment}>
+                          <div class="drill-comment">{r.comment}</div>
+                        </template>
+                        <div class="drill-subs">
+                          <template for:each={r.subs} for:item="s">
+                            <span key={s.key} class="sub"
+                              >{s.label} {s.value}</span
+                            >
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </template>
+              </div>
+            </template>
+          </section>
+
+          <!-- Hotel detail -->
+          <template lwc:if={hasHotelDetail}>
+            <section class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Hotel detail</h2>
+                <div class="legend" aria-hidden="true">
+                  <span><i class="sw heat_bad"></i>Below 7</span>
+                  <span><i class="sw heat_mid"></i>7 to 8</span>
+                  <span><i class="sw heat_good"></i>8 and above</span>
+                </div>
+              </div>
+              <p class="panel-note">
+                Guests only see these four questions when they score a hotel
+                below 9, so this is where the reasons for low hotel scores show
+                up.
+              </p>
+              <div class="heat-wrap">
+                <table class="heat-table">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="heat-hotel">Hotel</th>
+                      <th scope="col">Room</th>
+                      <th scope="col">Service</th>
+                      <th scope="col">Catering</th>
+                      <th scope="col">Cleanliness</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template for:each={hotelDetail} for:item="row">
+                      <tr key={row.key}>
+                        <th scope="row" class="heat-hotel">{row.hotel}</th>
+                        <template for:each={row.cells} for:item="c">
+                          <td key={c.key} class={c.cls} title={c.title}>
+                            {c.value}
+                          </td>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </template>
+
+          <div class="two">
+            <!-- Follow-up -->
+            <section class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Unhappy guests to follow up</h2>
+                <lightning-button
+                  variant="base"
+                  label={handledToggleLabel}
+                  onclick={toggleHandled}
+                ></lightning-button>
+              </div>
+              <template lwc:if={hasFollowUps}>
+                <template for:each={followUps} for:item="r">
+                  <div key={r.key} class="fu">
+                    <div class="fu-top">
+                      <span class="pill pill_bad">{r.npsLabel}</span>
+                      <div class="fu-who">
+                        <a href={r.url}>{r.bookingNumber}</a>
+                        <span> · {r.guest} · overall {r.overallLabel}</span>
+                      </div>
+                    </div>
+                    <p class="fu-comment">{r.comment}</p>
+                    <template lwc:if={r.followUpBy}>
+                      <p class="fu-meta">
+                        {r.status} by {r.followUpBy},
+                        <lightning-formatted-date-time
+                          value={r.followUpOn}
+                          year="numeric"
+                          month="short"
+                          day="numeric"
+                        ></lightning-formatted-date-time>
+                      </p>
+                    </template>
+                    <div class="fu-actions">
+                      <lightning-combobox
+                        class="fu-status"
+                        label="Status"
+                        variant="label-hidden"
+                        options={followUpOptions}
+                        value={r.draftStatus}
+                        data-id={r.key}
+                        onchange={handleStatusChange}
+                      ></lightning-combobox>
+                      <lightning-input
+                        class="fu-note"
+                        label="Note"
+                        variant="label-hidden"
+                        placeholder="What was done, e.g. called and offered a voucher"
+                        value={r.draftNote}
+                        data-id={r.key}
+                        onchange={handleNoteChange}
+                      ></lightning-input>
+                      <lightning-button
+                        label="Save"
+                        data-id={r.key}
+                        onclick={handleSaveFollowUp}
+                        disabled={r.saving}
+                      ></lightning-button>
+                    </div>
+                  </div>
+                </template>
+              </template>
+              <template lwc:else>
+                <p class="panel-note">{followUpEmptyText}</p>
+              </template>
+            </section>
+
+            <!-- Next destinations -->
+            <section class="panel">
+              <div class="panel-head">
+                <h2 class="panel-title">Where guests want to go next</h2>
+              </div>
+              <p class="panel-note">
+                Happiest guests first — the warmest leads for their next trip.
+              </p>
+              <template lwc:if={hasDestinations}>
+                <ul class="dest">
+                  <template for:each={destinations} for:item="d">
+                    <li key={d.key} class="dest-row">
+                      <span class="dest-wish">{d.wish}</span>
+                      <span class="dest-who">
+                        {d.guest} · <a href={d.url}>{d.bookingNumber}</a>
+                      </span>
+                      <template lwc:if={d.promoter}>
+                        <span class="pill pill_good">{d.npsLabel}</span>
+                      </template>
+                      <template lwc:else>
+                        <span class="pill pill_none">{d.npsLabel}</span>
+                      </template>
+                    </li>
+                  </template>
+                </ul>
+              </template>
+              <template lwc:else>
+                <p class="panel-note">
+                  Nobody has named a next destination in this selection.
+                </p>
+              </template>
+            </section>
+          </div>
+
+          <!-- Comments -->
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">What guests wrote</h2>
+            </div>
+            <template lwc:if={hasComments}>
+              <ul class="comments">
+                <template for:each={comments} for:item="c">
+                  <li key={c.key} class="comment">
+                    <template lwc:if={c.score}>
+                      <span class={c.cls}>{c.score}</span>
+                    </template>
+                    <template lwc:else>
+                      <span class="pill pill_none">–</span>
+                    </template>
+                    <div class="comment-main">
+                      <p class="comment-text">{c.text}</p>
+                      <p class="comment-meta">
+                        {c.about} · {c.guest} ·
+                        <a href={c.url}>{c.bookingNumber}</a>
+                      </p>
+                    </div>
+                  </li>
+                </template>
+              </ul>
+            </template>
+            <template lwc:else>
+              <p class="panel-note">No comments in this selection.</p>
+            </template>
+          </section>
+        </template>
+      </template>
+    </div>
+  </div>
+</template>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>68.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Guest Feedback Dashboard</masterLabel>
+    <description
+  >Post-trip survey results: NPS, response rate, venue scores, detractor follow-up and next-destination wishes.</description>
+    <targets>
+        <target>lightning__Tab</target>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+    </targets>
+</LightningComponentBundle>

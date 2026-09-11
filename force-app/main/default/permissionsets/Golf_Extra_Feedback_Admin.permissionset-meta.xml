@@ -164,6 +164,32 @@
     </fieldPermissions>
 
     <!--
+      Follow-up on unhappy guests. Status and note are editable so staff can
+      also work from the record page; who and when are stamped by the
+      dashboard and never typed in.
+    -->
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Feedback_Response__c.Follow_Up_Status__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Feedback_Response__c.Follow_Up_Note__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Feedback_Response__c.Follow_Up_By__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>Feedback_Response__c.Follow_Up_On__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+
+    <!--
       System-maintained, so readable but not editable: staff need to see when a
       guest was last asked and whether they have already been reminded, without
       being able to hand-edit the dispatch's own bookkeeping.
@@ -207,9 +233,17 @@
         <apexClass>GxFeedbackDispatch</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>GxFeedbackDashboardController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <!-- Without this the tab exists but nobody can see it. -->
     <tabSettings>
         <tab>Feedback_Response__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>Gx_Feedback_Dashboard</tab>
         <visibility>Visible</visibility>
     </tabSettings>
     <flowAccesses>

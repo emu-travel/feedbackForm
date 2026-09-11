@@ -1,0 +1,103 @@
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.board-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #3d5148;
+  margin: 0 0 0.5rem;
+}
+
+.board-sub {
+  font-size: 0.75rem;
+  color: #5a6b62;
+  margin: 0.75rem 0 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.board-empty {
+  font-size: 0.8125rem;
+  color: #5a6b62;
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.venue {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5rem 3.25rem 4.5rem;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: #10231a;
+  cursor: pointer;
+}
+
+.venue:hover,
+.venue:focus-visible {
+  background: #eef1ee;
+}
+
+.venue:focus-visible {
+  outline: 2px solid #e29d0b;
+  outline-offset: 1px;
+}
+
+.venue_unranked {
+  grid-template-columns: minmax(0, 1fr) 3.25rem 4.5rem;
+  color: #3d5148;
+}
+
+.venue-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.venue-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #eef1ee;
+  overflow: hidden;
+}
+
+.venue-fill {
+  display: block;
+  height: 100%;
+  background: #0f3822;
+  border-radius: 0 4px 4px 0;
+}
+
+.venue-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.venue-n {
+  font-size: 0.75rem;
+  color: #5a6b62;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

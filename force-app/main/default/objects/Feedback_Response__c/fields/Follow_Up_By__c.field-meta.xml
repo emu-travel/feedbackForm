@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Follow_Up_By__c</fullName>
+    <description
+  >Who last changed the follow-up status. Set by the dashboard, not by hand.</description>
+    <externalId>false</externalId>
+    <label>Follow-up By</label>
+    <referenceTo>User</referenceTo>
+    <relationshipName>Feedback_Follow_Ups</relationshipName>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

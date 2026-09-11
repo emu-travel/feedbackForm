@@ -1,0 +1,67 @@
+<template>
+  <div class="board">
+    <h3 class="board-title">{title}</h3>
+
+    <template lwc:if={isEmpty}>
+      <p class="board-empty">No ratings in this selection.</p>
+    </template>
+
+    <template lwc:if={hasRanked}>
+      <ol class="list">
+        <template for:each={ranked} for:item="v">
+          <li key={v.key}>
+            <button
+              class="venue"
+              data-name={v.name}
+              data-category={v.category}
+              onclick={handleSelect}
+              title="Show every rating for this venue"
+            >
+              <span class="venue-name">{v.name}</span>
+              <span class="venue-bar" aria-hidden="true">
+                <span class="venue-fill" style={v.barStyle}></span>
+              </span>
+              <span class="venue-score">
+                {v.score}
+                <template lwc:if={v.low}>
+                  <lightning-icon
+                    class="flag"
+                    icon-name="utility:warning"
+                    size="xx-small"
+                    variant="warning"
+                    alternative-text="Needs attention"
+                  ></lightning-icon>
+                </template>
+              </span>
+              <span class="venue-n">{v.ratingsLabel}</span>
+            </button>
+          </li>
+        </template>
+      </ol>
+    </template>
+
+    <template lwc:if={hasUnranked}>
+      <template lwc:if={showRankingNote}>
+        <p class="board-empty">{rankingNote}</p>
+      </template>
+      <p class="board-sub">Not enough ratings to rank yet</p>
+      <ul class="list">
+        <template for:each={unranked} for:item="v">
+          <li key={v.key}>
+            <button
+              class="venue venue_unranked"
+              data-name={v.name}
+              data-category={v.category}
+              onclick={handleSelect}
+              title="Show every rating for this venue"
+            >
+              <span class="venue-name">{v.name}</span>
+              <span class="venue-score">{v.score}</span>
+              <span class="venue-n">{v.ratingsLabel}</span>
+            </button>
+          </li>
+        </template>
+      </ul>
+    </template>
+  </div>
+</template>
