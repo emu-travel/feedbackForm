@@ -89,7 +89,8 @@ export function defaultFilters(today = new Date()) {
     region: "",
     country: "",
     travelType: "",
-    category: ""
+    category: "",
+    designer: ""
   };
 }
 
@@ -193,7 +194,9 @@ export function kpiTiles(kpis) {
       key: "responses",
       label: "Responses",
       value: String(k.responses || 0),
-      note: `${k.invited || 0} invited`
+      note: `${k.invited || 0} invited`,
+      target: "responses",
+      hint: "See every response"
     },
     {
       key: "rate",
@@ -543,8 +546,12 @@ export function responseView(detail) {
   });
 
   const where = [d.region, d.country].filter(Boolean).join(", ");
+  const standout = standoutOf(sections);
   return {
     title: `${d.reference || "Feedback"} · ${d.guest || "Guest"}`,
+    designer: d.designer || null,
+    standout,
+    hasStandout: standout.length > 0,
     tripLine: [d.bookingNumber, where, tripDates(d.tripStart, d.tripEnd)]
       .filter(Boolean)
       .join(" · "),
@@ -569,4 +576,126 @@ function textRows(pairs) {
   return pairs
     .filter(([, text]) => text && String(text).trim())
     .map(([label, text], i) => ({ key: `text-${i}-${label}`, label, text }));
+}
+
+/**
+ * Everything in a response scored below 7, for the strip at the top of the
+ * full view: what someone reading it for the first time should see first.
+ */
+function standoutOf(sections) {
+  const out = [];
+  sections.forEach((section) => {
+    section.items.forEach((item) => {
+      const n = Number(item.score);
+      const low =
+        item.key === "nps" ? n <= 6 : Number.isFinite(n) && n < LOW_SCORE;
+      if (item.score !== "—" && low) {
+        out.push({
+          key: `standout-${item.key}`,
+          label: item.key === "nps" ? "Would recommend" : item.label,
+          score: item.score,
+          cls: item.cls
+        });
+      }
+    });
+  });
+  return out;
+}
+
+// ------------------------------------------------------------------
+// The response list
+
+export const GROUP_OPTIONS = [
+  { label: "All", value: "all" },
+  { label: "Promoters", value: "promoters" },
+  { label: "Passives", value: "passives" },
+  { label: "Detractors", value: "detractors" },
+  { label: "Open follow-ups", value: "open" }
+];
+
+export const SORT_OPTIONS = [
+  { label: "Newest first", value: "newest" },
+  { label: "Lowest scores first", value: "lowest" }
+];
+
+/** "8 Sep 2026" from an ISO date. */
+export function shortDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : "";
+}
+
+/**
+ * A page of responses as list rows: who and which trip on the left, and on
+ * the right the few facts that decide whether to open it - the lowest score
+ * when it is 8 or below, how much the guest wrote, and where a follow-up
+ * stands.
+ */
+export function responseListRows(rows) {
+  return (rows || []).map((r) => {
+    const nps =
+      r.nps === null || r.nps === undefined ? null : Math.round(r.nps);
+    const detractor = nps !== null && nps <= 6;
+    const lowest =
+      r.lowestScore !== null &&
+      r.lowestScore !== undefined &&
+      r.lowestScore <= 8
+        ? {
+            label: r.lowestLabel,
+            score: formatScore(r.lowestScore),
+            cls: `pill pill_${toneFor(r.lowestScore)}`
+          }
+        : null;
+    const status = detractor ? r.followUpStatus || "Open" : null;
+    return {
+      key: r.responseId,
+      responseId: r.responseId,
+      guest: r.guest || "Guest",
+      bookingNumber: r.bookingNumber,
+      url: bookingUrl(r.bookingId),
+      reference: r.reference,
+      trip: [r.region, shortDate(r.tripEnd)].filter(Boolean).join(" · "),
+      designer: r.designer || null,
+      npsLabel: nps === null ? "NPS —" : `NPS ${nps}`,
+      npsCls: `pill pill_${npsToneFor(nps)}`,
+      overall: formatScore(r.overall),
+      overallCls: `pill pill_${toneFor(r.overall)}`,
+      lowest,
+      commentsLabel: r.comments
+        ? plural(r.comments, "comment", "comments")
+        : null,
+      statusLabel: status ? `Follow-up: ${status}` : null,
+      statusCls:
+        status && isOpenFollowUp(status) ? "status status_open" : "status",
+      reviewPrompted: Boolean(r.reviewPrompted)
+    };
+  });
+}
+
+/** What the list is showing, in words. */
+export function responsesSummary(page, term) {
+  const p = page || {};
+  const total = p.total || 0;
+  if (p.searching) {
+    return total
+      ? `${plural(total, "response", "responses")} matching "${term}", from all dates and filters`
+      : `No response matches "${term}". Search looks at guest name, email, booking number and FB number.`;
+  }
+  return total
+    ? plural(total, "response", "responses")
+    : "No responses in this selection";
+}
+
+/** Travel designers, with the one being filtered on marked. */
+export function designerRows(rows, activeId) {
+  return (rows || []).map((d) => ({
+    key: d.id,
+    id: d.id,
+    name: d.name,
+    responses: d.responses,
+    consultation: formatScore(d.consultation),
+    consultCls: `pill pill_${toneFor(d.consultation)}`,
+    nps: formatNps(d.nps),
+    active: d.id === activeId,
+    rowCls: d.id === activeId ? "drow drow_active" : "drow"
+  }));
 }

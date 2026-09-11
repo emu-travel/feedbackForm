@@ -2,6 +2,7 @@ import { createElement } from "lwc";
 import GxFeedbackDashboard from "c/gxFeedbackDashboard";
 import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDashboard";
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
+import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
 import updateFollowUp from "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp";
 import GxResponseModal from "c/gxResponseModal";
@@ -16,6 +17,14 @@ jest.mock(
 );
 jest.mock(
   "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions",
+  () => {
+    const { createApexTestWireAdapter } = require("@salesforce/sfdx-lwc-jest");
+    return { default: createApexTestWireAdapter(jest.fn()) };
+  },
+  { virtual: true }
+);
+jest.mock(
+  "@salesforce/apex/GxFeedbackDashboardController.findResponses",
   () => {
     const { createApexTestWireAdapter } = require("@salesforce/sfdx-lwc-jest");
     return { default: createApexTestWireAdapter(jest.fn()) };
@@ -465,5 +474,187 @@ describe("c-gx-feedback-dashboard at volume", () => {
     expect(open).toHaveBeenCalledWith(
       expect.objectContaining({ responseId: "a01", size: "medium" })
     );
+  });
+});
+
+describe("c-gx-feedback-dashboard for the people who use it", () => {
+  const PAGE = {
+    total: 2,
+    page: 1,
+    pageSize: 10,
+    searching: false,
+    rows: [
+      {
+        responseId: "r1",
+        reference: "FB-00016",
+        bookingId: "b1",
+        bookingNumber: "GX-TEST-A1",
+        guest: "Ali Haider",
+        designer: "Silke Bellgardt",
+        region: "Algarve",
+        tripEnd: "2026-09-08",
+        nps: 10,
+        overall: 9,
+        lowestLabel: "Sixt GmbH & Co KG",
+        lowestScore: 4,
+        comments: 4
+      },
+      {
+        responseId: "r2",
+        reference: "FB-00015",
+        bookingNumber: "GX-TEST-A3",
+        guest: "Ali Haider",
+        nps: 3,
+        overall: 5,
+        lowestScore: 5,
+        lowestLabel: "Overall",
+        comments: 0
+      }
+    ]
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    while (document.body.firstChild) {
+      document.body.removeChild(document.body.firstChild);
+    }
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+  });
+
+  const settle = async () => {
+    for (let i = 0; i < 6; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await Promise.resolve();
+    }
+  };
+
+  it("lists every response with what stood out in each", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    findResponses.emit(PAGE);
+    await settle();
+
+    const rows = [...el.shadowRoot.querySelectorAll("li.rrow")];
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain("Ali Haider");
+    expect(rows[0].textContent).toContain("Silke Bellgardt");
+    expect(rows[0].textContent).toContain("Lowest: Sixt GmbH & Co KG");
+    expect(rows[0].textContent).toContain("4 comments");
+    expect(rows[1].textContent).toContain("Follow-up: Open");
+    expect(el.shadowRoot.querySelector(".panel-count").textContent).toBe(
+      "2 responses"
+    );
+  });
+
+  it("searches once typing pauses, from page one", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    findResponses.emit(PAGE);
+    await settle();
+
+    const search = el.shadowRoot.querySelector("lightning-input.finder-search");
+    search.dispatchEvent(
+      new CustomEvent("change", { detail: { value: "Hai" } })
+    );
+    search.dispatchEvent(
+      new CustomEvent("change", { detail: { value: "Haider " } })
+    );
+    await settle();
+    expect(findResponses.getLastConfig().search).toBe("");
+
+    jest.advanceTimersByTime(400);
+    await settle();
+    expect(findResponses.getLastConfig()).toEqual(
+      expect.objectContaining({ search: "Haider", pageNumber: 1 })
+    );
+  });
+
+  it("narrows the list to one group of guests", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    findResponses.emit(PAGE);
+    await settle();
+
+    const chip = [...el.shadowRoot.querySelectorAll("button.chip")].find(
+      (b) => b.dataset.value === "open"
+    );
+    chip.click();
+    await settle();
+
+    expect(findResponses.getLastConfig().groupName).toBe("open");
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("puts the unhappiest guests first on request", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    await settle();
+
+    el.shadowRoot
+      .querySelector("lightning-combobox.finder-sort")
+      .dispatchEvent(
+        new CustomEvent("change", { detail: { value: "lowest" } })
+      );
+    await settle();
+
+    expect(findResponses.getLastConfig().sortBy).toBe("lowest");
+  });
+
+  it("opens a listed response in full", async () => {
+    const open = jest
+      .spyOn(GxResponseModal, "open")
+      .mockResolvedValue(undefined);
+    const el = mount();
+    getDashboard.emit(DATA);
+    findResponses.emit(PAGE);
+    await settle();
+
+    el.shadowRoot.querySelector("li.rrow button.full-btn").click();
+    await settle();
+
+    expect(open).toHaveBeenCalledWith(
+      expect.objectContaining({ responseId: "r1" })
+    );
+  });
+
+  it("narrows the whole dashboard to one travel designer, and back", async () => {
+    const el = mount();
+    getDashboard.emit({
+      ...DATA,
+      designers: [
+        {
+          id: "005A",
+          name: "Silke Bellgardt",
+          responses: 3,
+          consultation: 9,
+          nps: 33
+        },
+        { id: "none", name: "No travel designer", responses: 1 }
+      ]
+    });
+    await settle();
+
+    const silke = [...el.shadowRoot.querySelectorAll(".dtable button")].find(
+      (b) => b.dataset.id === "005A"
+    );
+    silke.click();
+    await settle();
+    expect(JSON.parse(getDashboard.getLastConfig().filtersJson).designer).toBe(
+      "005A"
+    );
+    expect(JSON.parse(findResponses.getLastConfig().filtersJson).designer).toBe(
+      "005A"
+    );
+
+    silke.click();
+    await settle();
+    expect(
+      JSON.parse(getDashboard.getLastConfig().filtersJson).designer
+    ).toBeUndefined();
   });
 });

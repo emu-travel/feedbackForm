@@ -2,6 +2,9 @@
   <lightning-modal-header label={heading}>
     <template lwc:if={view}>
       <p class="trip">{view.tripLine}</p>
+      <template lwc:if={view.designer}>
+        <p class="designer">Travel designer: {view.designer}</p>
+      </template>
       <p class="submitted">
         <span>Submitted</span>
         <lightning-formatted-date-time
@@ -31,6 +34,23 @@
     </template>
 
     <template lwc:if={view}>
+      <div class="standout">
+        <p class="standout-title">What stood out</p>
+        <template lwc:if={view.hasStandout}>
+          <ul class="standout-list">
+            <template for:each={view.standout} for:item="s">
+              <li key={s.key} class="standout-item">
+                <span class={s.cls}>{s.score}</span>
+                <span>{s.label}</span>
+              </li>
+            </template>
+          </ul>
+        </template>
+        <template lwc:else>
+          <p class="standout-none">Nothing scored below 7.</p>
+        </template>
+      </div>
+
       <template lwc:if={view.followUp}>
         <div class="followup">
           <span class="followup-status">Follow-up: {view.followUp.status}</span>

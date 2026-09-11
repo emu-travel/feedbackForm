@@ -5,6 +5,7 @@ import { ShowToastEvent } from "lightning/platformShowToastEvent";
 import GxResponseModal from "c/gxResponseModal";
 import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDashboard";
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
+import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
 import updateFollowUp from "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp";
 import {
@@ -22,17 +23,26 @@ import {
   commentRows,
   drillRows,
   categoryLabel,
-  pageOf
+  pageOf,
+  GROUP_OPTIONS,
+  SORT_OPTIONS,
+  responseListRows,
+  responsesSummary,
+  designerRows
 } from "c/gxDashboardView";
+
+/** How long typing pauses before the search runs. */
+const SEARCH_DELAY_MS = 350;
 
 /**
  * gxFeedbackDashboard
  *
- * The team's view of post-trip feedback. Everything is computed by
- * GxFeedbackDashboardController in one call per filter change; this component
- * only holds the filters, the follow-up drafts, the open drill-down and which
- * page each list is on. Every list pages ten rows at a time, and every
- * response it shows opens in full in gxResponseModal.
+ * The team's view of post-trip feedback. The numbers are computed by
+ * GxFeedbackDashboardController in one call per filter change; the response
+ * list is its own call, so searching and paging it never reloads the rest.
+ * This component holds the filters, the search, the follow-up drafts, the
+ * open drill-down and which page each list is on. Every response it shows
+ * opens in full in gxResponseModal.
  */
 export default class GxFeedbackDashboard extends NavigationMixin(
   LightningElement
@@ -44,9 +54,21 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   error;
   loading = true;
 
-  options = { regions: [], countries: [], travelTypes: [] };
+  options = { regions: [], countries: [], travelTypes: [], designers: [] };
   categoryOptions = CATEGORY_OPTIONS;
   followUpOptions = FOLLOW_UP_OPTIONS;
+  sortOptions = SORT_OPTIONS;
+
+  // The response list: what is typed, what was searched, and how it is cut.
+  searchInput = "";
+  searchTerm = "";
+  searchTimer;
+  responseGroup = "all";
+  responseSort = "newest";
+  responsePage = 1;
+  responses;
+  responsesLoading = true;
+  wiredResponsesResult;
 
   showHandled = false;
   lowOnly = false;
@@ -81,6 +103,29 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     }
   }
 
+  @wire(findResponses, {
+    filtersJson: "$filtersJson",
+    search: "$searchTerm",
+    groupName: "$responseGroup",
+    sortBy: "$responseSort",
+    pageNumber: "$responsePage"
+  })
+  wiredResponses(result) {
+    this.wiredResponsesResult = result;
+    if (result.data) {
+      this.responses = result.data;
+      this.responsesLoading = false;
+    } else if (result.error) {
+      this.responses = undefined;
+      this.responsesLoading = false;
+      this.toast(
+        "Couldn't load the responses",
+        messageOf(result.error),
+        "error"
+      );
+    }
+  }
+
   // ------------------------------------------------------------------
   // What the template reads
 
@@ -94,6 +139,114 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   get travelTypeOptions() {
     return withAll(this.options.travelTypes, "All travel types");
+  }
+
+  get designerOptions() {
+    return withAll(this.options.designers, "All travel designers");
+  }
+
+  // ------------------------------------------------------------------
+  // The response list
+
+  get responseRows() {
+    return responseListRows(this.responses && this.responses.rows);
+  }
+
+  get hasResponseRows() {
+    return this.responseRows.length > 0;
+  }
+
+  get responsesTotal() {
+    return (this.responses && this.responses.total) || 0;
+  }
+
+  get responsesPageNo() {
+    return (this.responses && this.responses.page) || 1;
+  }
+
+  get responsesPageSize() {
+    return (this.responses && this.responses.pageSize) || 10;
+  }
+
+  get responsesSummary() {
+    return responsesSummary(this.responses, this.searchTerm);
+  }
+
+  get responsesCapNote() {
+    return this.responses && this.responses.capped
+      ? "Paging stops here. Search, or narrow the dates, to reach older responses."
+      : null;
+  }
+
+  get groupChips() {
+    return GROUP_OPTIONS.map((g) => ({
+      ...g,
+      pressed: g.value === this.responseGroup ? "true" : "false",
+      cls: g.value === this.responseGroup ? "chip chip_on" : "chip"
+    }));
+  }
+
+  handleSearch(event) {
+    this.searchInput = event.detail.value || "";
+    clearTimeout(this.searchTimer);
+    // Wait for a pause in typing rather than searching on every keystroke.
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    this.searchTimer = setTimeout(() => {
+      const term = this.searchInput.trim();
+      if (term !== this.searchTerm) {
+        this.searchTerm = term;
+        this.responsePage = 1;
+      }
+    }, SEARCH_DELAY_MS);
+  }
+
+  handleGroup(event) {
+    this.responseGroup = event.currentTarget.dataset.value;
+    this.responsePage = 1;
+  }
+
+  handleSort(event) {
+    this.responseSort = event.detail.value;
+    this.responsePage = 1;
+  }
+
+  handleResponsePage(event) {
+    this.responsePage = event.detail.page;
+    this.scrollToSection("responses");
+  }
+
+  // ------------------------------------------------------------------
+  // Travel designers
+
+  get designers() {
+    return designerRows(
+      this.data && this.data.designers,
+      this.filters.designer
+    );
+  }
+
+  get hasDesigners() {
+    return this.designers.length > 0;
+  }
+
+  get designerPage() {
+    return pageOf(this.designers, this.pages.designers);
+  }
+
+  get designerFiltered() {
+    return Boolean(this.filters.designer);
+  }
+
+  handleDesignerSelect(event) {
+    const id = event.currentTarget.dataset.id;
+    this.applyFilters({
+      ...this.filters,
+      designer: this.filters.designer === id ? "" : id
+    });
+  }
+
+  clearDesigner() {
+    this.applyFilters({ ...this.filters, designer: "" });
   }
 
   get kpis() {
@@ -334,6 +487,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
       this.loading = true;
       this.drill = undefined;
       this.pages = {};
+      this.responsePage = 1;
       this.filtersJson = json;
     }
   }
@@ -341,7 +495,10 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   async handleRefresh() {
     this.loading = true;
     try {
-      await refreshApex(this.wiredDashboard);
+      await Promise.all([
+        refreshApex(this.wiredDashboard),
+        refreshApex(this.wiredResponsesResult)
+      ]);
     } finally {
       this.loading = false;
     }
@@ -436,7 +593,10 @@ export default class GxFeedbackDashboard extends NavigationMixin(
       const rest = { ...this.drafts };
       delete rest[id];
       this.drafts = rest;
-      await refreshApex(this.wiredDashboard);
+      await Promise.all([
+        refreshApex(this.wiredDashboard),
+        refreshApex(this.wiredResponsesResult)
+      ]);
       this.toast(
         "Follow-up saved",
         `${row.bookingNumber} is now ${row.draftStatus}.`,
@@ -447,6 +607,10 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     } finally {
       this.savingId = undefined;
     }
+  }
+
+  disconnectedCallback() {
+    clearTimeout(this.searchTimer);
   }
 
   toast(title, message, variant) {

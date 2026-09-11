@@ -53,6 +53,16 @@ public with sharing class GxFeedbackDashboardController {
   @TestVisible
   private static Integer maxRatingsInView = 40000;
 
+  /** The response list is paged on the server, this many rows at a time. */
+  @TestVisible
+  private static Integer responsePageSize = 10;
+
+  /** SOQL cannot skip further than this, so deeper pages ask for a search. */
+  private static final Integer MAX_OFFSET = 2000;
+
+  /** The designer filter's value for trips with no travel designer set. */
+  private static final String NO_DESIGNER = 'none';
+
   private static final String HOTEL = 'Hotel';
   private static final String GOLF = 'Golfclub';
   private static final Set<String> SUPPLIER_TYPES = new Set<String>{
@@ -87,6 +97,8 @@ public with sharing class GxFeedbackDashboardController {
     public String country;
     public String travelType;
     public String category;
+    /** A User Id, or 'none' for trips without a travel designer. */
+    public String designer;
   }
 
   public class Dashboard {
@@ -120,6 +132,84 @@ public with sharing class GxFeedbackDashboardController {
     /** True when older next-destination wishes were left out. */
     @AuraEnabled
     public Boolean destinationsCapped = false;
+
+    /** How each travel designer's guests rated the trip and our advice. */
+    @AuraEnabled
+    public List<DesignerRow> designers = new List<DesignerRow>();
+  }
+
+  public class DesignerRow {
+    /** The designer filter value: a User Id, or 'none'. */
+    @AuraEnabled
+    public String id;
+    @AuraEnabled
+    public String name;
+    @AuraEnabled
+    public Integer responses = 0;
+    @AuraEnabled
+    public Decimal consultation;
+    @AuraEnabled
+    public Integer promoters = 0;
+    @AuraEnabled
+    public Integer detractors = 0;
+    @AuraEnabled
+    public Decimal nps;
+  }
+
+  /** One page of the response list. */
+  public class ResponsePage {
+    @AuraEnabled
+    public List<ListRow> rows = new List<ListRow>();
+    @AuraEnabled
+    public Integer total = 0;
+    @AuraEnabled
+    public Integer page = 1;
+    @AuraEnabled
+    public Integer pageSize;
+    /** True when a search ran: it covers every response, whatever the filters. */
+    @AuraEnabled
+    public Boolean searching = false;
+    /** True when there are more rows than paging can reach. */
+    @AuraEnabled
+    public Boolean capped = false;
+  }
+
+  /** A response as a list row: who, which trip, and what stood out. */
+  public class ListRow {
+    @AuraEnabled
+    public Id responseId;
+    @AuraEnabled
+    public String reference;
+    @AuraEnabled
+    public Id bookingId;
+    @AuraEnabled
+    public String bookingNumber;
+    @AuraEnabled
+    public String guest;
+    @AuraEnabled
+    public String designer;
+    @AuraEnabled
+    public String region;
+    @AuraEnabled
+    public Date tripEnd;
+    @AuraEnabled
+    public Datetime submittedOn;
+    @AuraEnabled
+    public Decimal nps;
+    @AuraEnabled
+    public Decimal overall;
+    /** The lowest score anywhere in the answer, and what it was for. */
+    @AuraEnabled
+    public String lowestLabel;
+    @AuraEnabled
+    public Decimal lowestScore;
+    /** How many things the guest wrote in their own words. */
+    @AuraEnabled
+    public Integer comments = 0;
+    @AuraEnabled
+    public String followUpStatus;
+    @AuraEnabled
+    public Boolean reviewPrompted = false;
   }
 
   public class Kpis {
@@ -302,6 +392,8 @@ public with sharing class GxFeedbackDashboardController {
     public Date tripStart;
     @AuraEnabled
     public Date tripEnd;
+    @AuraEnabled
+    public String designer;
 
     // Screen 1
     @AuraEnabled
@@ -382,6 +474,8 @@ public with sharing class GxFeedbackDashboardController {
     public List<Option> countries = new List<Option>();
     @AuraEnabled
     public List<Option> travelTypes = new List<Option>();
+    @AuraEnabled
+    public List<Option> designers = new List<Option>();
   }
 
   // ------------------------------------------------------------------
@@ -398,6 +492,7 @@ public with sharing class GxFeedbackDashboardController {
     countInvitations(d.kpis, f);
     applyVenues(d, f);
     d.hotelDetail = hotelDetail(f);
+    d.designers = designers(f);
 
     d.followUps = followUps(f);
     d.followUpsTotal = d.kpis.detractors;
@@ -427,6 +522,7 @@ public with sharing class GxFeedbackDashboardController {
         toLabel(Booking__r.DestinationCountry__c),
         Booking__r.Start_Date__c,
         Booking__r.End_Date__c,
+        Booking__r.TravelDesigner__r.Name,
         Overall_Experience__c,
         Overall_Experience_Comment__c,
         Consultation_Rating__c,
@@ -476,6 +572,7 @@ public with sharing class GxFeedbackDashboardController {
     d.country = r.Booking__r?.DestinationCountry__c;
     d.tripStart = r.Booking__r?.Start_Date__c;
     d.tripEnd = r.Booking__r?.End_Date__c;
+    d.designer = r.Booking__r?.TravelDesigner__r?.Name;
     d.overall = r.Overall_Experience__c;
     d.overallComment = r.Overall_Experience_Comment__c;
     d.consultation = r.Consultation_Rating__c;
@@ -582,7 +679,109 @@ public with sharing class GxFeedbackDashboardController {
     o.regions = labelled(Booking__c.Region__c, regions);
     o.countries = labelled(Booking__c.DestinationCountry__c, countries);
     o.travelTypes = labelled(Booking__c.Travel_Type__c, types);
+
+    Boolean anyWithout = false;
+    for (AggregateResult ar : [
+      SELECT
+        Booking__r.TravelDesigner__c designer,
+        Booking__r.TravelDesigner__r.Name name,
+        COUNT(Id) n
+      FROM Feedback_Response__c
+      GROUP BY Booking__r.TravelDesigner__c, Booking__r.TravelDesigner__r.Name
+      ORDER BY Booking__r.TravelDesigner__r.Name
+    ]) {
+      Object designer = ar.get('designer');
+      if (designer == null) {
+        anyWithout = true;
+      } else {
+        o.designers.add(
+          new Option((String) ar.get('name'), String.valueOf(designer))
+        );
+      }
+    }
+    if (anyWithout) {
+      o.designers.add(new Option('No travel designer', NO_DESIGNER));
+    }
     return o;
+  }
+
+  /**
+   * Every response, a page at a time: the list the team works from.
+   *
+   * A search finds a guest by name, email, booking number or FB reference
+   * across every response, ignoring the dashboard filters - when a guest is
+   * on the phone, the trip date is exactly what nobody wants to guess. The
+   * group ('promoters', 'passives', 'detractors', 'open') and the order
+   * ('newest', 'lowest') apply either way.
+   */
+  @AuraEnabled(cacheable=true)
+  public static ResponsePage findResponses(
+    String filtersJson,
+    String search,
+    String groupName,
+    String sortBy,
+    Integer pageNumber
+  ) {
+    Filters f = parse(filtersJson);
+    ResponsePage out = new ResponsePage();
+    out.pageSize = responsePageSize;
+
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = new List<String>();
+    String term = String.isBlank(search) ? '' : search.trim();
+    if (term.length() >= 2) {
+      out.searching = true;
+      binds.put('term', '%' + escapeLike(term) + '%');
+      clauses.add(
+        '(Contact__r.LastName LIKE :term OR Contact__r.Name LIKE :term' +
+          ' OR Contact__r.Email LIKE :term' +
+          ' OR Booking__r.BookingNumber__c LIKE :term OR Name LIKE :term)'
+      );
+    } else {
+      clauses.addAll(bookingClauses('Booking__r.', f, binds));
+    }
+    String groupClause = groupClause(groupName, binds);
+    if (groupClause != null) {
+      clauses.add(groupClause);
+    }
+
+    out.total = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Feedback_Response__c' + whereOf(clauses),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    Integer lastPage = Math.max(
+      1,
+      Math.ceil((Decimal) out.total / responsePageSize).intValue()
+    );
+    Integer reachable = MAX_OFFSET / responsePageSize + 1;
+    out.capped = lastPage > reachable;
+    out.page = Math.min(
+      Math.max(pageNumber == null ? 1 : pageNumber, 1),
+      Math.min(lastPage, reachable)
+    );
+
+    String order = sortBy == 'lowest'
+      ? 'Recommendation_NPS__c ASC NULLS LAST, Overall_Experience__c ASC NULLS LAST, Submitted_On__c DESC'
+      : 'Submitted_On__c DESC NULLS LAST, Id DESC';
+    List<Feedback_Response__c> found = (List<Feedback_Response__c>) Database.queryWithBinds(
+      'SELECT ' +
+        RESPONSE_FIELDS +
+        ', Booking__r.TravelDesigner__r.Name, Booking__r.Region__c,' +
+        ' Booking__r.End_Date__c, Public_Review_Prompted__c' +
+        ' FROM Feedback_Response__c' +
+        whereOf(clauses) +
+        ' ORDER BY ' +
+        order +
+        ' LIMIT ' +
+        responsePageSize +
+        ' OFFSET ' +
+        (out.page - 1) * responsePageSize,
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    out.rows = listRows(found);
+    return out;
   }
 
   /**
@@ -965,6 +1164,188 @@ public with sharing class GxFeedbackDashboardController {
       : r.Item_Name__c;
   }
 
+  /** Per designer: responses, their consultation average, and NPS. */
+  private static List<DesignerRow> designers(Filters f) {
+    Map<String, DesignerRow> byId = new Map<String, DesignerRow>();
+    Map<String, Object> binds = new Map<String, Object>();
+    List<String> clauses = bookingClauses('Booking__r.', f, binds);
+    String groupBy = ' GROUP BY Booking__r.TravelDesigner__c, Booking__r.TravelDesigner__r.Name';
+
+    for (
+      AggregateResult ar : (List<AggregateResult>) Database.queryWithBinds(
+        'SELECT Booking__r.TravelDesigner__c designer, ' +
+          'Booking__r.TravelDesigner__r.Name name, COUNT(Id) n, ' +
+          'AVG(Consultation_Rating__c) consult FROM Feedback_Response__c' +
+          whereOf(clauses) +
+          groupBy,
+        binds,
+        AccessLevel.SYSTEM_MODE
+      )
+    ) {
+      DesignerRow row = new DesignerRow();
+      Object designer = ar.get('designer');
+      row.id = designer == null ? NO_DESIGNER : String.valueOf(designer);
+      row.name = designer == null
+        ? 'No travel designer'
+        : (String) ar.get('name');
+      row.responses = (Integer) ar.get('n');
+      row.consultation = scaled((Decimal) ar.get('consult'));
+      byId.put(row.id, row);
+    }
+
+    for (String bucket : new List<String>{ 'promoter', 'detractor' }) {
+      Map<String, Object> bucketBinds = binds.clone();
+      List<String> bucketClauses = clauses.clone();
+      if (bucket == 'promoter') {
+        bucketClauses.add('Recommendation_NPS__c >= :promoterMin');
+        bucketBinds.put('promoterMin', PROMOTER_MIN);
+      } else {
+        bucketClauses.add('Recommendation_NPS__c <= :detractorMax');
+        bucketBinds.put('detractorMax', DETRACTOR_MAX);
+      }
+      for (
+        AggregateResult ar : (List<AggregateResult>) Database.queryWithBinds(
+          'SELECT Booking__r.TravelDesigner__c designer, COUNT(Id) n ' +
+            'FROM Feedback_Response__c' +
+            whereOf(bucketClauses) +
+            ' GROUP BY Booking__r.TravelDesigner__c',
+          bucketBinds,
+          AccessLevel.SYSTEM_MODE
+        )
+      ) {
+        Object designer = ar.get('designer');
+        DesignerRow row = byId.get(
+          designer == null ? NO_DESIGNER : String.valueOf(designer)
+        );
+        if (row == null) {
+          continue;
+        }
+        if (bucket == 'promoter') {
+          row.promoters = (Integer) ar.get('n');
+        } else {
+          row.detractors = (Integer) ar.get('n');
+        }
+      }
+    }
+
+    List<DesignerRow> rows = byId.values();
+    for (DesignerRow row : rows) {
+      row.nps = npsOf(row.promoters, row.detractors, row.responses);
+    }
+    rows.sort(new ByResponsesDescending());
+    return rows;
+  }
+
+  private static String groupClause(
+    String groupName,
+    Map<String, Object> binds
+  ) {
+    if (groupName == 'promoters') {
+      binds.put('promoterMin', PROMOTER_MIN);
+      return 'Recommendation_NPS__c >= :promoterMin';
+    }
+    if (groupName == 'passives') {
+      binds.put('promoterMin', PROMOTER_MIN);
+      binds.put('detractorMax', DETRACTOR_MAX);
+      return 'Recommendation_NPS__c > :detractorMax AND Recommendation_NPS__c < :promoterMin';
+    }
+    if (groupName == 'detractors') {
+      binds.put('detractorMax', DETRACTOR_MAX);
+      return 'Recommendation_NPS__c <= :detractorMax';
+    }
+    if (groupName == 'open') {
+      binds.put('detractorMax', DETRACTOR_MAX);
+      binds.put('closed', CLOSED_STATUSES);
+      return 'Recommendation_NPS__c <= :detractorMax AND ' +
+        '(Follow_Up_Status__c = null OR Follow_Up_Status__c NOT IN :closed)';
+    }
+    return null;
+  }
+
+  /**
+   * List rows with what stood out in each answer: its lowest score and how
+   * much the guest wrote. One query for the page's ratings, not one per row.
+   */
+  private static List<ListRow> listRows(List<Feedback_Response__c> found) {
+    Map<Id, ListRow> byId = new Map<Id, ListRow>();
+    List<ListRow> rows = new List<ListRow>();
+    for (Feedback_Response__c r : found) {
+      ListRow row = new ListRow();
+      row.responseId = r.Id;
+      row.reference = r.Name;
+      row.bookingId = r.Booking__c;
+      row.bookingNumber = r.Booking__r?.BookingNumber__c;
+      row.guest = r.Contact__r?.Name;
+      row.designer = r.Booking__r?.TravelDesigner__r?.Name;
+      row.region = r.Booking__r?.Region__c;
+      row.tripEnd = r.Booking__r?.End_Date__c;
+      row.submittedOn = r.Submitted_On__c;
+      row.nps = r.Recommendation_NPS__c;
+      row.overall = r.Overall_Experience__c;
+      row.followUpStatus = r.Follow_Up_Status__c;
+      row.reviewPrompted = r.Public_Review_Prompted__c == true;
+      considerLowest(row, 'Overall', r.Overall_Experience__c);
+      considerLowest(row, 'Consultation', r.Consultation_Rating__c);
+      for (
+        String text : new List<String>{
+          r.Overall_Experience_Comment__c,
+          r.Consultation_Comment__c,
+          r.General_Hotel_Comment__c,
+          r.General_Golf_Comment__c,
+          r.Improvement_Suggestions__c,
+          r.General_Feedback__c
+        }
+      ) {
+        if (String.isNotBlank(text)) {
+          row.comments++;
+        }
+      }
+      byId.put(r.Id, row);
+      rows.add(row);
+    }
+    if (byId.isEmpty()) {
+      return rows;
+    }
+    Set<Id> ids = byId.keySet();
+    for (Feedback_Rating__c rating : [
+      SELECT
+        Feedback_Response__c,
+        Item_Name__c,
+        Sub_Category__c,
+        Score__c,
+        Comment__c
+      FROM Feedback_Rating__c
+      WHERE Feedback_Response__c IN :ids
+      WITH SYSTEM_MODE
+      ORDER BY CreatedDate, Id
+    ]) {
+      ListRow row = byId.get(rating.Feedback_Response__c);
+      if (String.isBlank(rating.Sub_Category__c)) {
+        considerLowest(row, rating.Item_Name__c, rating.Score__c);
+      }
+      if (String.isNotBlank(rating.Comment__c)) {
+        row.comments++;
+      }
+    }
+    return rows;
+  }
+
+  /** Keeps the first lowest score, so ties name the earlier question. */
+  private static void considerLowest(ListRow row, String label, Decimal score) {
+    if (score == null) {
+      return;
+    }
+    if (row.lowestScore == null || score < row.lowestScore) {
+      row.lowestScore = score;
+      row.lowestLabel = label;
+    }
+  }
+
+  /** A search term's own % and _ are matched literally, not as wildcards. */
+  private static String escapeLike(String term) {
+    return term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_');
+  }
+
   private static Decimal scaled(Decimal value) {
     return value == null ? null : value.setScale(1);
   }
@@ -1293,6 +1674,12 @@ public with sharing class GxFeedbackDashboardController {
       clauses.add(prefix + 'Travel_Type__c = :travelType');
       binds.put('travelType', f.travelType);
     }
+    if (f.designer == NO_DESIGNER) {
+      clauses.add(prefix + 'TravelDesigner__c = null');
+    } else if (String.isNotBlank(f.designer)) {
+      clauses.add(prefix + 'TravelDesigner__c = :designer');
+      binds.put('designer', f.designer);
+    }
     return clauses;
   }
 
@@ -1302,7 +1689,13 @@ public with sharing class GxFeedbackDashboardController {
     }
     try {
       Filters f = (Filters) JSON.deserialize(filtersJson, Filters.class);
-      return f == null ? new Filters() : f;
+      if (f == null) {
+        return new Filters();
+      }
+      if (String.isNotBlank(f.designer) && f.designer != NO_DESIGNER) {
+        f.designer = Id.valueOf(f.designer); // throws on anything else
+      }
+      return f;
     } catch (Exception e) {
       throw new AuraHandledException(
         'The dashboard filters could not be read.'
@@ -1401,6 +1794,15 @@ public with sharing class GxFeedbackDashboardController {
       }
       if (a.ratings != b.ratings) {
         return a.ratings > b.ratings ? -1 : 1;
+      }
+      return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+    }
+  }
+
+  private class ByResponsesDescending implements Comparator<DesignerRow> {
+    public Integer compare(DesignerRow a, DesignerRow b) {
+      if (a.responses != b.responses) {
+        return a.responses > b.responses ? -1 : 1;
       }
       return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
     }

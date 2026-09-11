@@ -644,4 +644,220 @@ private class GxFeedbackDashboardControllerTest {
       Assert.isNotNull(e.getMessage(), 'It says why');
     }
   }
+
+  // ------------------------------------------------------------------
+  // Finding responses
+
+  private static GxFeedbackDashboardController.ResponsePage find(
+    Map<String, Object> filters,
+    String search,
+    String groupName,
+    String sortBy,
+    Integer page
+  ) {
+    return GxFeedbackDashboardController.findResponses(
+      filters == null ? null : JSON.serialize(filters),
+      search,
+      groupName,
+      sortBy,
+      page
+    );
+  }
+
+  @IsTest
+  static void everyResponseIsListedNewestFirst() {
+    GxFeedbackDashboardController.ResponsePage p = find(
+      null,
+      null,
+      null,
+      null,
+      1
+    );
+    Assert.areEqual(4, p.total, 'All four answers');
+    Assert.areEqual(4, p.rows.size(), 'on one page');
+    Assert.isFalse(p.searching, 'No search ran');
+  }
+
+  @IsTest
+  static void aBookingNumberFindsItsResponse() {
+    GxFeedbackDashboardController.ResponsePage p = find(
+      null,
+      'gxd-2',
+      null,
+      null,
+      1
+    );
+    Assert.areEqual(1, p.total, 'Found regardless of case');
+    Assert.areEqual('GXD-2', p.rows[0].bookingNumber, 'The right one');
+    Assert.isTrue(p.searching, 'and the page knows a search ran');
+  }
+
+  @IsTest
+  static void aLastNameFindsTheGuestWhateverTheDates() {
+    // The date filter would exclude every trip; a search ignores it, because
+    // nobody on the phone with a guest should have to guess the trip date.
+    GxFeedbackDashboardController.ResponsePage p = find(
+      new Map<String, Object>{
+        'fromDate' => String.valueOf(Date.today().addYears(5))
+      },
+      'Gast',
+      null,
+      null,
+      1
+    );
+    Assert.areEqual(4, p.total, 'Every answer from Test Gast');
+  }
+
+  @IsTest
+  static void aFeedbackReferenceFindsItsResponse() {
+    String reference = [
+      SELECT Name
+      FROM Feedback_Response__c
+      WHERE Booking__r.BookingNumber__c = 'GXD-5'
+    ]
+    .Name;
+    Assert.areEqual(1, find(null, reference, null, null, 1).total);
+  }
+
+  @IsTest
+  static void aSearchTermIsMatchedLiterallyNotAsAWildcard() {
+    Assert.areEqual(
+      0,
+      find(null, '%%', null, null, 1).total,
+      'Percent signs are text, not match-everything'
+    );
+    Assert.isFalse(
+      find(null, 'G', null, null, 1).searching,
+      'One letter is not a search yet'
+    );
+  }
+
+  @IsTest
+  static void theListNarrowsToOneGroupOfGuests() {
+    Assert.areEqual(2, find(null, null, 'promoters', null, 1).total);
+    Assert.areEqual(1, find(null, null, 'passives', null, 1).total);
+    Assert.areEqual(1, find(null, null, 'detractors', null, 1).total);
+    Assert.areEqual(1, find(null, null, 'open', null, 1).total);
+  }
+
+  @IsTest
+  static void lowestFirstPutsTheUnhappiestGuestOnTop() {
+    List<GxFeedbackDashboardController.ListRow> rows = find(
+        null,
+        null,
+        null,
+        'lowest',
+        1
+      )
+      .rows;
+    Assert.areEqual('GXD-2', rows[0].bookingNumber, 'NPS 3 first');
+    Assert.areEqual('GXD-1', rows[3].bookingNumber, 'NPS 10 last');
+  }
+
+  @IsTest
+  static void eachRowSaysWhatStoodOut() {
+    GxFeedbackDashboardController.ListRow row = find(
+        null,
+        'GXD-2',
+        null,
+        null,
+        1
+      )
+      .rows[0];
+    Assert.areEqual(5, row.lowestScore, 'The lowest score in the answer');
+    Assert.areEqual('Overall', row.lowestLabel, 'the first question to hit it');
+    Assert.areEqual(3, row.comments, 'A suggestion plus two rating comments');
+  }
+
+  @IsTest
+  static void theListPagesOnTheServer() {
+    GxFeedbackDashboardController.responsePageSize = 3;
+
+    GxFeedbackDashboardController.ResponsePage second = find(
+      null,
+      null,
+      null,
+      null,
+      2
+    );
+    Assert.areEqual(4, second.total, 'The total covers every page');
+    Assert.areEqual(1, second.rows.size(), 'Page two holds the fourth');
+    Assert.areEqual(2, second.page, 'on page two');
+
+    Assert.areEqual(
+      2,
+      find(null, null, null, null, 99).page,
+      'A page past the end lands on the last page'
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // Travel designers
+
+  /**
+   * Gives one booking the running user as travel designer and clears it on
+   * the rest. Set explicitly on every booking, because the org fills the
+   * field in by itself when a booking is created.
+   */
+  private static void assignDesignerTo(String bookingNumber) {
+    List<Booking__c> all = [SELECT Id, BookingNumber__c FROM Booking__c];
+    for (Booking__c b : all) {
+      b.TravelDesigner__c = b.BookingNumber__c == bookingNumber
+        ? UserInfo.getUserId()
+        : null;
+    }
+    Database.update(all, AccessLevel.SYSTEM_MODE);
+  }
+
+  @IsTest
+  static void eachTravelDesignerHasTheirOwnNumbers() {
+    assignDesignerTo('GXD-1');
+
+    List<GxFeedbackDashboardController.DesignerRow> rows = load(null).designers;
+    Assert.areEqual(2, rows.size(), 'One designer, and the unassigned rest');
+    Assert.areEqual('none', rows[0].id, 'Three trips without a designer');
+    Assert.areEqual(3, rows[0].responses, 'come first, with the most answers');
+    Assert.areEqual(
+      String.valueOf(UserInfo.getUserId()),
+      rows[1].id,
+      'then the designer'
+    );
+    Assert.areEqual(10, rows[1].consultation, 'with the consultation score');
+    Assert.areEqual(100, rows[1].nps, 'and the NPS of their one promoter');
+
+    GxFeedbackDashboardController.Dashboard mine = load(
+      new Map<String, Object>{ 'designer' => UserInfo.getUserId() }
+    );
+    Assert.areEqual(1, mine.kpis.responses, 'The filter narrows everything');
+
+    GxFeedbackDashboardController.Dashboard unassigned = load(
+      new Map<String, Object>{ 'designer' => 'none' }
+    );
+    Assert.areEqual(3, unassigned.kpis.responses, 'and can find the gaps');
+
+    Assert.isTrue(
+      GxFeedbackDashboardController.getFilterOptions().designers.size() >= 2,
+      'Both are offered as filters'
+    );
+  }
+
+  @IsTest
+  static void anUnreadableDesignerIsRefused() {
+    try {
+      load(new Map<String, Object>{ 'designer' => 'not-an-id' });
+      Assert.fail('A made-up designer must not silently show everything');
+    } catch (AuraHandledException e) {
+      Assert.isNotNull(e.getMessage(), 'It says why');
+    }
+  }
+
+  @IsTest
+  static void aFullResponseNamesItsTravelDesigner() {
+    assignDesignerTo('GXD-1');
+    Assert.areEqual(
+      UserInfo.getName(),
+      GxFeedbackDashboardController.getResponseDetail(responseOf('GXD-1'))
+        .designer
+    );
+  }
 }

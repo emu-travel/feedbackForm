@@ -86,6 +86,21 @@ describe("c-gx-response-modal", () => {
     );
   });
 
+  it("leads with what stood out", async () => {
+    getResponseDetail.mockResolvedValue({ ...DETAIL, designer: "Silke" });
+    const el = mount();
+    await flush();
+
+    const standout = [...el.shadowRoot.querySelectorAll(".standout-item")].map(
+      (n) => n.textContent
+    );
+    expect(standout).toEqual([
+      "6.0The trip overall",
+      "5.0Conrad Algarve",
+      "4Would recommend"
+    ]);
+  });
+
   it("says so when the response cannot be loaded", async () => {
     getResponseDetail.mockRejectedValue({
       body: { message: "This feedback could not be found." }

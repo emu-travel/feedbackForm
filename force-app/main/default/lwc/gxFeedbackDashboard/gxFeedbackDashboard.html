@@ -59,6 +59,13 @@
         onchange={handleFilter}
         field-level-help="Narrows the venue sections. NPS and response rate always cover the whole trip."
       ></lightning-combobox>
+      <lightning-combobox
+        label="Travel designer"
+        data-field="designer"
+        value={filters.designer}
+        options={designerOptions}
+        onchange={handleFilter}
+      ></lightning-combobox>
       <div class="filter-actions">
         <lightning-button
           variant="base"
@@ -109,6 +116,111 @@
                 </div>
               </template>
             </div>
+          </template>
+        </section>
+
+        <!-- Every response: find one, or work through them -->
+        <section class="panel" data-section="responses">
+          <div class="panel-head">
+            <h2 class="panel-title">Responses</h2>
+            <span class="panel-count">{responsesSummary}</span>
+          </div>
+          <div class="finder">
+            <lightning-input
+              class="finder-search"
+              type="search"
+              label="Find a response"
+              variant="label-hidden"
+              placeholder="Search guest name, email, booking or FB number"
+              value={searchInput}
+              onchange={handleSearch}
+            ></lightning-input>
+            <div class="chips" role="group" aria-label="Show">
+              <template for:each={groupChips} for:item="c">
+                <button
+                  key={c.value}
+                  class={c.cls}
+                  data-value={c.value}
+                  aria-pressed={c.pressed}
+                  onclick={handleGroup}
+                >
+                  {c.label}
+                </button>
+              </template>
+            </div>
+            <lightning-combobox
+              class="finder-sort"
+              label="Order"
+              variant="label-hidden"
+              options={sortOptions}
+              value={responseSort}
+              onchange={handleSort}
+            ></lightning-combobox>
+          </div>
+
+          <template lwc:if={hasResponseRows}>
+            <ul class="rlist">
+              <template for:each={responseRows} for:item="r">
+                <li key={r.key} class="rrow">
+                  <span class={r.npsCls}>{r.npsLabel}</span>
+                  <div class="rmain">
+                    <p class="meta rwho">
+                      <span class="rguest">{r.guest}</span>
+                      <span aria-hidden="true">·</span>
+                      <a href={r.url}>{r.bookingNumber}</a>
+                      <span aria-hidden="true">·</span>
+                      <span>{r.reference}</span>
+                    </p>
+                    <p class="meta rtrip">
+                      <span>{r.trip}</span>
+                      <template lwc:if={r.designer}>
+                        <span aria-hidden="true">·</span>
+                        <span>{r.designer}</span>
+                      </template>
+                    </p>
+                    <p class="rfacts">
+                      <span class="rfact">
+                        <span>Overall</span>
+                        <span class={r.overallCls}>{r.overall}</span>
+                      </span>
+                      <template lwc:if={r.lowest}>
+                        <span class="rfact">
+                          <span>Lowest: {r.lowest.label}</span>
+                          <span class={r.lowest.cls}>{r.lowest.score}</span>
+                        </span>
+                      </template>
+                      <template lwc:if={r.commentsLabel}>
+                        <span class="rfact">{r.commentsLabel}</span>
+                      </template>
+                      <template lwc:if={r.statusLabel}>
+                        <span class={r.statusCls}>{r.statusLabel}</span>
+                      </template>
+                    </p>
+                  </div>
+                  <button
+                    class="link-btn full-btn"
+                    data-response-id={r.responseId}
+                    title="Open the guest's whole answer"
+                    onclick={handleOpenResponse}
+                  >
+                    Full response
+                  </button>
+                </li>
+              </template>
+            </ul>
+            <c-gx-pager
+              label="Pages of responses"
+              total={responsesTotal}
+              page={responsesPageNo}
+              page-size={responsesPageSize}
+              onpagechange={handleResponsePage}
+            ></c-gx-pager>
+            <template lwc:if={responsesCapNote}>
+              <p class="panel-note">{responsesCapNote}</p>
+            </template>
+          </template>
+          <template lwc:elseif={responsesLoading}>
+            <p class="panel-note">Loading responses…</p>
           </template>
         </section>
 
@@ -165,6 +277,68 @@
               </p>
             </template>
           </section>
+
+          <!-- Travel designers -->
+          <template lwc:if={hasDesigners}>
+            <section class="panel" data-section="designers">
+              <div class="panel-head">
+                <h2 class="panel-title">Travel designers</h2>
+                <template lwc:if={designerFiltered}>
+                  <lightning-button
+                    variant="base"
+                    label="Show all designers"
+                    onclick={clearDesigner}
+                  ></lightning-button>
+                </template>
+              </div>
+              <p class="panel-note">
+                Consultation is how guests rated our advice and product choice.
+                Select a designer to see the whole dashboard for their trips
+                only.
+              </p>
+              <div class="heat-wrap">
+                <table class="dtable">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="dname">Travel designer</th>
+                      <th scope="col">Responses</th>
+                      <th scope="col">Consultation</th>
+                      <th scope="col">NPS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template for:each={designerPage.rows} for:item="d">
+                      <tr key={d.key} class={d.rowCls}>
+                        <th scope="row" class="dname">
+                          <button
+                            class="link-btn"
+                            data-id={d.id}
+                            aria-pressed={d.active}
+                            title="Show only this designer's trips"
+                            onclick={handleDesignerSelect}
+                          >
+                            {d.name}
+                          </button>
+                        </th>
+                        <td>{d.responses}</td>
+                        <td>
+                          <span class={d.consultCls}>{d.consultation}</span>
+                        </td>
+                        <td class="dnps">{d.nps}</td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <c-gx-pager
+                data-list="designers"
+                label="Pages of travel designers"
+                total={designerPage.total}
+                page={designerPage.page}
+                onpagechange={handlePage}
+              ></c-gx-pager>
+            </section>
+          </template>
 
           <!-- Venues -->
           <section class="panel">

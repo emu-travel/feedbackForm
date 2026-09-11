@@ -1,6 +1,7 @@
 :host {
   --gx-gold: #e59e0f;
   --gx-gold-dark: #b87a08;
+  --gx-gold-hover: #d99313;
   --gx-gold-soft: #fffbeb;
   --gx-gold-border: #fde68a;
   --gx-forest: #0f3822;
@@ -204,15 +205,17 @@
   color: var(--gx-slate-900);
 }
 
+/* The brand's gold with forest text, as in the design and the emails. */
 .btn_primary {
   /* Stays on the right when there is no Zurück beside it (step 1). */
   margin-left: auto;
-  background: var(--gx-forest);
-  color: #fff;
+  background: var(--gx-gold);
+  color: var(--gx-forest);
+  box-shadow: 0 4px 10px rgba(229, 158, 15, 0.25);
 }
 
 .btn_primary:hover:not(:disabled) {
-  background: var(--gx-forest-soft);
+  background: var(--gx-gold-hover);
 }
 
 .state {

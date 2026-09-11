@@ -661,3 +661,178 @@ button.kpi:focus-visible,
   margin-left: auto;
   font-size: 0.8125rem;
 }
+
+/* ---------- response list ---------- */
+
+.panel-count {
+  font-size: 0.8125rem;
+  color: var(--gx-muted);
+}
+
+.finder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.finder-search {
+  flex: 1 1 18rem;
+  min-width: 14rem;
+}
+
+.finder-sort {
+  flex: 0 0 12rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.chip {
+  border: 1px solid var(--gx-line);
+  background: #fff;
+  color: var(--gx-ink-soft);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--gx-forest);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--gx-gold);
+  outline-offset: 2px;
+}
+
+.chip_on {
+  background: var(--gx-forest);
+  border-color: var(--gx-forest);
+  color: #fff;
+}
+
+.rlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rrow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--gx-line);
+}
+
+.rrow:last-child {
+  border-bottom: 0;
+}
+
+.rmain p {
+  margin: 0;
+}
+
+.rwho {
+  font-size: 0.875rem;
+}
+
+.rguest {
+  font-weight: 600;
+  color: var(--gx-ink);
+}
+
+.rmain .rtrip {
+  font-size: 0.75rem;
+  color: var(--gx-muted);
+  margin-top: 0.1rem;
+}
+
+.rmain .rfacts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 1rem;
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--gx-ink-soft);
+}
+
+.rfact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rfact .pill {
+  min-width: 2.25rem;
+}
+
+.status {
+  font-size: 0.75rem;
+  color: var(--gx-good);
+  font-weight: 600;
+}
+
+.status_open {
+  color: var(--gx-bad);
+}
+
+/* ---------- travel designers ---------- */
+
+.dtable {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dtable th,
+.dtable td {
+  padding: 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--gx-line);
+  text-align: right;
+}
+
+.dtable thead th {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--gx-muted);
+}
+
+.dtable .dname {
+  text-align: left;
+  font-weight: 500;
+}
+
+.dnps {
+  font-weight: 600;
+}
+
+.drow_active {
+  background: var(--gx-sunk);
+}
+
+.drow_active .link-btn {
+  color: var(--gx-forest);
+  font-weight: 700;
+}
+
+@media (max-width: 40rem) {
+  .rrow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .rrow .full-btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

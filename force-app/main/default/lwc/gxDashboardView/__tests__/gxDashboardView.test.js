@@ -22,7 +22,11 @@ import {
   pageOf,
   rangeLabel,
   responseView,
-  tripDates
+  tripDates,
+  responseListRows,
+  responsesSummary,
+  designerRows,
+  shortDate
 } from "c/gxDashboardView";
 
 describe("number formatting", () => {
@@ -521,5 +525,133 @@ describe("one whole response", () => {
 
   it("has nothing to show for nothing", () => {
     expect(responseView(null)).toBeNull();
+  });
+});
+
+describe("the response list", () => {
+  const ROW = {
+    responseId: "a01",
+    reference: "FB-00016",
+    bookingId: "b01",
+    bookingNumber: "GX-TEST-A1",
+    guest: "Ali Haider",
+    designer: "Silke Bellgardt",
+    region: "Algarve",
+    tripEnd: "2026-09-08",
+    nps: 4,
+    overall: 6,
+    lowestLabel: "Sixt GmbH & Co KG",
+    lowestScore: 4,
+    comments: 3,
+    followUpStatus: null
+  };
+
+  it("says who, which trip and whose trip it was", () => {
+    const [r] = responseListRows([ROW]);
+    expect(r.trip).toBe("Algarve · 8 Sep 2026");
+    expect(r.designer).toBe("Silke Bellgardt");
+    expect(r.url).toBe("/lightning/r/Booking__c/b01/view");
+  });
+
+  it("brings the lowest score forward when it is 8 or below", () => {
+    const [low] = responseListRows([ROW]);
+    expect(low.lowest).toEqual({
+      label: "Sixt GmbH & Co KG",
+      score: "4.0",
+      cls: "pill pill_bad"
+    });
+    const [fine] = responseListRows([{ ...ROW, lowestScore: 9 }]);
+    expect(fine.lowest).toBeNull();
+  });
+
+  it("counts what the guest wrote", () => {
+    expect(responseListRows([ROW])[0].commentsLabel).toBe("3 comments");
+    expect(responseListRows([{ ...ROW, comments: 1 }])[0].commentsLabel).toBe(
+      "1 comment"
+    );
+    expect(
+      responseListRows([{ ...ROW, comments: 0 }])[0].commentsLabel
+    ).toBeNull();
+  });
+
+  it("shows a follow-up state only for detractors, blank meaning open", () => {
+    const [open] = responseListRows([ROW]);
+    expect(open.statusLabel).toBe("Follow-up: Open");
+    expect(open.statusCls).toBe("status status_open");
+    const [done] = responseListRows([{ ...ROW, followUpStatus: "Resolved" }]);
+    expect(done.statusCls).toBe("status");
+    const [promoter] = responseListRows([{ ...ROW, nps: 10 }]);
+    expect(promoter.statusLabel).toBeNull();
+    expect(promoter.npsCls).toBe("pill pill_good");
+  });
+
+  it("describes what the list is showing", () => {
+    expect(responsesSummary({ total: 57 }, "")).toBe("57 responses");
+    expect(responsesSummary({ total: 0 }, "")).toBe(
+      "No responses in this selection"
+    );
+    expect(responsesSummary({ total: 2, searching: true }, "haid")).toBe(
+      '2 responses matching "haid", from all dates and filters'
+    );
+    expect(responsesSummary({ total: 0, searching: true }, "xyz")).toContain(
+      'No response matches "xyz"'
+    );
+  });
+
+  it("writes a date briefly", () => {
+    expect(shortDate("2026-09-08")).toBe("8 Sep 2026");
+    expect(shortDate(null)).toBe("");
+  });
+});
+
+describe("travel designers", () => {
+  it("marks the designer being filtered on", () => {
+    const rows = designerRows(
+      [
+        { id: "u1", name: "Silke", responses: 12, consultation: 9.1, nps: 50 },
+        { id: "none", name: "No travel designer", responses: 2, nps: null }
+      ],
+      "u1"
+    );
+    expect(rows[0].active).toBe(true);
+    expect(rows[0].rowCls).toBe("drow drow_active");
+    expect(rows[0].consultation).toBe("9.1");
+    expect(rows[0].nps).toBe("+50");
+    expect(rows[1].active).toBe(false);
+    expect(rows[1].nps).toBe("—");
+  });
+
+  it("adds a designer to the default filters, set to everyone", () => {
+    expect(defaultFilters(new Date(2026, 8, 11)).designer).toBe("");
+  });
+});
+
+describe("what stood out", () => {
+  it("lists every score below 7, including a low recommendation", () => {
+    const v = responseView({
+      reference: "FB-1",
+      overall: 6,
+      consultation: 9,
+      hotels: [{ name: "Conrad", score: 5, subScores: [] }],
+      recommendation: 4,
+      designer: "Silke"
+    });
+    expect(v.standout.map((s) => `${s.label} ${s.score}`)).toEqual([
+      "The trip overall 6.0",
+      "Conrad 5.0",
+      "Would recommend 4"
+    ]);
+    expect(v.hasStandout).toBe(true);
+    expect(v.designer).toBe("Silke");
+  });
+
+  it("has nothing to flag when everything scored 7 or more", () => {
+    const v = responseView({ overall: 9, consultation: 7, recommendation: 7 });
+    expect(v.hasStandout).toBe(false);
+  });
+
+  it("makes the responses tile a way into the list", () => {
+    const tile = kpiTiles({ responses: 3 }).find((t) => t.key === "responses");
+    expect(tile.target).toBe("responses");
   });
 });
