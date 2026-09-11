@@ -203,11 +203,60 @@ public with sharing class GxFeedbackDispatch {
     if (!ELIGIBLE_BOOKING_STATUS.contains(b.Status__c)) {
       return 'Trip is not complete (status ' + b.Status__c + ')';
     }
+    // The window decides who enters the programme. A guest we have already
+    // invited is inside it, so reminders and resends are not re-judged here.
+    if (b.Survey_Sent_On__c == null) {
+      String outside = outsideSurveyWindow(b);
+      if (outside != null) {
+        return outside;
+      }
+    }
     if (!waitingPeriodPassed(b)) {
       return 'Waiting period after the trip has not passed yet';
     }
     if (!rateable.contains(b.Id)) {
       return 'Nothing on this itinerary can be rated';
+    }
+    return null;
+  }
+
+  /**
+   * Null when the trip may be surveyed; otherwise why not.
+   *
+   * Without this, the first nightly run in an org would invite every guest in
+   * its booking history - every finished trip has an end date in the past,
+   * the waiting period long since over. Two guards, and either is enough to
+   * refuse:
+   *
+   * - Survey_Start_Date__c: nothing that ended before the programme started.
+   *   Blank refuses everything, because a missing setting must not quietly
+   *   become "no limit".
+   * - Max_Trip_Age_Days__c: nothing older than a few weeks, whatever the start
+   *   date says. If the start date is set wrong or the job is paused and later
+   *   resumed, this bounds the damage to recent trips.
+   */
+  @TestVisible
+  private static String outsideSurveyWindow(Booking__c b) {
+    Date startDate = GxFeedbackSettings.surveyStartDate();
+    if (startDate == null) {
+      return 'No survey start date is configured, so no trip is invited';
+    }
+    Date tripEnd = b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c;
+    if (tripEnd == null) {
+      return 'Trip has no dates to check against the survey start date';
+    }
+    if (tripEnd < startDate) {
+      return 'Trip ended before the survey started (' +
+        startDate.format() +
+        ')';
+    }
+    Decimal maxAge = GxFeedbackSettings.maxTripAgeDays();
+    if (
+      maxAge != null &&
+      maxAge > 0 &&
+      tripEnd.daysBetween(Date.today()) > maxAge.intValue()
+    ) {
+      return 'Trip ended more than ' + maxAge.intValue() + ' days ago';
     }
     return null;
   }

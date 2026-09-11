@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Start_Date__c</fullName>
+    <description
+  >The day the survey programme started. Trips that ended before it are never invited, so switching the nightly job on does not email every guest in the booking history. Set it to the go-live date in each org. Blank means no trip is invited at all - a missing setting must fail safe, because failing open is exactly the mass email this exists to prevent. Applies to first invitations only; reminders go to guests who are already in the programme.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Survey Start Date</label>
+    <required>false</required>
+    <type>Date</type>
+</CustomField>

@@ -55,6 +55,19 @@ public with sharing class GxFeedbackSettings {
     return config().Reminder_Delay_Days__c;
   }
 
+  /**
+   * Trips that ended before this are never invited. Null means no trip is,
+   * by design - see Survey_Start_Date__c.
+   */
+  public static Date surveyStartDate() {
+    return config().Survey_Start_Date__c;
+  }
+
+  /** Trips older than this many days are never invited. Blank or zero: no cap. */
+  public static Decimal maxTripAgeDays() {
+    return config().Max_Trip_Age_Days__c;
+  }
+
   /** Public address of the survey page. Differs per environment. */
   public static String surveyBaseUrl() {
     return config().Survey_Base_URL__c;

@@ -40,6 +40,11 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
    * decided per booking by GxFeedbackDispatch.
    */
   private static List<GxFeedbackSender.Request> invitations() {
+    Date earliest = earliestTripEnd();
+    if (earliest == null) {
+      // No survey start date: nobody is invited. See Survey_Start_Date__c.
+      return new List<GxFeedbackSender.Request>();
+    }
     List<Booking__c> due = [
       SELECT Id
       FROM Booking__c
@@ -47,12 +52,37 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
         SurveySent__c = FALSE
         AND MainContact__c != NULL
         AND End_Date__c != NULL
+        AND End_Date__c >= :earliest
         AND End_Date__c < TODAY
         AND Status__c IN ('Completed', 'Paid', 'Invoiced', 'Feedback')
       ORDER BY End_Date__c
       LIMIT :batchLimit
     ];
     return requestsFor(due, false);
+  }
+
+  /**
+   * The oldest trip end the programme will invite: the survey start date, or
+   * the age cap, whichever is later.
+   *
+   * Filtered here as well as refused in GxFeedbackDispatch. Without it the
+   * query would select the org's whole booking history every night, the
+   * dispatch would refuse all of it, and those refusals would fill the batch
+   * limit ahead of the guests who should actually be asked. The dispatch stays
+   * the authority; this only keeps the batch for trips that can pass.
+   */
+  @TestVisible
+  private static Date earliestTripEnd() {
+    Date startDate = GxFeedbackSettings.surveyStartDate();
+    if (startDate == null) {
+      return null;
+    }
+    Decimal maxAge = GxFeedbackSettings.maxTripAgeDays();
+    if (maxAge == null || maxAge <= 0) {
+      return startDate;
+    }
+    Date ageLimit = Date.today().addDays(-maxAge.intValue());
+    return ageLimit > startDate ? ageLimit : startDate;
   }
 
   /**

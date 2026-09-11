@@ -8,14 +8,26 @@
 private class GxFeedbackDispatchTest {
   private static final String BOOKING_NUM = 'TEST-GX-DISPATCH';
 
+  /** The survey window wide open, so these tests are about everything else. */
   private static Gx_Feedback_Setting__mdt settings(
     Decimal delayHours,
     String baseUrl
   ) {
+    return settings(delayHours, baseUrl, Date.today().addYears(-5), null);
+  }
+
+  private static Gx_Feedback_Setting__mdt settings(
+    Decimal delayHours,
+    String baseUrl,
+    Date surveyStart,
+    Decimal maxTripAgeDays
+  ) {
     return new Gx_Feedback_Setting__mdt(
       Dispatch_Delay_Hours__c = delayHours,
       Link_Validity_Days__c = 14,
-      Survey_Base_URL__c = baseUrl
+      Survey_Base_URL__c = baseUrl,
+      Survey_Start_Date__c = surveyStart,
+      Max_Trip_Age_Days__c = maxTripAgeDays
     );
   }
 
@@ -249,6 +261,111 @@ private class GxFeedbackDispatchTest {
       'The reason says so: ' + out[0].skippedReason
     );
     Assert.isNull(theBooking().Form_Secret__c, 'No token is minted for a skip');
+  }
+
+  // ------------------------------------------------------------------
+  // The survey window: the guard against inviting the whole booking history
+
+  @IsTest
+  static void aTripThatEndedBeforeTheSurveyStartedIsNotInvited() {
+    // The fixture trip ended a week ago; the programme started three days ago.
+    GxFeedbackSettings.useForTest(
+      settings(
+        0,
+        'https://example.test/feedback/',
+        Date.today().addDays(-3),
+        null
+      )
+    );
+
+    List<GxFeedbackDispatch.Result> out = run(theBooking().Id);
+
+    Assert.isFalse(out[0].ok, 'A trip from before launch is never invited');
+    Assert.isTrue(
+      out[0].skippedReason.contains('before the survey started'),
+      out[0].skippedReason
+    );
+    Assert.isNull(theBooking().Form_Secret__c, 'Nothing is minted for it');
+  }
+
+  @IsTest
+  static void aTripEndingOnTheStartDateIsInvited() {
+    GxFeedbackSettings.useForTest(
+      settings(
+        0,
+        'https://example.test/feedback/',
+        theBooking().End_Date__c,
+        null
+      )
+    );
+    Assert.isTrue(
+      run(theBooking().Id)[0].ok,
+      'The start date itself is inside the window'
+    );
+  }
+
+  @IsTest
+  static void withNoStartDateNobodyIsInvited() {
+    // A missing setting must fail safe: blank is not "no limit".
+    GxFeedbackSettings.useForTest(
+      settings(0, 'https://example.test/feedback/', null, null)
+    );
+
+    List<GxFeedbackDispatch.Result> out = run(theBooking().Id);
+
+    Assert.isFalse(out[0].ok, 'Nobody is invited until a start date is set');
+    Assert.isTrue(
+      out[0].skippedReason.contains('No survey start date'),
+      out[0].skippedReason
+    );
+  }
+
+  @IsTest
+  static void aTripOlderThanTheAgeCapIsNotInvitedWhateverTheStartDate() {
+    // Start date wide open - as if someone left it too early - but the trip
+    // ended a week ago and the cap is five days.
+    GxFeedbackSettings.useForTest(
+      settings(
+        0,
+        'https://example.test/feedback/',
+        Date.today().addYears(-5),
+        5
+      )
+    );
+
+    List<GxFeedbackDispatch.Result> out = run(theBooking().Id);
+
+    Assert.isFalse(out[0].ok, 'The backstop holds even with a bad start date');
+    Assert.isTrue(
+      out[0].skippedReason.contains('more than 5 days ago'),
+      out[0].skippedReason
+    );
+  }
+
+  @IsTest
+  static void theWindowDoesNotStopAReminder() {
+    // Invited while inside the window; by reminder time the start date has
+    // moved past the trip. The guest is already in the programme.
+    Booking__c b = theBooking();
+    b.Survey_Sent_On__c = Datetime.now().addDays(-11);
+    b.SurveySent__c = true;
+    update b;
+    GxFeedbackSettings.useForTest(
+      settings(0, 'https://example.test/feedback/', Date.today(), 1)
+    );
+
+    GxFeedbackDispatch.Request req = new GxFeedbackDispatch.Request();
+    req.bookingId = b.Id;
+    req.allowResend = true;
+    req.markReminder = true;
+    List<GxFeedbackDispatch.Result> out = GxFeedbackDispatch.prepare(
+      new List<GxFeedbackDispatch.Request>{ req }
+    );
+
+    Assert.isTrue(
+      out[0].ok,
+      'Reminders are not re-judged: ' + out[0].skippedReason
+    );
   }
 
   @IsTest

@@ -22,7 +22,9 @@ private class GxFeedbackSenderTest {
         Reminder_Delay_Days__c = reminderDays,
         Link_Validity_Days__c = 14,
         Survey_Base_URL__c = 'https://example.test/feedback/',
-        Sender_Email__c = null
+        Sender_Email__c = null,
+        // Wide open: these tests are about sending, not the survey window.
+        Survey_Start_Date__c = Date.today().addYears(-5)
       )
     );
   }
@@ -226,7 +228,8 @@ private class GxFeedbackSenderTest {
       new Gx_Feedback_Setting__mdt(
         Dispatch_Delay_Hours__c = 0,
         Link_Validity_Days__c = 14,
-        Survey_Base_URL__c = null
+        Survey_Base_URL__c = null,
+        Survey_Start_Date__c = Date.today().addYears(-5)
       )
     );
 
@@ -437,6 +440,129 @@ private class GxFeedbackSenderTest {
       0,
       GxFeedbackScheduler.run().size(),
       'Switching reminders on does not mail a backlog of old trips'
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // The survey window, at the nightly job
+
+  private static void pinWindow(Date surveyStart, Decimal maxAge) {
+    GxFeedbackSettings.useForTest(
+      new Gx_Feedback_Setting__mdt(
+        Dispatch_Delay_Hours__c = 36,
+        Reminder_Delay_Days__c = 0,
+        Link_Validity_Days__c = 14,
+        Survey_Base_URL__c = 'https://example.test/feedback/',
+        Survey_Start_Date__c = surveyStart,
+        Max_Trip_Age_Days__c = maxAge
+      )
+    );
+  }
+
+  @IsTest
+  static void theNightlyJobLeavesTripsFromBeforeLaunchAlone() {
+    // READY ended five days ago; the programme went live two days ago.
+    pinWindow(Date.today().addDays(-2), null);
+    Assert.areEqual(
+      0,
+      GxFeedbackScheduler.run().size(),
+      'A finished trip from before launch is not even selected'
+    );
+    Assert.isFalse(booking(READY).SurveySent__c, 'And is left untouched');
+  }
+
+  @IsTest
+  static void withNoStartDateTheNightlyJobInvitesNobody() {
+    pinWindow(null, null);
+    Assert.areEqual(
+      0,
+      GxFeedbackScheduler.run().size(),
+      'An unset start date sends nothing - it does not mean no limit'
+    );
+  }
+
+  /**
+   * The disaster this guards against: on its first night the job would see
+   * every finished trip in the history. Old trips must not even be selected,
+   * or they fill the batch ahead of the guests who should be asked.
+   */
+  @IsTest
+  static void oldTripsCannotCrowdNewOnesOutOfTheBatch() {
+    Booking__c template = [
+      SELECT Opportunity__c, Quote_for__c, MainContact__c
+      FROM Booking__c
+      WHERE BookingNumber__c = :READY
+    ];
+    List<Booking__c> history = new List<Booking__c>();
+    for (Integer i = 1; i <= 3; i++) {
+      history.add(
+        new Booking__c(
+          Opportunity__c = template.Opportunity__c,
+          Quote_for__c = template.Quote_for__c,
+          MainContact__c = template.MainContact__c,
+          BookingNumber__c = 'TEST-GX-HISTORY-' + i,
+          Travel_Type__c = 'FIT',
+          DestinationCountry__c = 'EG',
+          Status__c = 'Completed',
+          Start_Date__c = Date.today().addDays(-400 - i),
+          End_Date__c = Date.today().addDays(-393 - i)
+        )
+      );
+    }
+    insert history;
+
+    // Room for exactly one. Ordered oldest first, history would take it.
+    GxFeedbackScheduler.batchLimit = 1;
+    pinWindow(Date.today().addDays(-30), 30);
+
+    Test.startTest();
+    List<GxFeedbackSender.Result> out = GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.areEqual(1, out.size(), 'The one slot is used');
+    Assert.isTrue(
+      out[0].sent,
+      'On the guest who should be asked: ' + out[0].message
+    );
+    Assert.isTrue(booking(READY).SurveySent__c, 'The recent trip was invited');
+    Assert.areEqual(
+      0,
+      [
+        SELECT COUNT()
+        FROM Booking__c
+        WHERE BookingNumber__c LIKE 'TEST-GX-HISTORY-%' AND SurveySent__c = TRUE
+      ],
+      'Nothing from last year was touched'
+    );
+  }
+
+  @IsTest
+  static void theEarliestTripIsTheLaterOfStartDateAndAgeCap() {
+    pinWindow(Date.today().addDays(-100), 30);
+    Assert.areEqual(
+      Date.today().addDays(-30),
+      GxFeedbackScheduler.earliestTripEnd(),
+      'A start date long ago is overridden by the age cap'
+    );
+
+    pinWindow(Date.today().addDays(-10), 30);
+    Assert.areEqual(
+      Date.today().addDays(-10),
+      GxFeedbackScheduler.earliestTripEnd(),
+      'A recent start date wins over the cap'
+    );
+
+    pinWindow(Date.today().addDays(-10), null);
+    Assert.areEqual(
+      Date.today().addDays(-10),
+      GxFeedbackScheduler.earliestTripEnd(),
+      'No cap: the start date alone'
+    );
+
+    pinWindow(null, 30);
+    Assert.isNull(
+      GxFeedbackScheduler.earliestTripEnd(),
+      'No start date: nothing, not the cap'
     );
   }
 
