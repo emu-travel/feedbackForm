@@ -120,6 +120,12 @@
             </div>
             <template lwc:if={hasTrend}>
               <div class="trend">
+                <div class="trend-row trend-head" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span class="trend-nps">NPS</span>
+                  <span class="trend-n">Responses</span>
+                </div>
                 <template for:each={trend} for:item="m">
                   <div key={m.key} class="trend-row">
                     <span class="trend-month">{m.label}</span>
@@ -222,7 +228,7 @@
                 <h2 class="panel-title">Hotel detail</h2>
                 <div class="legend" aria-hidden="true">
                   <span><i class="sw heat_bad"></i>Below 7</span>
-                  <span><i class="sw heat_mid"></i>7 to 8</span>
+                  <span><i class="sw heat_mid"></i>7 to 7.9</span>
                   <span><i class="sw heat_good"></i>8 and above</span>
                 </div>
               </div>
@@ -277,7 +283,7 @@
                       <span class="pill pill_bad">{r.npsLabel}</span>
                       <div class="fu-who">
                         <a href={r.url}>{r.bookingNumber}</a>
-                        <span> · {r.guest} · overall {r.overallLabel}</span>
+                        <span> · {r.detail}</span>
                       </div>
                     </div>
                     <p class="fu-comment">{r.comment}</p>

@@ -16,7 +16,9 @@ import {
   commentRows,
   drillRows,
   bookingUrl,
-  monthLabel
+  monthLabel,
+  plural,
+  npsToneFor
 } from "c/gxDashboardView";
 
 describe("number formatting", () => {
@@ -278,5 +280,50 @@ describe("other lists", () => {
 
   it("has no link without a booking", () => {
     expect(bookingUrl(null)).toBeNull();
+  });
+});
+
+describe("copy and labelling fixes from the first review", () => {
+  it("uses singular and plural correctly", () => {
+    expect(plural(1, "detractor", "detractors")).toBe("1 detractor");
+    expect(plural(2, "detractor", "detractors")).toBe("2 detractors");
+    expect(plural(0, "detractor", "detractors")).toBe("0 detractors");
+  });
+
+  it("says 1 detractor and 1 unhappy guest, not 1 detractors", () => {
+    const byKey = Object.fromEntries(
+      kpiTiles({ promoters: 2, detractors: 1, openFollowUps: 1 }).map((t) => [
+        t.key,
+        t
+      ])
+    );
+    expect(byKey.nps.note).toBe("2 promoters · 1 detractor");
+    expect(byKey.followups.note).toBe("unhappy guest not yet contacted");
+  });
+
+  it("never leaves a gap where a follow-up guest's name should be", () => {
+    const [r] = followUpRows([{ responseId: "a", nps: 5, overall: 6 }], false);
+    expect(r.detail).toBe("Guest · overall 6.0");
+  });
+
+  it("labels an NPS answer as NPS, not as a 1-10 score", () => {
+    const [c] = commentRows([
+      { key: "k", text: "Zu laut", score: 5, scoreKind: "nps" }
+    ]);
+    expect(c.score).toBe("NPS 5");
+  });
+
+  it("colours NPS answers by NPS bands, so an 8 is a passive", () => {
+    expect(npsToneFor(8)).toBe("mid");
+    expect(npsToneFor(9)).toBe("good");
+    expect(npsToneFor(6)).toBe("bad");
+    const [passive] = commentRows([
+      { key: "k", text: "Ok", score: 8, scoreKind: "nps" }
+    ]);
+    expect(passive.cls).toBe("pill pill_mid");
+    const [rating] = commentRows([
+      { key: "k", text: "Ok", score: 8, scoreKind: "score" }
+    ]);
+    expect(rating.cls).toBe("pill pill_good");
   });
 });

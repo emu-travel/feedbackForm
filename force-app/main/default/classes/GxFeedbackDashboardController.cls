@@ -211,6 +211,14 @@ public with sharing class GxFeedbackDashboardController {
     public String about;
     @AuraEnabled
     public Decimal score;
+    /**
+     * What `score` is: 'score' for a 1-10 rating of the thing commented on,
+     * 'nps' where the only number to hand is the guest's recommendation
+     * answer. They look alike and mean different things, so the page labels
+     * and colours them differently.
+     */
+    @AuraEnabled
+    public String scoreKind;
     @AuraEnabled
     public Id bookingId;
     @AuraEnabled
@@ -763,6 +771,7 @@ public with sharing class GxFeedbackDashboardController {
         ? r.Item_Name__c
         : r.Item_Name__c + ' · ' + r.Sub_Category__c;
       c.score = r.Score__c;
+      c.scoreKind = 'score';
       c.bookingId = r.Feedback_Response__r.Booking__c;
       c.bookingNumber = r.Feedback_Response__r.Booking__r.BookingNumber__c;
       c.guest = r.Feedback_Response__r.Contact__r?.Name;
@@ -793,6 +802,11 @@ public with sharing class GxFeedbackDashboardController {
     c.text = text;
     c.about = about;
     c.score = score;
+    // Suggestions sit on the closing screen beside the recommendation
+    // question, so the number beside them is an NPS answer, not a rating.
+    c.scoreKind = score == null
+      ? null
+      : (suffix == 'suggest' ? 'nps' : 'score');
     c.bookingId = r.Booking__c;
     c.bookingNumber = r.Booking__r?.BookingNumber__c;
     c.guest = r.Contact__r?.Name;

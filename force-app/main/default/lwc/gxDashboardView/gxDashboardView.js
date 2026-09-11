@@ -154,6 +154,26 @@ export function toneFor(score) {
   return score < GOOD_SCORE ? "mid" : "good";
 }
 
+/** One promoter, two promoters. */
+export function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/**
+ * NPS answers use NPS bands, not score bands: 9-10 promoter, 7-8 passive,
+ * 0-6 detractor. Coloured as a score, an 8 would read green when it is a
+ * passive.
+ */
+export function npsToneFor(value) {
+  if (value === null || value === undefined) {
+    return "none";
+  }
+  if (value >= 9) {
+    return "good";
+  }
+  return value >= 7 ? "mid" : "bad";
+}
+
 export function isOpenFollowUp(status) {
   return !CLOSED_FOLLOW_UP.has(status);
 }
@@ -185,7 +205,11 @@ export function kpiTiles(kpis) {
       key: "nps",
       label: "NPS",
       value: formatNps(k.nps),
-      note: `${k.promoters || 0} promoters · ${k.detractors || 0} detractors`
+      note: `${plural(k.promoters || 0, "promoter", "promoters")} · ${plural(
+        k.detractors || 0,
+        "detractor",
+        "detractors"
+      )}`
     },
     {
       key: "overall",
@@ -209,7 +233,10 @@ export function kpiTiles(kpis) {
       key: "followups",
       label: "Open follow-ups",
       value: String(k.openFollowUps || 0),
-      note: "unhappy guests not yet contacted",
+      note:
+        (k.openFollowUps || 0) === 1
+          ? "unhappy guest not yet contacted"
+          : "unhappy guests not yet contacted",
       alert: (k.openFollowUps || 0) > 0
     }
   ];
@@ -283,6 +310,7 @@ export function followUpRows(rows, showHandled) {
       key: r.responseId,
       npsLabel: `NPS ${r.nps === null || r.nps === undefined ? "—" : r.nps}`,
       overallLabel: formatScore(r.overall),
+      detail: `${r.guest || "Guest"} · overall ${formatScore(r.overall)}`,
       url: bookingUrl(r.bookingId),
       status: r.followUpStatus || "Open",
       handled: !isOpenFollowUp(r.followUpStatus),
@@ -307,13 +335,21 @@ export function commentRows(rows) {
     key: c.key,
     text: c.text,
     about: c.about,
-    score:
-      c.score === null || c.score === undefined ? null : formatScore(c.score),
-    cls: `pill pill_${toneFor(c.score)}`,
+    score: commentScoreLabel(c),
+    cls: `pill pill_${c.scoreKind === "nps" ? npsToneFor(c.score) : toneFor(c.score)}`,
     guest: c.guest || "Guest",
     bookingNumber: c.bookingNumber,
     url: bookingUrl(c.bookingId)
   }));
+}
+
+function commentScoreLabel(c) {
+  if (c.score === null || c.score === undefined) {
+    return null;
+  }
+  return c.scoreKind === "nps"
+    ? `NPS ${Math.round(c.score)}`
+    : formatScore(c.score);
 }
 
 export function drillRows(rows) {
