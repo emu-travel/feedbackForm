@@ -162,6 +162,35 @@ function isScore(value) {
   return typeof value === "number" && value >= 1 && value <= 10;
 }
 
+const GERMAN_MONTHS = [
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember"
+];
+
+/**
+ * "2026-09-04" as a German guest reads it: "4. September 2026". Anything that
+ * is not an ISO date comes back unchanged rather than as a wrong date.
+ */
+export function germanDate(iso) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  if (!match) {
+    return iso || "";
+  }
+  const [, year, month, day] = match;
+  const name = GERMAN_MONTHS[Number(month) - 1];
+  return name ? `${Number(day)}. ${name} ${year}` : iso;
+}
+
 /**
  * Builds the JSON body GxFeedbackService.submit expects.
  *

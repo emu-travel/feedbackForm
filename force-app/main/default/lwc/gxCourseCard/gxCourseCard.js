@@ -1,4 +1,5 @@
 import { LightningElement, api } from "lwc";
+import { germanDate } from "c/gxSurveyFlow";
 
 /**
  * gxCourseCard
@@ -40,7 +41,7 @@ export default class GxCourseCard extends LightningElement {
     if (this.course.teeTime) {
       parts.push(`Startzeit ${this.course.teeTime}`);
     } else if (this.course.startDate) {
-      parts.push(this.course.startDate);
+      parts.push(germanDate(this.course.startDate));
     }
     return parts.join(" · ");
   }
@@ -50,7 +51,7 @@ export default class GxCourseCard extends LightningElement {
   }
 
   get commentPlaceholder() {
-    return "z.B. Platzzustand, Service, Clubhaus, …";
+    return "z. B. Platzzustand, Service, Clubhaus, …";
   }
 
   get ratingAriaLabel() {

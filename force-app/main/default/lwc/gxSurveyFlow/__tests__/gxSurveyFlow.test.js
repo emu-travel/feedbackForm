@@ -11,7 +11,8 @@ import {
   earnsPublicReview,
   buildPayload,
   DEFAULT_SCORE,
-  DEFAULT_SUB_SCORE
+  DEFAULT_SUB_SCORE,
+  germanDate
 } from "c/gxSurveyFlow";
 
 const context = (overrides = {}) => ({
@@ -378,5 +379,17 @@ describe("payload assembly", () => {
     });
     expect(p.hotels[0].reservationId).toBe("h1");
     expect(p.hotels[0].score).toBe(DEFAULT_SCORE);
+  });
+});
+
+describe("dates shown to the guest", () => {
+  it("writes an ISO date the way a German guest reads it", () => {
+    expect(germanDate("2026-09-04")).toBe("4. September 2026");
+    expect(germanDate("2026-03-21")).toBe("21. März 2026");
+  });
+
+  it("passes anything that is not an ISO date through unchanged", () => {
+    expect(germanDate("04.09.2026")).toBe("04.09.2026");
+    expect(germanDate(null)).toBe("");
   });
 });

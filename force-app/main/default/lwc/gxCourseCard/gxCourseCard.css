@@ -26,3 +26,9 @@
   font-size: 0.75rem;
   color: var(--gx-slate-600, #475569);
 }
+
+@media (max-width: 30rem) {
+  .card {
+    padding: 0.875rem;
+  }
+}

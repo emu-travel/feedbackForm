@@ -199,7 +199,7 @@ export default class GxFeedbackForm extends LightningElement {
     return isLastQuestionScreen(this.screen, this.ctx);
   }
   get nextLabel() {
-    return this.isFinalStep ? "Feedback Jetzt Absenden" : "Weiter";
+    return this.isFinalStep ? "Feedback jetzt absenden" : "Weiter";
   }
   get canGoBack() {
     return previousScreen(this.screen, this.ctx) !== null;

@@ -37,6 +37,15 @@ describe("c-gx-hotel-card", () => {
     );
   });
 
+  it("says 1 Nacht, not 1 Nächte", () => {
+    const element = mount({
+      hotel: { ...HOTEL, nights: 1, detail: null }
+    });
+    expect(element.shadowRoot.querySelector(".subtitle").textContent).toBe(
+      "Almancil, Portugal · 1 Nacht"
+    );
+  });
+
   it("omits parts of the subtitle the itinerary did not supply", () => {
     const element = mount({
       hotel: { reservationId: "r1", name: "Sparse Hotel" }

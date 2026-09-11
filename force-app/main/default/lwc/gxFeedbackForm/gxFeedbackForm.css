@@ -45,7 +45,7 @@
 }
 
 .logo {
-  max-height: 2.25rem;
+  max-height: 2.75rem;
   width: auto;
 }
 
@@ -68,7 +68,7 @@
 .progress-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -147,7 +147,7 @@
   border-radius: 0.75rem;
   padding: 0.625rem 0.75rem;
   font-family: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   color: var(--gx-slate-900);
   resize: vertical;
 }
@@ -205,6 +205,8 @@
 }
 
 .btn_primary {
+  /* Stays on the right when there is no Zurück beside it (step 1). */
+  margin-left: auto;
   background: var(--gx-forest);
   color: #fff;
 }
@@ -344,9 +346,20 @@
 }
 
 @media (max-width: 30rem) {
+  /* On a phone the card is the page: a frame inside a frame only costs the
+     rating buttons width they need. */
+  .shell {
+    padding: 0 0 2rem;
+  }
   .survey {
-    padding: 1.125rem;
-    border-radius: 1.125rem;
+    padding: 1.25rem 1rem;
+    border-radius: 0;
+    border-width: 0 0 1px;
+    box-shadow: none;
+  }
+  /* 16px is the size below which iOS zooms the page when a field is tapped. */
+  .textbox {
+    font-size: 1rem;
   }
   .title {
     font-size: 1.125rem;

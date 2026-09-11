@@ -231,6 +231,17 @@ describe("c-gx-feedback-form", () => {
       expect(title(element)).toBe("Transfer- und Mobilitätsleistungen");
     });
 
+    it("offers no Zurück on the first screen, where it has nowhere to go", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+      expect(backButton(element)).toBeNull();
+
+      nextButton(element).click();
+      await flush();
+      expect(backButton(element)).not.toBeNull();
+    });
+
     it("labels the last question screen as the submit action", async () => {
       const element = mount();
       withUrl();
@@ -239,7 +250,7 @@ describe("c-gx-feedback-form", () => {
 
       await walkToEnd(element);
       expect(nextButton(element).textContent.trim()).toBe(
-        "Feedback Jetzt Absenden"
+        "Feedback jetzt absenden"
       );
     });
 

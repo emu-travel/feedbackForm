@@ -53,7 +53,9 @@ export default class GxHotelCard extends LightningElement {
       parts.push(this.hotel.location);
     }
     if (this.hotel.nights) {
-      parts.push(`${this.hotel.nights} Nächte`);
+      parts.push(
+        this.hotel.nights === 1 ? "1 Nacht" : `${this.hotel.nights} Nächte`
+      );
     }
     if (this.hotel.detail) {
       parts.push(this.hotel.detail);
@@ -79,7 +81,7 @@ export default class GxHotelCard extends LightningElement {
   }
 
   get commentPlaceholder() {
-    return "z.B. Zimmerausstattung, Service, Verpflegung, Sauberkeit, Spa, …";
+    return "z. B. Zimmerausstattung, Service, Verpflegung, Sauberkeit, Spa, …";
   }
 
   get ratingAriaLabel() {
