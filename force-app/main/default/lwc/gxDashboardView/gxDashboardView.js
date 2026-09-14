@@ -758,7 +758,7 @@ export function responsesSummary(page, term, group) {
     }
     return total
       ? `${plural(total, "response", "responses")} matching "${term}", from all dates and filters`
-      : `No response matches "${term}". Search looks at guest name, email, booking number and FB number.`;
+      : `No response matches "${term}". Search looks at guest name, email, booking number, FB number, region and country.`;
   }
   return total
     ? plural(total, "response", "responses")

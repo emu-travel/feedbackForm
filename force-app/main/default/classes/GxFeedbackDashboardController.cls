@@ -1522,11 +1522,26 @@ public with sharing class GxFeedbackDashboardController {
     String term = String.isBlank(search) ? '' : search.trim();
     if (term.length() >= 2) {
       binds.put('term', '%' + escapeLike(term) + '%');
-      clauses.add(
+      String clause =
         '(Contact__r.LastName LIKE :term OR Contact__r.Name LIKE :term' +
-          ' OR Contact__r.Email LIKE :term' +
-          ' OR Booking__r.BookingNumber__c LIKE :term OR Name LIKE :term)'
+        ' OR Contact__r.Email LIKE :term' +
+        ' OR Booking__r.BookingNumber__c LIKE :term OR Name LIKE :term';
+      // Region and country are picklists: match the label the team reads
+      // ("Spanien"), not the stored code ("ES").
+      Set<String> regions = picklistMatches(Booking__c.Region__c, term);
+      if (!regions.isEmpty()) {
+        binds.put('termRegions', regions);
+        clause += ' OR Booking__r.Region__c IN :termRegions';
+      }
+      Set<String> countries = picklistMatches(
+        Booking__c.DestinationCountry__c,
+        term
       );
+      if (!countries.isEmpty()) {
+        binds.put('termCountries', countries);
+        clause += ' OR Booking__r.DestinationCountry__c IN :termCountries';
+      }
+      clauses.add(clause + ')');
     } else {
       clauses.addAll(bookingClauses('Booking__r.', f, binds));
     }
@@ -1737,6 +1752,21 @@ public with sharing class GxFeedbackDashboardController {
   /** A search term's own % and _ are matched literally, not as wildcards. */
   private static String escapeLike(String term) {
     return term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_');
+  }
+
+  /** The stored values of a picklist whose label contains the term, any case. */
+  private static Set<String> picklistMatches(
+    Schema.SObjectField field,
+    String term
+  ) {
+    String needle = term.toLowerCase();
+    Set<String> out = new Set<String>();
+    for (Schema.PicklistEntry e : field.getDescribe().getPicklistValues()) {
+      if (e.getLabel().toLowerCase().contains(needle)) {
+        out.add(e.getValue());
+      }
+    }
+    return out;
   }
 
   private static Decimal scaled(Decimal value) {

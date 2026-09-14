@@ -805,6 +805,44 @@ private class GxFeedbackDashboardControllerTest {
   }
 
   @IsTest
+  static void aRegionOrCountryFindsItsResponsesWhateverTheDates() {
+    Map<String, Object> future = new Map<String, Object>{
+      'fromDate' => String.valueOf(Date.today().addYears(5))
+    };
+    Assert.areEqual(
+      3,
+      find(future, 'algarve', null, null, 1).total,
+      'GXD-1 to GXD-3 are Algarve trips, found in any case'
+    );
+    Assert.areEqual(
+      1,
+      find(future, 'Mallorca', null, null, 1).total,
+      'Only GXD-5 answered in Mallorca'
+    );
+
+    // Countries are stored as codes; the team types the name they see.
+    String spain;
+    for (
+      Schema.PicklistEntry e : Booking__c.DestinationCountry__c.getDescribe()
+        .getPicklistValues()
+    ) {
+      if (e.getValue() == 'ES') {
+        spain = e.getLabel();
+      }
+    }
+    Assert.areEqual(
+      1,
+      find(future, spain, null, null, 1).total,
+      'The country label finds the Mallorca answer'
+    );
+    Assert.areEqual(
+      1,
+      find(future, 'algarve', 'detractors', null, 1).total,
+      'and a group still narrows it: GXD-2'
+    );
+  }
+
+  @IsTest
   static void aSearchTermIsMatchedLiterallyNotAsAWildcard() {
     Assert.areEqual(
       0,
