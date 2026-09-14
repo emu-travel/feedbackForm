@@ -10,9 +10,13 @@
  * decides how one is shown.
  */
 
-/** Heatmap bands: below 7 needs attention, 8 and above is good. */
+/**
+ * Score bands, read the way the survey reads them: at 8 or below it asks the
+ * guest what was missing (COMMENT_THRESHOLD in gxSurveyFlow), so only 9 and 10
+ * are green. Below 7 needs attention; 7 to 8.9 is amber.
+ */
 export const LOW_SCORE = 7;
-export const GOOD_SCORE = 8;
+export const GOOD_SCORE = 9;
 
 /** A ranked venue averaging under this gets a warning marker. */
 export const FLAG_BELOW = 7.5;
@@ -144,7 +148,7 @@ export function categoryLabel(category) {
   return CATEGORY_LABELS[category] || category || "";
 }
 
-/** 'bad' below 7, 'mid' from 7, 'good' from 8 - the heatmap's three bands. */
+/** 'bad' below 7, 'mid' from 7, 'good' from 9 - the dashboard's three bands. */
 export function toneFor(score) {
   if (score === null || score === undefined) {
     return "none";
@@ -161,9 +165,9 @@ export function plural(n, one, many) {
 }
 
 /**
- * NPS answers use NPS bands, not score bands: 9-10 promoter, 7-8 passive,
- * 0-6 detractor. Coloured as a score, an 8 would read green when it is a
- * passive.
+ * NPS answers use NPS bands: 9-10 promoter, 7-8 passive, 1-6 detractor. The
+ * score bands now share those cut-offs, but NPS is defined by them, so it
+ * keeps its own rule rather than borrowing the score's.
  */
 export function npsToneFor(value) {
   if (value === null || value === undefined) {
@@ -276,22 +280,101 @@ export function trendBars(trend) {
  * is out of 10, so its length reads as the score itself.
  */
 export function venueList(venues) {
-  const rows = (venues || []).map((v) => ({
-    key: `${v.category}|${v.name}`,
-    name: v.name,
-    category: v.category,
-    categoryLabel: categoryLabel(v.category),
-    score: formatScore(v.average),
-    ratings: v.ratings,
-    ratingsLabel: v.ratings === 1 ? "1 rating" : `${v.ratings} ratings`,
-    barStyle: `width:${Math.max(0, Math.min(100, (v.average || 0) * 10))}%`,
-    ranked: Boolean(v.ranked),
-    low: Boolean(v.ranked) && v.average < FLAG_BELOW
-  }));
+  const rows = (venues || []).map((v) => {
+    const tone = toneFor(v.average);
+    return {
+      key: `${v.category}|${v.name}`,
+      name: v.name,
+      category: v.category,
+      categoryLabel: categoryLabel(v.category),
+      score: formatScore(v.average),
+      ratings: v.ratings,
+      ratingsLabel: v.ratings === 1 ? "1 rating" : `${v.ratings} ratings`,
+      barStyle: `width:${Math.max(0, Math.min(100, (v.average || 0) * 10))}%`,
+      fillCls: `venue-fill venue-fill_${tone}`,
+      scoreCls: `venue-score venue-score_${tone}`,
+      pillCls: `pill pill_${tone}`,
+      ranked: Boolean(v.ranked),
+      low: Boolean(v.ranked) && v.average < FLAG_BELOW
+    };
+  });
   return {
     ranked: rows.filter((r) => r.ranked),
     unranked: rows.filter((r) => !r.ranked)
   };
+}
+
+// ------------------------------------------------------------------
+// Finding a venue
+
+/** The three leaderboards, with what one of their venues is called. */
+const VENUE_BOARDS = [
+  { list: "hotels", many: "hotels" },
+  { list: "golf", many: "golf courses" },
+  { list: "suppliers", many: "partners" }
+];
+
+/**
+ * Text as a search compares it: lower case, accents and ß folded, spaces
+ * squeezed - so "sao lourenco" finds "São Lourenço" and "schloss" finds
+ * "Schloß".
+ */
+export function searchKey(text) {
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Every hotel, golf course and partner whose name holds all the typed words,
+ * in any order, each with where it stands on its own leaderboard. Names that
+ * start with the search come first; otherwise hotels, then golf, then
+ * partners, best score first, as on the boards.
+ */
+export function venueMatches(data, term) {
+  const words = searchKey(term).split(" ").filter(Boolean);
+  if (!words.length) {
+    return [];
+  }
+  const start = words.join(" ");
+  const out = [];
+  VENUE_BOARDS.forEach(({ list, many }) => {
+    const { ranked, unranked } = venueList(data && data[list]);
+    const found = (v) => {
+      const name = searchKey(v.name);
+      return words.every((w) => name.includes(w));
+    };
+    ranked.forEach((v, i) => {
+      if (found(v)) {
+        out.push({
+          ...v,
+          place: `${v.categoryLabel} · No. ${i + 1} of ${ranked.length} ranked ${many}`
+        });
+      }
+    });
+    unranked.forEach((v) => {
+      if (found(v)) {
+        out.push({
+          ...v,
+          place: `${v.categoryLabel} · not enough ratings to rank yet`
+        });
+      }
+    });
+  });
+  const leading = (v) => (searchKey(v.name).startsWith(start) ? 0 : 1);
+  // Array sort is stable, so the board order holds within each group.
+  return out.sort((a, b) => leading(a) - leading(b));
+}
+
+/** What the venue search found, in words. */
+export function venueSearchSummary(count, term) {
+  return count
+    ? `${plural(count, "venue", "venues")} matching "${term}"`
+    : `No hotel, golf course or partner matching "${term}" was rated in this selection.`;
 }
 
 export function heatRows(rows) {
@@ -629,7 +712,7 @@ export function shortDate(iso) {
 /**
  * A page of responses as list rows: who and which trip on the left, and on
  * the right the few facts that decide whether to open it - the lowest score
- * when it is 8 or below, how much the guest wrote, and where a follow-up
+ * when it is not green, how much the guest wrote, and where a follow-up
  * stands.
  */
 export function responseListRows(rows) {
@@ -640,7 +723,7 @@ export function responseListRows(rows) {
     const lowest =
       r.lowestScore !== null &&
       r.lowestScore !== undefined &&
-      r.lowestScore <= 8
+      r.lowestScore < GOOD_SCORE
         ? {
             label: r.lowestLabel,
             score: formatScore(r.lowestScore),

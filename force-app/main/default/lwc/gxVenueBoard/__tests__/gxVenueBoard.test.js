@@ -61,4 +61,29 @@ describe("c-gx-venue-board", () => {
 
     expect(names(el)[0]).toBe("Golf 1");
   });
+
+  it("colours each score by band: 9 and above green, 8.5 amber", () => {
+    const el = mount(
+      venueList([
+        {
+          category: "Hotel",
+          name: "Pine Cliffs",
+          average: 9.1,
+          ratings: 5,
+          ranked: true
+        },
+        {
+          category: "Hotel",
+          name: "Conrad Algarve",
+          average: 8.5,
+          ratings: 4,
+          ranked: true
+        }
+      ])
+    );
+    const scores = [...el.shadowRoot.querySelectorAll(".venue-score")];
+    expect(scores[0].classList).toContain("venue-score_good");
+    expect(scores[1].classList).toContain("venue-score_mid");
+    expect(el.shadowRoot.querySelectorAll(".venue-fill_mid")).toHaveLength(1);
+  });
 });

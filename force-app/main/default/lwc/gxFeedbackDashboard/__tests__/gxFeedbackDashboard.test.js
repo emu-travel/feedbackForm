@@ -788,3 +788,118 @@ describe("c-gx-feedback-dashboard exports and chases", () => {
     expect(config.pageNumber).toBe(1);
   });
 });
+
+describe("c-gx-feedback-dashboard finding a venue", () => {
+  afterEach(() => {
+    while (document.body.firstChild) {
+      document.body.removeChild(document.body.firstChild);
+    }
+    jest.clearAllMocks();
+  });
+
+  const VENUES = {
+    ...DATA,
+    hotels: [
+      {
+        category: "Hotel",
+        name: "Pine Cliffs",
+        average: 9.2,
+        ratings: 6,
+        ranked: true
+      },
+      {
+        category: "Hotel",
+        name: "Conrad Algarve",
+        average: 8.4,
+        ratings: 4,
+        ranked: true
+      }
+    ],
+    golf: [
+      {
+        category: "Golfclub",
+        name: "São Lourenço",
+        average: 6.5,
+        ratings: 2,
+        ranked: false
+      }
+    ]
+  };
+
+  const search = (el, value) =>
+    el.shadowRoot
+      .querySelector("lightning-input.venue-search")
+      .dispatchEvent(new CustomEvent("change", { detail: { value } }));
+
+  it("finds a hotel or golf course by name, with its score and standing", async () => {
+    const el = mount();
+    getDashboard.emit(VENUES);
+    await flush();
+
+    search(el, "sao lourenco");
+    await flush();
+
+    const rows = [...el.shadowRoot.querySelectorAll("button.vrow")];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain("São Lourenço");
+    expect(rows[0].textContent).toContain("not enough ratings to rank yet");
+    expect(rows[0].querySelector(".pill").textContent).toBe("6.5");
+    expect(rows[0].querySelector(".pill").classList).toContain("pill_bad");
+    expect(el.shadowRoot.querySelector("c-gx-venue-board")).toBeNull();
+  });
+
+  it("opens every rating for the venue picked from the results", async () => {
+    getVenueDetail.mockResolvedValue([]);
+    const el = mount();
+    getDashboard.emit(VENUES);
+    await flush();
+
+    search(el, "conrad");
+    await flush();
+    el.shadowRoot.querySelector("button.vrow").click();
+    await flush();
+
+    expect(getVenueDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "Hotel", itemName: "Conrad Algarve" })
+    );
+  });
+
+  it("says when nothing matches, and looks across all dates on request", async () => {
+    const el = mount();
+    getDashboard.emit(VENUES);
+    await flush();
+
+    search(el, "Belfry");
+    await flush();
+    expect(text(el)).toContain(
+      'No hotel, golf course or partner matching "Belfry"'
+    );
+
+    el.shadowRoot.querySelector("button.venue-widen").click();
+    await flush();
+    const filters = JSON.parse(getDashboard.getLastConfig().filtersJson);
+    expect(filters.fromDate).toBeUndefined();
+    expect(filters.toDate).toBeUndefined();
+
+    getDashboard.emit(VENUES);
+    await flush();
+    expect(
+      el.shadowRoot.querySelector("lightning-input.venue-search").value
+    ).toBe("Belfry");
+    expect(el.shadowRoot.querySelector("button.venue-widen")).toBeNull();
+  });
+
+  it("brings the leaderboards back when the search is cleared", async () => {
+    const el = mount();
+    getDashboard.emit(VENUES);
+    await flush();
+
+    search(el, "pine");
+    await flush();
+    search(el, "");
+    await flush();
+
+    expect(el.shadowRoot.querySelectorAll("c-gx-venue-board")).toHaveLength(3);
+    expect(el.shadowRoot.querySelector("button.vrow")).toBeNull();
+  });
+});

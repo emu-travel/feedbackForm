@@ -19,6 +19,8 @@ import {
   kpiTiles,
   trendBars,
   venueList,
+  venueMatches,
+  venueSearchSummary,
   heatRows,
   followUpRows,
   destinationRows,
@@ -397,6 +399,56 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   get rankingHint() {
     return `Ranked once a venue has ${this.minRatings} ratings. Overall scores only — sub-ratings are shown separately below. Select a venue to see every rating.`;
+  }
+
+  // ------------------------------------------------------------------
+  // Finding a venue
+
+  /**
+   * What is typed in the venue search. It survives a filter change, so
+   * "Search all dates" looks for the same venue further back. The venues are
+   * already loaded, so it filters as the user types, with no server call.
+   */
+  venueInput = "";
+
+  get venueTerm() {
+    return this.venueInput.trim();
+  }
+
+  get venueSearching() {
+    return this.venueTerm.length > 0;
+  }
+
+  get venueResults() {
+    return venueMatches(this.data, this.venueTerm);
+  }
+
+  get hasVenueResults() {
+    return this.venueResults.length > 0;
+  }
+
+  get venueResultPage() {
+    return pageOf(this.venueResults, this.pages.venues);
+  }
+
+  get venueSearchSummary() {
+    return venueSearchSummary(this.venueResults.length, this.venueTerm);
+  }
+
+  /** Offered only while dates narrow the selection. */
+  get venueCanWiden() {
+    const f = this.filters || {};
+    return Boolean(f.fromDate || f.toDate);
+  }
+
+  handleVenueSearch(event) {
+    this.venueInput = event.detail.value || "";
+    this.setPage("venues", 1);
+  }
+
+  handleVenuePick(event) {
+    const { name, category } = event.currentTarget.dataset;
+    this.openDrill(name, category);
   }
 
   get hotelDetail() {

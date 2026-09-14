@@ -86,6 +86,19 @@
   border-radius: 0 4px 4px 0;
 }
 
+/* The dashboard's score bands: 9 and above green, 7 to 8.9 amber, below 7 red. */
+.venue-fill_good {
+  background: #2f6b4f;
+}
+
+.venue-fill_mid {
+  background: #e29d0b;
+}
+
+.venue-fill_bad {
+  background: #a6402e;
+}
+
 .venue-score {
   display: inline-flex;
   align-items: center;
@@ -93,6 +106,18 @@
   gap: 0.25rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.venue-score_good {
+  color: #2f6b4f;
+}
+
+.venue-score_mid {
+  color: #8a5a00;
+}
+
+.venue-score_bad {
+  color: #a6402e;
 }
 
 .venue-n {

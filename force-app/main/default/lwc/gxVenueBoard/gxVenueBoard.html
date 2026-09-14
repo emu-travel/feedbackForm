@@ -19,9 +19,9 @@
             >
               <span class="venue-name">{v.name}</span>
               <span class="venue-bar" aria-hidden="true">
-                <span class="venue-fill" style={v.barStyle}></span>
+                <span class={v.fillCls} style={v.barStyle}></span>
               </span>
-              <span class="venue-score">
+              <span class={v.scoreCls}>
                 {v.score}
                 <template lwc:if={v.low}>
                   <lightning-icon
@@ -63,7 +63,7 @@
               title="Show every rating for this venue"
             >
               <span class="venue-name">{v.name}</span>
-              <span class="venue-score">{v.score}</span>
+              <span class={v.scoreCls}>{v.score}</span>
               <span class="venue-n">{v.ratingsLabel}</span>
               <span class="chev" aria-hidden="true">›</span>
             </button>

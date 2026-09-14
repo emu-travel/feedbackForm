@@ -1,8 +1,13 @@
+import { COMMENT_THRESHOLD } from "c/gxSurveyFlow";
 import {
   formatNps,
   formatScore,
   formatPercent,
   toneFor,
+  GOOD_SCORE,
+  searchKey,
+  venueMatches,
+  venueSearchSummary,
   isOpenFollowUp,
   defaultFilters,
   filtersPayload,
@@ -57,13 +62,18 @@ describe("number formatting", () => {
   });
 });
 
-describe("heatmap bands", () => {
-  it("puts below 7 in red, 7 to under 8 in amber, 8 and up in green", () => {
+describe("score bands", () => {
+  it("puts below 7 in red, 7 to under 9 in amber, 9 and up in green", () => {
     expect(toneFor(6.9)).toBe("bad");
     expect(toneFor(7)).toBe("mid");
-    expect(toneFor(7.9)).toBe("mid");
-    expect(toneFor(8)).toBe("good");
+    expect(toneFor(8)).toBe("mid");
+    expect(toneFor(8.9)).toBe("mid");
+    expect(toneFor(9)).toBe("good");
     expect(toneFor(null)).toBe("none");
+  });
+
+  it("turns green exactly where the survey stops asking the guest why", () => {
+    expect(GOOD_SCORE).toBe(COMMENT_THRESHOLD + 1);
   });
 });
 
@@ -208,6 +218,109 @@ describe("venue leaderboard", () => {
   it("draws the bar out of ten", () => {
     expect(venueList(venues).ranked[0].barStyle).toBe("width:70%");
   });
+
+  it("colours score and bar by band, so an 8.9 is not green", () => {
+    const { ranked, unranked } = venueList(venues);
+    expect(ranked[1].scoreCls).toBe("venue-score venue-score_mid");
+    expect(ranked[1].fillCls).toBe("venue-fill venue-fill_mid");
+    expect(unranked[0].pillCls).toBe("pill pill_good");
+  });
+});
+
+describe("finding a venue", () => {
+  const DATA = {
+    hotels: [
+      {
+        category: "Hotel",
+        name: "Pine Cliffs",
+        average: 9.2,
+        ratings: 6,
+        ranked: true
+      },
+      {
+        category: "Hotel",
+        name: "Conrad Algarve",
+        average: 8.4,
+        ratings: 4,
+        ranked: true
+      },
+      {
+        category: "Hotel",
+        name: "Vila Vita Parc",
+        average: 10,
+        ratings: 1,
+        ranked: false
+      }
+    ],
+    golf: [
+      {
+        category: "Golfclub",
+        name: "Quinta do Lago South",
+        average: 9.5,
+        ratings: 5,
+        ranked: true
+      },
+      {
+        category: "Golfclub",
+        name: "São Lourenço",
+        average: 6.5,
+        ratings: 2,
+        ranked: false
+      }
+    ],
+    suppliers: [
+      {
+        category: "Airline",
+        name: "Lufthansa",
+        average: 7,
+        ratings: 3,
+        ranked: true
+      }
+    ]
+  };
+
+  it("ignores case, accents and ß", () => {
+    expect(searchKey("  São  Lourenço ")).toBe("sao lourenco");
+    expect(searchKey("Schloß Elmau")).toBe("schloss elmau");
+  });
+
+  it("finds a venue on any board, and says where it stands there", () => {
+    const [conrad] = venueMatches(DATA, "conrad");
+    expect(conrad.name).toBe("Conrad Algarve");
+    expect(conrad.place).toBe("Hotel · No. 2 of 2 ranked hotels");
+    expect(conrad.pillCls).toBe("pill pill_mid");
+
+    const [sao] = venueMatches(DATA, "sao lourenco");
+    expect(sao.place).toBe("Golf course · not enough ratings to rank yet");
+    expect(sao.pillCls).toBe("pill pill_bad");
+  });
+
+  it("matches the words in any order, across hotels, golf and partners", () => {
+    expect(venueMatches(DATA, "south quinta").map((v) => v.name)).toEqual([
+      "Quinta do Lago South"
+    ]);
+    expect(venueMatches(DATA, "a").length).toBe(5);
+  });
+
+  it("puts names that start with the search first", () => {
+    expect(venueMatches(DATA, "l").map((v) => v.name)).toEqual([
+      "Lufthansa",
+      "Pine Cliffs",
+      "Conrad Algarve",
+      "Vila Vita Parc",
+      "Quinta do Lago South",
+      "São Lourenço"
+    ]);
+  });
+
+  it("finds nothing for an empty search, and says so plainly otherwise", () => {
+    expect(venueMatches(DATA, "   ")).toEqual([]);
+    expect(venueMatches(undefined, "pine")).toEqual([]);
+    expect(venueSearchSummary(2, "pine")).toBe('2 venues matching "pine"');
+    expect(venueSearchSummary(0, "Belfry")).toBe(
+      'No hotel, golf course or partner matching "Belfry" was rated in this selection.'
+    );
+  });
 });
 
 describe("hotel detail heatmap", () => {
@@ -218,7 +331,7 @@ describe("hotel detail heatmap", () => {
         cells: [
           { subCategory: "Room", average: 6, ratings: 2 },
           { subCategory: "Service", average: 7.5, ratings: 2 },
-          { subCategory: "Catering", average: 8, ratings: 2 },
+          { subCategory: "Catering", average: 9, ratings: 2 },
           { subCategory: "Cleanliness", average: null, ratings: 0 }
         ]
       }
@@ -323,7 +436,7 @@ describe("copy and labelling fixes from the first review", () => {
     expect(c.score).toBe("NPS 5");
   });
 
-  it("colours NPS answers by NPS bands, so an 8 is a passive", () => {
+  it("colours an 8 amber, as an NPS answer and as a score alike", () => {
     expect(npsToneFor(8)).toBe("mid");
     expect(npsToneFor(9)).toBe("good");
     expect(npsToneFor(6)).toBe("bad");
@@ -334,7 +447,7 @@ describe("copy and labelling fixes from the first review", () => {
     const [rating] = commentRows([
       { key: "k", text: "Ok", score: 8, scoreKind: "score" }
     ]);
-    expect(rating.cls).toBe("pill pill_good");
+    expect(rating.cls).toBe("pill pill_mid");
   });
 });
 

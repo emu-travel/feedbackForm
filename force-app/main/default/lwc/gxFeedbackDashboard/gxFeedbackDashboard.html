@@ -349,31 +349,96 @@
           </template>
 
           <!-- Venues -->
-          <section class="panel">
+          <section class="panel" data-section="venues">
             <div class="panel-head">
               <h2 class="panel-title">How our venues and partners score</h2>
+              <lightning-input
+                class="venue-search"
+                type="search"
+                label="Find a venue"
+                variant="label-hidden"
+                placeholder="Search a hotel, golf course, airline or transfer"
+                value={venueInput}
+                onchange={handleVenueSearch}
+              ></lightning-input>
             </div>
             <p class="panel-note">{rankingHint}</p>
-            <div class="boards">
-              <c-gx-venue-board
-                title="Hotels"
-                board={hotelBoard}
-                min-ratings={minRatings}
-                onselect={handleVenueSelect}
-              ></c-gx-venue-board>
-              <c-gx-venue-board
-                title="Golf courses"
-                board={golfBoard}
-                min-ratings={minRatings}
-                onselect={handleVenueSelect}
-              ></c-gx-venue-board>
-              <c-gx-venue-board
-                title="Airlines, transfers and rental cars"
-                board={supplierBoard}
-                min-ratings={minRatings}
-                onselect={handleVenueSelect}
-              ></c-gx-venue-board>
+            <div class="legend venue-legend" aria-hidden="true">
+              <span><i class="sw heat_bad"></i>Below 7</span>
+              <span><i class="sw heat_mid"></i>7 to 8.9</span>
+              <span><i class="sw heat_good"></i>9 and above</span>
             </div>
+
+            <template lwc:if={venueSearching}>
+              <div class="venue-found">
+                <span class="panel-count" aria-live="polite"
+                  >{venueSearchSummary}</span
+                >
+                <template lwc:if={venueCanWiden}>
+                  <button
+                    class="link-btn full-btn venue-widen"
+                    onclick={handleAllTime}
+                  >
+                    Search all dates
+                  </button>
+                </template>
+              </div>
+              <template lwc:if={hasVenueResults}>
+                <ul class="vlist">
+                  <template for:each={venueResultPage.rows} for:item="v">
+                    <li key={v.key}>
+                      <button
+                        class="vrow"
+                        data-name={v.name}
+                        data-category={v.category}
+                        onclick={handleVenuePick}
+                        title="Show every rating for this venue"
+                      >
+                        <span class="vrow-main">
+                          <span class="vrow-name">{v.name}</span>
+                          <span class="vrow-place">{v.place}</span>
+                        </span>
+                        <span class="vrow-bar" aria-hidden="true">
+                          <span class={v.fillCls} style={v.barStyle}></span>
+                        </span>
+                        <span class={v.pillCls}>{v.score}</span>
+                        <span class="vrow-n">{v.ratingsLabel}</span>
+                        <span class="vrow-chev" aria-hidden="true">›</span>
+                      </button>
+                    </li>
+                  </template>
+                </ul>
+                <c-gx-pager
+                  data-list="venues"
+                  label="Pages of matching venues"
+                  total={venueResultPage.total}
+                  page={venueResultPage.page}
+                  onpagechange={handlePage}
+                ></c-gx-pager>
+              </template>
+            </template>
+            <template lwc:else>
+              <div class="boards">
+                <c-gx-venue-board
+                  title="Hotels"
+                  board={hotelBoard}
+                  min-ratings={minRatings}
+                  onselect={handleVenueSelect}
+                ></c-gx-venue-board>
+                <c-gx-venue-board
+                  title="Golf courses"
+                  board={golfBoard}
+                  min-ratings={minRatings}
+                  onselect={handleVenueSelect}
+                ></c-gx-venue-board>
+                <c-gx-venue-board
+                  title="Airlines, transfers and rental cars"
+                  board={supplierBoard}
+                  min-ratings={minRatings}
+                  onselect={handleVenueSelect}
+                ></c-gx-venue-board>
+              </div>
+            </template>
 
             <template lwc:if={drill}>
               <div
@@ -448,8 +513,8 @@
                 <h2 class="panel-title">Hotel detail</h2>
                 <div class="legend" aria-hidden="true">
                   <span><i class="sw heat_bad"></i>Below 7</span>
-                  <span><i class="sw heat_mid"></i>7 to 7.9</span>
-                  <span><i class="sw heat_good"></i>8 and above</span>
+                  <span><i class="sw heat_mid"></i>7 to 8.9</span>
+                  <span><i class="sw heat_good"></i>9 and above</span>
                 </div>
               </div>
               <p class="panel-note">

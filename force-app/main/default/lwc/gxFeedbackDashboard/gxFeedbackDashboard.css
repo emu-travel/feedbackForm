@@ -303,6 +303,134 @@
   margin-top: 0.5rem;
 }
 
+/* ---------- finding a venue ---------- */
+
+.venue-search {
+  flex: 1 1 16rem;
+  max-width: 26rem;
+}
+
+.venue-legend {
+  margin-bottom: 0.75rem;
+}
+
+.venue-found {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.vlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6rem 2.75rem 4.5rem 0.75rem;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--gx-ink);
+  cursor: pointer;
+}
+
+.vrow:hover,
+.vrow:focus-visible {
+  background: var(--gx-sunk);
+}
+
+.vrow:focus-visible {
+  outline: 2px solid var(--gx-gold);
+  outline-offset: 1px;
+}
+
+.vrow-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vrow-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vrow-place {
+  font-size: 0.75rem;
+  color: var(--gx-muted);
+}
+
+.vrow-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #eef1ee;
+  overflow: hidden;
+}
+
+.vrow .venue-fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+}
+
+.venue-fill_good {
+  background: var(--gx-good);
+}
+
+.venue-fill_mid {
+  background: var(--gx-gold);
+}
+
+.venue-fill_bad {
+  background: var(--gx-bad);
+}
+
+.vrow-n {
+  font-size: 0.75rem;
+  color: var(--gx-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vrow-chev {
+  color: #c3cec8;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: right;
+}
+
+.vrow:hover .vrow-chev,
+.vrow:focus-visible .vrow-chev {
+  color: var(--gx-forest);
+}
+
+@media (max-width: 30em) {
+  .vrow {
+    grid-template-columns: minmax(0, 1fr) 2.75rem 0.75rem;
+  }
+
+  .vrow-bar,
+  .vrow-n {
+    display: none;
+  }
+}
+
 .drill {
   margin-top: 1.25rem;
   border-top: 1px solid var(--gx-line);
