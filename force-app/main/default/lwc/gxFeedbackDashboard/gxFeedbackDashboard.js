@@ -24,7 +24,6 @@ import {
   heatRows,
   followUpRows,
   destinationRows,
-  commentRows,
   drillRows,
   categoryLabel,
   pageOf,
@@ -82,7 +81,6 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   exporting = false;
 
   showHandled = false;
-  lowOnly = false;
   drafts = {};
   savingId;
 
@@ -585,38 +583,6 @@ export default class GxFeedbackDashboard extends NavigationMixin(
       : null;
   }
 
-  get comments() {
-    return this.memo("comments", [this.data, this.lowOnly], () => {
-      const rows = commentRows(this.data && this.data.comments);
-      return this.lowOnly ? rows.filter((c) => c.low) : rows;
-    });
-  }
-
-  get lowOnlyLabel() {
-    return this.lowOnly ? "Show all comments" : "Only low scores";
-  }
-
-  get commentPage() {
-    return pageOf(this.comments, this.pages.comments);
-  }
-
-  get commentsCapNote() {
-    return this.data && this.data.commentsCapped
-      ? "The most recent comments. Narrow the dates to see older ones."
-      : null;
-  }
-
-  get commentsEmptyText() {
-    return this.lowOnly
-      ? "No low-scoring comments in this selection."
-      : "No comments in this selection.";
-  }
-
-  toggleLowOnly() {
-    this.lowOnly = !this.lowOnly;
-    this.setPage("comments", 1);
-  }
-
   handleKpiClick(event) {
     this.scrollToSection(event.currentTarget.dataset.target);
   }
@@ -626,10 +592,6 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     if (section && section.scrollIntoView) {
       section.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }
-
-  get hasComments() {
-    return this.comments.length > 0;
   }
 
   get drillTitle() {

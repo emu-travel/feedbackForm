@@ -730,64 +730,6 @@
               </template>
             </section>
           </div>
-
-          <!-- Comments -->
-          <section class="panel" data-section="comments">
-            <div class="panel-head">
-              <h2 class="panel-title">What guests wrote</h2>
-              <lightning-button
-                variant="base"
-                label={lowOnlyLabel}
-                onclick={toggleLowOnly}
-              ></lightning-button>
-            </div>
-            <template lwc:if={commentsCapNote}>
-              <p class="panel-note">{commentsCapNote}</p>
-            </template>
-            <template lwc:if={hasComments}>
-              <ul class="comments">
-                <template for:each={commentPage.rows} for:item="c">
-                  <li key={c.key} class="comment">
-                    <template lwc:if={c.score}>
-                      <span class={c.cls}>{c.score}</span>
-                    </template>
-                    <template lwc:else>
-                      <span class="pill pill_none">–</span>
-                    </template>
-                    <div class="comment-main">
-                      <p class="comment-text">{c.text}</p>
-                      <p class="meta comment-meta">
-                        <span>{c.about}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{c.guest}</span>
-                        <span aria-hidden="true">·</span>
-                        <a href={c.url}>{c.bookingNumber}</a>
-                        <span aria-hidden="true">·</span>
-                        <button
-                          class="link-btn full-btn"
-                          data-response-id={c.responseId}
-                          title="Open the guest's whole answer"
-                          onclick={handleOpenResponse}
-                        >
-                          Full response
-                        </button>
-                      </p>
-                    </div>
-                  </li>
-                </template>
-              </ul>
-              <c-gx-pager
-                data-list="comments"
-                label="Pages of comments"
-                total={commentPage.total}
-                page={commentPage.page}
-                onpagechange={handlePage}
-              ></c-gx-pager>
-            </template>
-            <template lwc:else>
-              <p class="panel-note">{commentsEmptyText}</p>
-            </template>
-          </section>
         </template>
       </template>
     </div>

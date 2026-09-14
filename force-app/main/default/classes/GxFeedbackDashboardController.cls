@@ -12,8 +12,8 @@
  *
  * Every number is counted or averaged in SOQL rather than from loaded rows, so
  * it stays right however many responses a selection covers. Rows are loaded
- * only for what has to be read - follow-ups, next destinations, comments -
- * and each of those is capped, with the cap reported so the page can say so.
+ * only for what has to be read - follow-ups and next destinations - and each
+ * of those is capped, with the cap reported so the page can say so.
  * The page pages through what it receives.
  *
  * Every filter narrows the bookings, and every number follows from the
@@ -32,20 +32,15 @@ public with sharing class GxFeedbackDashboardController {
   private static final Integer PROMOTER_MIN = 9;
   private static final Integer DETRACTOR_MAX = 6;
 
-  /** A comment box only opens at 8 or below, so this bounds the search. */
-  private static final Integer COMMENT_SCORE_MAX = 8;
-
   /** Caps on rows sent to the page. The page pages through them 10 at a time. */
-  @TestVisible
-  private static Integer maxComments = 300;
   @TestVisible
   private static Integer maxFollowUps = 500;
   @TestVisible
   private static Integer maxDestinations = 500;
 
   /**
-   * Newest responses read for their free text (comments, next destinations).
-   * Their long text sits in the request's 6 MB heap, so this stays modest.
+   * Newest responses read for their next-destination wish. Their long text
+   * sits in the request's 6 MB heap, so this stays modest.
    */
   private static final Integer MAX_RESPONSES = 1000;
 
@@ -133,15 +128,10 @@ public with sharing class GxFeedbackDashboardController {
     public List<ResponseRow> followUps = new List<ResponseRow>();
     @AuraEnabled
     public List<ResponseRow> nextDestinations = new List<ResponseRow>();
-    @AuraEnabled
-    public List<CommentRow> comments = new List<CommentRow>();
 
     /** Every detractor in the selection; followUps may hold fewer. */
     @AuraEnabled
     public Integer followUpsTotal = 0;
-    /** True when there were more comments than were sent. */
-    @AuraEnabled
-    public Boolean commentsCapped = false;
     /** True when older next-destination wishes were left out. */
     @AuraEnabled
     public Boolean destinationsCapped = false;
@@ -285,10 +275,6 @@ public with sharing class GxFeedbackDashboardController {
     @AuraEnabled
     public Decimal avgConsultation;
     @AuraEnabled
-    public Integer reminded = 0;
-    @AuraEnabled
-    public Integer answeredAfterReminder = 0;
-    @AuraEnabled
     public Integer openFollowUps = 0;
   }
 
@@ -367,35 +353,6 @@ public with sharing class GxFeedbackDashboardController {
     public String followUpBy;
     @AuraEnabled
     public Datetime followUpOn;
-    @AuraEnabled
-    public Datetime submittedOn;
-  }
-
-  public class CommentRow {
-    @AuraEnabled
-    public String key;
-    @AuraEnabled
-    public Id responseId;
-    @AuraEnabled
-    public String text;
-    @AuraEnabled
-    public String about;
-    @AuraEnabled
-    public Decimal score;
-    /**
-     * What `score` is: 'score' for a 1-10 rating of the thing commented on,
-     * 'nps' where the only number to hand is the guest's recommendation
-     * answer. They look alike and mean different things, so the page labels
-     * and colours them differently.
-     */
-    @AuraEnabled
-    public String scoreKind;
-    @AuraEnabled
-    public Id bookingId;
-    @AuraEnabled
-    public String bookingNumber;
-    @AuraEnabled
-    public String guest;
     @AuraEnabled
     public Datetime submittedOn;
   }
@@ -557,7 +514,6 @@ public with sharing class GxFeedbackDashboardController {
 
     List<Feedback_Response__c> recent = loadResponses(f);
     applyDestinations(d, recent, d.kpis.responses > recent.size());
-    applyComments(d, f, recent);
     return d;
   }
 
@@ -1009,13 +965,6 @@ public with sharing class GxFeedbackDashboardController {
     k.answeredInvitations = countResponses(
       f,
       'Booking__r.Survey_Sent_On__c != null',
-      null
-    );
-    // Reminders only ever go to guests who had not answered, so any answer
-    // on a reminded booking arrived after the reminder.
-    k.answeredAfterReminder = countResponses(
-      f,
-      'Booking__r.Survey_Reminder_Sent__c = true',
       null
     );
     k.openFollowUps = countResponses(
@@ -1792,14 +1741,6 @@ public with sharing class GxFeedbackDashboardController {
       AccessLevel.SYSTEM_MODE
     );
 
-    List<String> reminded = clauses.clone();
-    reminded.add('Survey_Reminder_Sent__c = true');
-    k.reminded = Database.countQueryWithBinds(
-      'SELECT COUNT() FROM Booking__c WHERE ' + String.join(reminded, ' AND '),
-      binds,
-      AccessLevel.SYSTEM_MODE
-    );
-
     k.responseRate = k.invited == 0
       ? null
       : Math.min(
@@ -1932,150 +1873,6 @@ public with sharing class GxFeedbackDashboardController {
     }
     rows.sort(new ByWeakestCell());
     s.hotelDetail = rows;
-  }
-
-  // ------------------------------------------------------------------
-  // Comments
-
-  /**
-   * The words behind the scores, newest first, from both places they live:
-   * the free-text fields on each response, and the comment on each individual
-   * rating. Long text fields cannot be filtered in SOQL, so blanks are dropped
-   * here; ratings are narrowed to 8 and below first, since a comment box only
-   * opens at those scores.
-   */
-  private static void applyComments(
-    Dashboard d,
-    Filters f,
-    List<Feedback_Response__c> responses
-  ) {
-    List<CommentRow> rows = new List<CommentRow>();
-
-    if (String.isBlank(f.category)) {
-      for (Feedback_Response__c r : responses) {
-        addComment(
-          rows,
-          r,
-          r.Overall_Experience_Comment__c,
-          'Overall experience',
-          r.Overall_Experience__c,
-          'overall'
-        );
-        addComment(
-          rows,
-          r,
-          r.Consultation_Comment__c,
-          'Consultation',
-          r.Consultation_Rating__c,
-          'consult'
-        );
-        addComment(
-          rows,
-          r,
-          r.General_Hotel_Comment__c,
-          'Hotels in general',
-          null,
-          'hotels'
-        );
-        addComment(
-          rows,
-          r,
-          r.General_Golf_Comment__c,
-          'Golf in general',
-          null,
-          'golf'
-        );
-        addComment(
-          rows,
-          r,
-          r.Improvement_Suggestions__c,
-          'Suggestions',
-          r.Recommendation_NPS__c,
-          'suggest'
-        );
-        addComment(rows, r, r.General_Feedback__c, 'Other', null, 'other');
-      }
-    }
-
-    Map<String, Object> binds = new Map<String, Object>{
-      'scoreMax' => COMMENT_SCORE_MAX
-    };
-    List<String> clauses = new List<String>{ 'Score__c <= :scoreMax' };
-    clauses.addAll(
-      bookingClauses('Feedback_Response__r.Booking__r.', f, binds)
-    );
-    if (String.isNotBlank(f.category)) {
-      clauses.add('Category__c = :category');
-      binds.put('category', f.category);
-    }
-    for (
-      Feedback_Rating__c r : (List<Feedback_Rating__c>) Database.queryWithBinds(
-        'SELECT Id, Item_Name__c, Sub_Category__c, Score__c, Comment__c, ' +
-          'Feedback_Response__c, Feedback_Response__r.Booking__c, ' +
-          'Feedback_Response__r.Booking__r.BookingNumber__c, ' +
-          'Feedback_Response__r.Contact__r.Name, ' +
-          'Feedback_Response__r.Submitted_On__c ' +
-          'FROM Feedback_Rating__c WHERE ' +
-          String.join(clauses, ' AND ') +
-          ' ORDER BY Feedback_Response__r.Submitted_On__c DESC LIMIT 500',
-        binds,
-        AccessLevel.SYSTEM_MODE
-      )
-    ) {
-      if (String.isBlank(r.Comment__c)) {
-        continue;
-      }
-      CommentRow c = new CommentRow();
-      c.key = r.Id;
-      c.responseId = r.Feedback_Response__c;
-      c.text = r.Comment__c;
-      c.about = String.isBlank(r.Sub_Category__c)
-        ? r.Item_Name__c
-        : r.Item_Name__c + ' · ' + r.Sub_Category__c;
-      c.score = r.Score__c;
-      c.scoreKind = 'score';
-      c.bookingId = r.Feedback_Response__r.Booking__c;
-      c.bookingNumber = r.Feedback_Response__r.Booking__r.BookingNumber__c;
-      c.guest = r.Feedback_Response__r.Contact__r?.Name;
-      c.submittedOn = r.Feedback_Response__r.Submitted_On__c;
-      rows.add(c);
-    }
-
-    rows.sort(new ByNewest());
-    while (rows.size() > maxComments) {
-      rows.remove(rows.size() - 1);
-      d.commentsCapped = true;
-    }
-    d.comments = rows;
-  }
-
-  private static void addComment(
-    List<CommentRow> rows,
-    Feedback_Response__c r,
-    String text,
-    String about,
-    Decimal score,
-    String suffix
-  ) {
-    if (String.isBlank(text)) {
-      return;
-    }
-    CommentRow c = new CommentRow();
-    c.key = r.Id + '-' + suffix;
-    c.responseId = r.Id;
-    c.text = text;
-    c.about = about;
-    c.score = score;
-    // Suggestions sit on the closing screen beside the recommendation
-    // question, so the number beside them is an NPS answer, not a rating.
-    c.scoreKind = score == null
-      ? null
-      : (suffix == 'suggest' ? 'nps' : 'score');
-    c.bookingId = r.Booking__c;
-    c.bookingNumber = r.Booking__r?.BookingNumber__c;
-    c.guest = r.Contact__r?.Name;
-    c.submittedOn = r.Submitted_On__c;
-    rows.add(c);
   }
 
   // ------------------------------------------------------------------
@@ -2280,21 +2077,6 @@ public with sharing class GxFeedbackDashboardController {
       Decimal x = a.nps == null ? -1 : a.nps;
       Decimal y = b.nps == null ? -1 : b.nps;
       return x == y ? 0 : (x > y ? -1 : 1);
-    }
-  }
-
-  private class ByNewest implements Comparator<CommentRow> {
-    public Integer compare(CommentRow a, CommentRow b) {
-      if (a.submittedOn == b.submittedOn) {
-        return 0;
-      }
-      if (a.submittedOn == null) {
-        return 1;
-      }
-      if (b.submittedOn == null) {
-        return -1;
-      }
-      return a.submittedOn > b.submittedOn ? -1 : 1;
     }
   }
 }

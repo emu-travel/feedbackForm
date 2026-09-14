@@ -20,7 +20,6 @@ import {
   heatRows,
   followUpRows,
   destinationRows,
-  commentRows,
   drillRows,
   bookingUrl,
   monthLabel,
@@ -131,11 +130,10 @@ describe("KPI tiles", () => {
       detractors: 1,
       avgOverall: 8,
       avgConsultation: 8,
-      reminded: 1,
-      answeredAfterReminder: 1,
       openFollowUps: 1
     });
     const byKey = Object.fromEntries(tiles.map((t) => [t.key, t]));
+    expect(byKey.reminder).toBeUndefined();
     expect(byKey.responses.value).toBe("4");
     expect(byKey.rate.value).toBe("80%");
     expect(byKey.rate.note).toBe("1 still open");
@@ -402,20 +400,6 @@ describe("other lists", () => {
     expect(rows[1].promoter).toBe(false);
   });
 
-  it("colours a comment by the score it came with", () => {
-    const [c] = commentRows([
-      { key: "k", text: "Laut", score: 5, about: "Conrad" }
-    ]);
-    expect(c.cls).toBe("pill pill_bad");
-    expect(c.score).toBe("5.0");
-  });
-
-  it("keeps a comment with no score uncoloured", () => {
-    const [c] = commentRows([{ key: "k", text: "Toll", score: null }]);
-    expect(c.score).toBeNull();
-    expect(c.cls).toBe("pill pill_none");
-  });
-
   it("lists each guest's sub-scores in the drill-down", () => {
     const [r] = drillRows([
       {
@@ -456,39 +440,15 @@ describe("copy and labelling fixes from the first review", () => {
     expect(r.detail).toBe("Guest · overall 6.0");
   });
 
-  it("labels an NPS answer as NPS, not as a 1-10 score", () => {
-    const [c] = commentRows([
-      { key: "k", text: "Zu laut", score: 5, scoreKind: "nps" }
-    ]);
-    expect(c.score).toBe("NPS 5");
-  });
-
   it("colours an 8 amber, as an NPS answer and as a score alike", () => {
     expect(npsToneFor(8)).toBe("mid");
     expect(npsToneFor(9)).toBe("good");
     expect(npsToneFor(6)).toBe("bad");
-    const [passive] = commentRows([
-      { key: "k", text: "Ok", score: 8, scoreKind: "nps" }
-    ]);
-    expect(passive.cls).toBe("pill pill_mid");
-    const [rating] = commentRows([
-      { key: "k", text: "Ok", score: 8, scoreKind: "score" }
-    ]);
-    expect(rating.cls).toBe("pill pill_mid");
+    expect(toneFor(8)).toBe("mid");
   });
 });
 
 describe("usability pass", () => {
-  it("marks low-scoring comments, whichever scale the number is on", () => {
-    const rows = commentRows([
-      { key: "a", text: "x", score: 5, scoreKind: "nps" },
-      { key: "b", text: "x", score: 7, scoreKind: "score" },
-      { key: "c", text: "x", score: 5, scoreKind: "score" },
-      { key: "d", text: "x", score: null }
-    ]);
-    expect(rows.map((r) => r.low)).toEqual([true, false, true, false]);
-  });
-
   it("makes the open follow-ups tile a way into the list", () => {
     const tile = kpiTiles({ openFollowUps: 2 }).find(
       (t) => t.key === "followups"

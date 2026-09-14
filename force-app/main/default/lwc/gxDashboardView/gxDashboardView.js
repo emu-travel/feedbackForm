@@ -231,12 +231,6 @@ export function kpiTiles(kpis) {
       note: "our advice, not the venues"
     },
     {
-      key: "reminder",
-      label: "Answered after reminder",
-      value: String(k.answeredAfterReminder || 0),
-      note: `of ${k.reminded || 0} reminded`
-    },
-    {
       key: "followups",
       label: "Open follow-ups",
       value: String(k.openFollowUps || 0),
@@ -424,34 +418,6 @@ export function destinationRows(rows) {
     url: bookingUrl(r.bookingId),
     bookingNumber: r.bookingNumber
   }));
-}
-
-export function commentRows(rows) {
-  return (rows || []).map((c) => ({
-    key: c.key,
-    responseId: c.responseId,
-    text: c.text,
-    about: c.about,
-    score: commentScoreLabel(c),
-    cls: `pill pill_${commentTone(c)}`,
-    low: commentTone(c) === "bad",
-    guest: c.guest || "Guest",
-    bookingNumber: c.bookingNumber,
-    url: bookingUrl(c.bookingId)
-  }));
-}
-
-function commentTone(c) {
-  return c.scoreKind === "nps" ? npsToneFor(c.score) : toneFor(c.score);
-}
-
-function commentScoreLabel(c) {
-  if (c.score === null || c.score === undefined) {
-    return null;
-  }
-  return c.scoreKind === "nps"
-    ? `NPS ${Math.round(c.score)}`
-    : formatScore(c.score);
 }
 
 export function drillRows(rows) {

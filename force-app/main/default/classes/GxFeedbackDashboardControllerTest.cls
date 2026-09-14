@@ -231,13 +231,6 @@ private class GxFeedbackDashboardControllerTest {
     Assert.areEqual(80, k.responseRate, '4 of 5');
   }
 
-  @IsTest
-  static void theReminderIsMeasurable() {
-    GxFeedbackDashboardController.Kpis k = load(null).kpis;
-    Assert.areEqual(1, k.reminded, 'One guest was reminded');
-    Assert.areEqual(1, k.answeredAfterReminder, 'And answered because of it');
-  }
-
   // ------------------------------------------------------------------
   // Venues
 
@@ -445,18 +438,6 @@ private class GxFeedbackDashboardControllerTest {
   }
 
   @IsTest
-  static void commentsComeFromResponsesAndRatingsAndSkipBlanks() {
-    Set<String> texts = new Set<String>();
-    for (GxFeedbackDashboardController.CommentRow c : load(null).comments) {
-      texts.add(c.text);
-    }
-    Assert.isTrue(texts.contains('Zu laut'), 'From the response');
-    Assert.isTrue(texts.contains('Laut'), 'From a hotel rating');
-    Assert.isTrue(texts.contains('Verspätet'), 'From an airline rating');
-    Assert.areEqual(3, texts.size(), 'And nothing blank');
-  }
-
-  @IsTest
   static void aVenueDrillsDownToEachGuest() {
     GxFeedbackDashboardController.VenueDetail detail = GxFeedbackDashboardController.getVenueDetail(
       null,
@@ -536,7 +517,6 @@ private class GxFeedbackDashboardControllerTest {
   @IsTest
   static void listsWithinTheirCapsSayNothingWasLeftOut() {
     GxFeedbackDashboardController.Dashboard d = load(null);
-    Assert.isFalse(d.commentsCapped, 'Every comment was sent');
     Assert.isFalse(d.destinationsCapped, 'Every wish was sent');
     Assert.areEqual(
       d.kpis.detractors,
@@ -547,13 +527,10 @@ private class GxFeedbackDashboardControllerTest {
 
   @IsTest
   static void listsBeyondTheirCapsAreCutAndSaySo() {
-    GxFeedbackDashboardController.maxComments = 1;
     GxFeedbackDashboardController.maxDestinations = 1;
 
     GxFeedbackDashboardController.Dashboard d = load(null);
 
-    Assert.areEqual(1, d.comments.size(), 'Comments stop at the cap');
-    Assert.isTrue(d.commentsCapped, 'and the page is told more exist');
     Assert.areEqual(1, d.nextDestinations.size(), 'Wishes stop at the cap');
     Assert.areEqual(
       'Schottland',
@@ -657,13 +634,6 @@ private class GxFeedbackDashboardControllerTest {
     Assert.areEqual(2, rows.size(), 'Both detractors are listed');
     Assert.areEqual('GXD-2', rows[0].bookingNumber, 'The open case first');
     Assert.areEqual('GXD-1', rows[1].bookingNumber, 'The resolved one after');
-  }
-
-  @IsTest
-  static void everyCommentKnowsWhichResponseItCameFrom() {
-    for (GxFeedbackDashboardController.CommentRow c : load(null).comments) {
-      Assert.isNotNull(c.responseId, c.text + ' can open its full response');
-    }
   }
 
   // ------------------------------------------------------------------

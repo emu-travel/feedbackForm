@@ -79,8 +79,6 @@ const DATA = {
     nps: 25,
     avgOverall: 8,
     avgConsultation: 8,
-    reminded: 1,
-    answeredAfterReminder: 1,
     openFollowUps: 1
   },
   trend: [
@@ -115,17 +113,6 @@ const DATA = {
       guest: "Test Gast",
       nps: 10,
       nextDestination: "Schottland"
-    }
-  ],
-  comments: [
-    {
-      key: "c1",
-      text: "Laut",
-      about: "Conrad Algarve",
-      score: 5,
-      bookingId: "b01",
-      bookingNumber: "GXD-2",
-      guest: "Test Gast"
     }
   ]
 };
@@ -376,27 +363,16 @@ describe("c-gx-feedback-dashboard usability", () => {
     );
   });
 
-  it("filters the comments down to the low scores on request", async () => {
+  it("has no comment list and no reminder tile", async () => {
     const el = mount();
-    getDashboard.emit({
-      ...DATA,
-      comments: [
-        { key: "low", text: "Laut", score: 4, scoreKind: "score" },
-        { key: "high", text: "Toll", score: 9, scoreKind: "score" }
-      ]
-    });
+    getDashboard.emit(DATA);
     await flush();
-    expect(el.shadowRoot.querySelectorAll("li.comment").length).toBe(2);
 
-    const toggle = [...el.shadowRoot.querySelectorAll("lightning-button")].find(
-      (b) => b.label === "Only low scores"
+    expect(el.shadowRoot.querySelector('[data-section="comments"]')).toBeNull();
+    const labels = [...el.shadowRoot.querySelectorAll(".kpi-label")].map(
+      (n) => n.textContent
     );
-    toggle.click();
-    await flush();
-
-    const left = [...el.shadowRoot.querySelectorAll("li.comment")];
-    expect(left.length).toBe(1);
-    expect(left[0].textContent).toContain("Laut");
+    expect(labels).not.toContain("Answered after reminder");
   });
 });
 
@@ -409,39 +385,39 @@ describe("c-gx-feedback-dashboard at volume", () => {
     jest.clearAllMocks();
   });
 
-  const manyComments = Array.from({ length: 23 }, (_, i) => ({
-    key: `c${i + 1}`,
+  const manyWishes = Array.from({ length: 23 }, (_, i) => ({
     responseId: `r${i + 1}`,
-    text: `Kommentar ${i + 1}`,
-    score: 5,
-    scoreKind: "score"
+    bookingNumber: `GXD-${i + 1}`,
+    guest: "Test Gast",
+    nps: 10,
+    nextDestination: `Ziel ${i + 1}`
   }));
 
   it("shows a long list ten at a time", async () => {
     const el = mount();
-    getDashboard.emit({ ...DATA, comments: manyComments });
+    getDashboard.emit({ ...DATA, nextDestinations: manyWishes });
     await flush();
 
-    expect(el.shadowRoot.querySelectorAll("li.comment")).toHaveLength(10);
+    expect(el.shadowRoot.querySelectorAll("li.dest-row")).toHaveLength(10);
     const pager = el.shadowRoot.querySelector(
-      'c-gx-pager[data-list="comments"]'
+      'c-gx-pager[data-list="destinations"]'
     );
     expect(pager.total).toBe(23);
 
     pager.dispatchEvent(new CustomEvent("pagechange", { detail: { page: 3 } }));
     await flush();
 
-    const shown = [...el.shadowRoot.querySelectorAll("li.comment")];
+    const shown = [...el.shadowRoot.querySelectorAll("li.dest-row")];
     expect(shown).toHaveLength(3);
-    expect(shown[0].textContent).toContain("Kommentar 21");
+    expect(shown[0].textContent).toContain("Ziel 21");
   });
 
   it("starts every list again on page one when a filter changes", async () => {
     const el = mount();
-    getDashboard.emit({ ...DATA, comments: manyComments });
+    getDashboard.emit({ ...DATA, nextDestinations: manyWishes });
     await flush();
     el.shadowRoot
-      .querySelector('c-gx-pager[data-list="comments"]')
+      .querySelector('c-gx-pager[data-list="destinations"]')
       .dispatchEvent(new CustomEvent("pagechange", { detail: { page: 3 } }));
     await flush();
 
@@ -451,11 +427,11 @@ describe("c-gx-feedback-dashboard at volume", () => {
     region.dispatchEvent(
       new CustomEvent("change", { detail: { value: "Algarve" } })
     );
-    getDashboard.emit({ ...DATA, comments: manyComments });
+    getDashboard.emit({ ...DATA, nextDestinations: manyWishes });
     await flush();
 
     expect(
-      el.shadowRoot.querySelector('c-gx-pager[data-list="comments"]').page
+      el.shadowRoot.querySelector('c-gx-pager[data-list="destinations"]').page
     ).toBe(1);
   });
 
@@ -464,13 +440,11 @@ describe("c-gx-feedback-dashboard at volume", () => {
     getDashboard.emit({
       ...DATA,
       followUpsTotal: 612,
-      commentsCapped: true,
       destinationsCapped: true
     });
     await flush();
 
     expect(text(el)).toContain("Showing 1 of 612 unhappy guests");
-    expect(text(el)).toContain("The most recent comments.");
     expect(text(el)).toContain("From the most recent responses.");
   });
 
@@ -481,23 +455,16 @@ describe("c-gx-feedback-dashboard at volume", () => {
     expect(text(el)).not.toContain("Narrow the dates to");
   });
 
-  it("opens the whole response behind a follow-up, a comment or a wish", async () => {
+  it("opens the whole response behind a follow-up or a wish", async () => {
     const open = jest
       .spyOn(GxResponseModal, "open")
       .mockResolvedValue(undefined);
     const el = mount();
-    getDashboard.emit({
-      ...DATA,
-      comments: [{ ...DATA.comments[0], responseId: "a09" }]
-    });
+    getDashboard.emit(DATA);
     await flush();
 
     const buttons = [...el.shadowRoot.querySelectorAll("button.full-btn")];
-    expect(buttons.map((b) => b.dataset.responseId)).toEqual([
-      "a01",
-      "a02",
-      "a09"
-    ]);
+    expect(buttons.map((b) => b.dataset.responseId)).toEqual(["a01", "a02"]);
 
     buttons[0].click();
     await flush();
