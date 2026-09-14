@@ -51,8 +51,8 @@
             {
               "attributes": {
                 "customHeadTags": "",
-                "description": "",
-                "pageTitle": "Home",
+                "description": "Ihr persönliches Feedback zu Ihrer golf.extra Golfreise.",
+                "pageTitle": "golf.extra | Ihr Reise-Feedback",
                 "recordId": "{!recordId}"
               },
               "definition": "community_builder:seoAssistant",

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<StaticResource xmlns="http://soap.sforce.com/2006/04/metadata">
+    <cacheControl>Public</cacheControl>
+    <contentType>image/png</contentType>
+    <description>Home screen icon (180x180) of the golf.extra feedback survey site, for phones that save the page to the home screen. Made from the golf.extra logo.</description>
+</StaticResource>

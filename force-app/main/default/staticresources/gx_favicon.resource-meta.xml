@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<StaticResource xmlns="http://soap.sforce.com/2006/04/metadata">
+    <cacheControl>Public</cacheControl>
+    <contentType>image/png</contentType>
+    <description>Browser tab icon (32x32) of the golf.extra feedback survey site, made from the golf.extra logo.</description>
+</StaticResource>

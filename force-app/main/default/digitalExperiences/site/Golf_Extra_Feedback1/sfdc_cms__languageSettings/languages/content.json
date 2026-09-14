@@ -4,13 +4,13 @@
   "contentBody": {
     "languages": [
       {
-        "locale": "en_US",
-        "label": "English (US)",
+        "locale": "de",
+        "label": "German",
         "isActive": true,
         "isAuthoringOnly": false
       }
     ],
-    "defaultLocale": "en_US"
+    "defaultLocale": "de"
   },
   "urlName": "languagecontent"
 }
