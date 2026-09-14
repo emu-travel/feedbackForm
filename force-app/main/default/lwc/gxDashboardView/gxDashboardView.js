@@ -206,9 +206,7 @@ export function kpiTiles(kpis) {
       key: "rate",
       label: "Response rate",
       value: formatPercent(k.responseRate),
-      note: `${Math.max((k.invited || 0) - (k.answeredInvitations || 0), 0)} still open`,
-      target: "waiting",
-      hint: "See who has not answered yet"
+      note: `${Math.max((k.invited || 0) - (k.answeredInvitations || 0), 0)} still open`
     },
     {
       key: "nps",
@@ -804,69 +802,6 @@ export function designerRows(rows, activeId) {
     active: d.id === activeId,
     rowCls: d.id === activeId ? "drow drow_active" : "drow"
   }));
-}
-
-// ------------------------------------------------------------------
-// Waiting for an answer
-
-export const WAITING_OPTIONS = [
-  { label: "All", value: "all" },
-  { label: "Link still open", value: "open" },
-  { label: "Link expired", value: "expired" }
-];
-
-/** What the waiting list is showing, in words. */
-export function waitingSummary(total, state) {
-  if (!total) {
-    return "";
-  }
-  if (state === "open") {
-    return `${plural(total, "guest", "guests")} whose link still works`;
-  }
-  if (state === "expired") {
-    return `${plural(total, "guest", "guests")} whose link ran out`;
-  }
-  return `${plural(total, "guest", "guests")} not answered yet`;
-}
-
-const WAITING_STATES = {
-  waiting: "wtag wtag_waiting",
-  reminded: "wtag wtag_reminded",
-  expired: "wtag wtag_expired"
-};
-
-/**
- * Invited guests who have not answered: who, which trip, when they were last
- * asked, and what happens next - a reminder, or nothing, because the link
- * has run out.
- */
-export function waitingRows(rows) {
-  return (rows || []).map((w) => {
-    const sent = shortDate(String(w.lastSent || "").slice(0, 10));
-    let stateLabel;
-    if (w.state === "expired") {
-      stateLabel = `Link expired ${shortDate(w.expiresOn)}`;
-    } else if (w.state === "reminded") {
-      stateLabel = w.expiresOn
-        ? `Reminded · link open until ${shortDate(w.expiresOn)}`
-        : "Reminded";
-    } else {
-      stateLabel = w.reminderDue
-        ? `Reminder due ${shortDate(w.reminderDue)}`
-        : "No reminder planned";
-    }
-    return {
-      key: w.bookingId,
-      guest: w.guest || "Guest",
-      bookingNumber: w.bookingNumber,
-      url: bookingUrl(w.bookingId),
-      designer: w.designer || null,
-      trip: [w.region, shortDate(w.tripEnd)].filter(Boolean).join(" · "),
-      sentLabel: `${w.reminded ? "Last asked" : "Invited"} ${sent}`,
-      stateLabel,
-      stateCls: WAITING_STATES[w.state] || WAITING_STATES.waiting
-    };
-  });
 }
 
 /** What the export did, for the toast. */

@@ -6,7 +6,6 @@ import GxResponseModal from "c/gxResponseModal";
 import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDashboard";
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
 import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findResponses";
-import findWaiting from "@salesforce/apex/GxFeedbackDashboardController.findWaiting";
 import exportResponses from "@salesforce/apex/GxFeedbackDashboardController.exportResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
 import getVenueScores from "@salesforce/apex/GxFeedbackDashboardController.getVenueScores";
@@ -34,13 +33,10 @@ import {
   responseListRows,
   responsesSummary,
   designerRows,
-  waitingRows,
   exportMessage,
   nameMatches,
   pagingNote,
-  plural,
-  WAITING_OPTIONS,
-  waitingSummary
+  plural
 } from "c/gxDashboardView";
 
 /** How long typing pauses before the search runs. */
@@ -52,8 +48,8 @@ const SEARCH_DELAY_MS = 350;
  * The team's view of post-trip feedback, from GxFeedbackDashboardController:
  * headline numbers and lists in one call, venue scores in another - each has
  * its own row limit, so a selection too big for one still shows the other -
- * and the response and waiting lists in calls of their own, so searching and
- * paging them never reloads the rest.
+ * and the response list in a call of its own, so searching and paging it
+ * never reloads the rest.
  * This component holds the filters, the search, the follow-up drafts, the
  * open drill-down and which page each list is on. Every response it shows
  * opens in full in gxResponseModal.
@@ -84,12 +80,6 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   responsesLoading = true;
   wiredResponsesResult;
   exporting = false;
-
-  // Invited guests who have not answered yet.
-  waitingPage = 1;
-  waitingState = "all";
-  waiting;
-  wiredWaitingResult;
 
   showHandled = false;
   lowOnly = false;
@@ -193,20 +183,6 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   get countryOptions() {
     return withAll(this.options.countries, "All countries");
-  }
-
-  @wire(findWaiting, {
-    filtersJson: "$filtersJson",
-    stateName: "$waitingState",
-    pageNumber: "$waitingPage"
-  })
-  wiredWaiting(result) {
-    this.wiredWaitingResult = result;
-    if (result.data) {
-      this.waiting = result.data;
-    } else if (result.error) {
-      this.waiting = undefined;
-    }
   }
 
   get travelTypeOptions() {
@@ -349,73 +325,6 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     // Revoked a moment later: some browsers still need it as the save begins.
     // eslint-disable-next-line @lwc/lwc/no-async-operation
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-  }
-
-  // ------------------------------------------------------------------
-  // Waiting for an answer
-
-  get waitingList() {
-    return this.memo("waitingList", [this.waiting], () =>
-      waitingRows(this.waiting && this.waiting.rows)
-    );
-  }
-
-  get hasWaiting() {
-    return this.waitingList.length > 0;
-  }
-
-  get waitingTotal() {
-    return (this.waiting && this.waiting.total) || 0;
-  }
-
-  get waitingPageNo() {
-    return (this.waiting && this.waiting.page) || 1;
-  }
-
-  get waitingPageSize() {
-    return (this.waiting && this.waiting.pageSize) || 10;
-  }
-
-  get waitingSummary() {
-    return waitingSummary(this.waitingTotal, this.waitingState);
-  }
-
-  get waitingChips() {
-    return WAITING_OPTIONS.map((o) => ({
-      ...o,
-      pressed: o.value === this.waitingState ? "true" : "false",
-      cls: o.value === this.waitingState ? "chip chip_on" : "chip"
-    }));
-  }
-
-  get waitingPagerTotal() {
-    return this.waiting && this.waiting.capped
-      ? this.waiting.reachable
-      : this.waitingTotal;
-  }
-
-  get waitingCapNote() {
-    return pagingNote(
-      this.waiting,
-      "guests",
-      "Pick a link state, or narrow the dates, to reach the rest."
-    );
-  }
-
-  get waitingEmptyText() {
-    return this.waitingState === "all"
-      ? "Everyone invited in this selection has answered."
-      : "No guest in this selection matches.";
-  }
-
-  handleWaitingState(event) {
-    this.waitingState = event.currentTarget.dataset.value;
-    this.waitingPage = 1;
-  }
-
-  handleWaitingPage(event) {
-    this.waitingPage = event.detail.page;
-    this.scrollToSection("waiting");
   }
 
   // ------------------------------------------------------------------
@@ -822,7 +731,6 @@ export default class GxFeedbackDashboard extends NavigationMixin(
       this.drill = undefined;
       this.pages = {};
       this.responsePage = 1;
-      this.waitingPage = 1;
       this.filtersJson = json;
     }
   }
@@ -833,8 +741,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
       await Promise.all([
         refreshApex(this.wiredDashboard),
         refreshApex(this.wiredVenuesResult),
-        refreshApex(this.wiredResponsesResult),
-        refreshApex(this.wiredWaitingResult)
+        refreshApex(this.wiredResponsesResult)
       ]);
     } finally {
       this.loading = false;

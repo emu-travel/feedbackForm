@@ -3,7 +3,6 @@ import GxFeedbackDashboard from "c/gxFeedbackDashboard";
 import getDashboard from "@salesforce/apex/GxFeedbackDashboardController.getDashboard";
 import getFilterOptions from "@salesforce/apex/GxFeedbackDashboardController.getFilterOptions";
 import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findResponses";
-import findWaiting from "@salesforce/apex/GxFeedbackDashboardController.findWaiting";
 import exportResponses from "@salesforce/apex/GxFeedbackDashboardController.exportResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
 import getVenueScores from "@salesforce/apex/GxFeedbackDashboardController.getVenueScores";
@@ -28,14 +27,6 @@ jest.mock(
 );
 jest.mock(
   "@salesforce/apex/GxFeedbackDashboardController.findResponses",
-  () => {
-    const { createApexTestWireAdapter } = require("@salesforce/sfdx-lwc-jest");
-    return { default: createApexTestWireAdapter(jest.fn()) };
-  },
-  { virtual: true }
-);
-jest.mock(
-  "@salesforce/apex/GxFeedbackDashboardController.findWaiting",
   () => {
     const { createApexTestWireAdapter } = require("@salesforce/sfdx-lwc-jest");
     return { default: createApexTestWireAdapter(jest.fn()) };
@@ -698,7 +689,7 @@ describe("c-gx-feedback-dashboard for the people who use it", () => {
   });
 });
 
-describe("c-gx-feedback-dashboard exports and chases", () => {
+describe("c-gx-feedback-dashboard exports", () => {
   const originalCreate = URL.createObjectURL;
   const originalRevoke = URL.revokeObjectURL;
 
@@ -766,50 +757,16 @@ describe("c-gx-feedback-dashboard exports and chases", () => {
     expect(exportButton(el).disabled).toBe(true);
   });
 
-  it("lists the guests still to answer, and what happens next", async () => {
-    const el = mount();
-    getDashboard.emit(DATA);
-    findWaiting.emit({
-      total: 1,
-      page: 1,
-      pageSize: 10,
-      rows: [
-        {
-          bookingId: "b9",
-          bookingNumber: "GX-TEST-A2",
-          guest: "Ali Haider",
-          lastSent: "2026-09-11T14:02:27.000Z",
-          reminded: false,
-          reminderDue: "2026-09-21",
-          expiresOn: "2026-09-25",
-          state: "waiting"
-        }
-      ]
-    });
-    await flush();
-
-    const row = el.shadowRoot.querySelector("li.wrow");
-    expect(row.textContent).toContain("GX-TEST-A2");
-    expect(row.textContent).toContain("Reminder due 21 Sep 2026");
-    expect(text(el)).toContain("1 guest not answered yet");
-  });
-
-  it("follows the dashboard filters, from page one", async () => {
+  it("has no waiting list, and no tile pointing to one", async () => {
     const el = mount();
     getDashboard.emit(DATA);
     await flush();
 
-    const region = [
-      ...el.shadowRoot.querySelectorAll("lightning-combobox")
-    ].find((c) => c.dataset.field === "region");
-    region.dispatchEvent(
-      new CustomEvent("change", { detail: { value: "Algarve" } })
+    expect(el.shadowRoot.querySelector('[data-section="waiting"]')).toBeNull();
+    const targets = [...el.shadowRoot.querySelectorAll("button.kpi")].map(
+      (b) => b.dataset.target
     );
-    await flush();
-
-    const config = findWaiting.getLastConfig();
-    expect(JSON.parse(config.filtersJson).region).toBe("Algarve");
-    expect(config.pageNumber).toBe(1);
+    expect(targets).not.toContain("waiting");
   });
 });
 
@@ -930,23 +887,6 @@ describe("c-gx-feedback-dashboard at scale", () => {
       "640 guests"
     );
     expect(text(el)).toContain("Showing the latest 1 of 640");
-  });
-
-  it("filters the waiting list by whether the link still works", async () => {
-    const el = mount();
-    getDashboard.emit(DATA);
-    await flush();
-
-    const expired = el.shadowRoot.querySelector(
-      '.waiting-chips button[data-value="expired"]'
-    );
-    expired.click();
-    await flush();
-
-    expect(findWaiting.getLastConfig()).toEqual(
-      expect.objectContaining({ stateName: "expired", pageNumber: 1 })
-    );
-    expect(expired.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("stops the pager where paging stops, and says so", async () => {
