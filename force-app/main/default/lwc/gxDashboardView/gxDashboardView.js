@@ -742,10 +742,20 @@ export function responseListRows(rows) {
 }
 
 /** What the list is showing, in words. */
-export function responsesSummary(page, term) {
+export function responsesSummary(page, term, group) {
   const p = page || {};
   const total = p.total || 0;
   if (p.searching) {
+    // Search ignores dates and filters but keeps the chip, so name the chip:
+    // otherwise a guest outside it reads as "not found".
+    const chip = GROUP_OPTIONS.find(
+      (g) => g.value === group && g.value !== "all"
+    );
+    if (chip) {
+      return total
+        ? `${plural(total, "response", "responses")} matching "${term}" in ${chip.label}, from all dates and filters`
+        : `No response in ${chip.label} matches "${term}". Select All to search every response.`;
+    }
     return total
       ? `${plural(total, "response", "responses")} matching "${term}", from all dates and filters`
       : `No response matches "${term}". Search looks at guest name, email, booking number and FB number.`;

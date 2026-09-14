@@ -224,7 +224,11 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get responsesSummary() {
-    return responsesSummary(this.responses, this.searchTerm);
+    return responsesSummary(
+      this.responses,
+      this.searchTerm,
+      this.responseGroup
+    );
   }
 
   get responsesCapNote() {
@@ -309,8 +313,11 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   download(fileName, csv) {
+    // Lightning Web Security refuses a "text/csv" blob ("Unsupported MIME
+    // type"). A plain byte stream is allowed, and the .csv name plus the byte
+    // order mark are what make Excel open it as UTF-8.
     const blob = new Blob(["\ufeff" + csv], {
-      type: "text/csv;charset=utf-8"
+      type: "application/octet-stream"
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

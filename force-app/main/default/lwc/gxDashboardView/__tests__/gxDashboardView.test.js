@@ -706,6 +706,22 @@ describe("the response list", () => {
     );
   });
 
+  it("names the chip a search is limited to", () => {
+    expect(
+      responsesSummary({ total: 1, searching: true }, "Mustermann", "open")
+    ).toBe(
+      '1 response matching "Mustermann" in Open follow-ups, from all dates and filters'
+    );
+    expect(
+      responsesSummary({ total: 0, searching: true }, "FB-00022", "open")
+    ).toBe(
+      'No response in Open follow-ups matches "FB-00022". Select All to search every response.'
+    );
+    expect(
+      responsesSummary({ total: 0, searching: true }, "xyz", "all")
+    ).toContain('No response matches "xyz"');
+  });
+
   it("writes a date briefly", () => {
     expect(shortDate("2026-09-08")).toBe("8 Sep 2026");
     expect(shortDate(null)).toBe("");
