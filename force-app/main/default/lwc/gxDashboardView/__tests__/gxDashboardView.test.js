@@ -42,20 +42,20 @@ describe("number formatting", () => {
     expect(formatNps(25)).toBe("+25");
     expect(formatNps(0)).toBe("0");
     expect(formatNps(-10)).toBe("−10");
-    expect(formatNps(null)).toBe("—");
-    expect(formatNps(undefined)).toBe("—");
+    expect(formatNps(null)).toBe("-");
+    expect(formatNps(undefined)).toBe("-");
   });
 
   it("shows scores to one decimal and missing ones as a dash", () => {
     expect(formatScore(8)).toBe("8.0");
     expect(formatScore(8.666)).toBe("8.7");
-    expect(formatScore(null)).toBe("—");
+    expect(formatScore(null)).toBe("-");
   });
 
   it("rounds percentages", () => {
     expect(formatPercent(80)).toBe("80%");
     expect(formatPercent(66.6)).toBe("67%");
-    expect(formatPercent(null)).toBe("—");
+    expect(formatPercent(null)).toBe("-");
   });
 
   it("labels months", () => {
@@ -148,7 +148,7 @@ describe("KPI tiles", () => {
       kpiTiles(undefined).map((t) => [t.key, t])
     );
     expect(byKey.responses.value).toBe("0");
-    expect(byKey.nps.value).toBe("—");
+    expect(byKey.nps.value).toBe("-");
     expect(byKey.followups.alert).toBe(false);
   });
 });
@@ -760,7 +760,7 @@ describe("travel designers", () => {
     expect(rows[0].consultation).toBe("9.1");
     expect(rows[0].nps).toBe("+50");
     expect(rows[1].active).toBe(false);
-    expect(rows[1].nps).toBe("—");
+    expect(rows[1].nps).toBe("-");
   });
 
   it("adds a designer to the default filters, set to everyone", () => {

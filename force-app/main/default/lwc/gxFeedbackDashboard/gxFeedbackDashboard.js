@@ -421,7 +421,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get rankingHint() {
-    return `Ranked once a venue has ${this.minRatings} ratings. Overall scores only — sub-ratings are shown separately below. Select a venue to see every rating.`;
+    return `Ranked once a venue has ${this.minRatings} ratings. Overall scores only - sub-ratings are shown separately below. Select a venue to see every rating.`;
   }
 
   // ------------------------------------------------------------------

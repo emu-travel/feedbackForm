@@ -119,13 +119,13 @@ export function withAll(options, allLabel) {
 // Numbers
 
 export function formatScore(value) {
-  return value === null || value === undefined ? "—" : Number(value).toFixed(1);
+  return value === null || value === undefined ? "-" : Number(value).toFixed(1);
 }
 
 /** NPS carries its sign: +25, 0, −10. A missing NPS is a dash, not zero. */
 export function formatNps(value) {
   if (value === null || value === undefined) {
-    return "—";
+    return "-";
   }
   const n = Math.round(Number(value));
   if (n > 0) {
@@ -136,7 +136,7 @@ export function formatNps(value) {
 
 export function formatPercent(value) {
   return value === null || value === undefined
-    ? "—"
+    ? "-"
     : `${Math.round(Number(value))}%`;
 }
 
@@ -402,7 +402,7 @@ export function followUpRows(rows, showHandled) {
     .map((r) => ({
       ...r,
       key: r.responseId,
-      npsLabel: `NPS ${r.nps === null || r.nps === undefined ? "—" : r.nps}`,
+      npsLabel: `NPS ${r.nps === null || r.nps === undefined ? "-" : r.nps}`,
       overallLabel: formatScore(r.overall),
       detail: `${r.guest || "Guest"} · overall ${formatScore(r.overall)}`,
       url: bookingUrl(r.bookingId),
@@ -635,7 +635,7 @@ export function responseView(detail) {
       {
         key: "nps",
         label: "Would recommend golf.extra",
-        score: nps === null ? "—" : String(nps),
+        score: nps === null ? "-" : String(nps),
         cls: `pill pill_${npsToneFor(nps)}`,
         comment: null,
         subs: [],
@@ -693,7 +693,7 @@ function standoutOf(sections) {
       const n = Number(item.score);
       const low =
         item.key === "nps" ? n <= 6 : Number.isFinite(n) && n < LOW_SCORE;
-      if (item.score !== "—" && low) {
+      if (item.score !== "-" && low) {
         out.push({
           key: `standout-${item.key}`,
           label: item.key === "nps" ? "Would recommend" : item.label,
@@ -759,7 +759,7 @@ export function responseListRows(rows) {
       reference: r.reference,
       trip: [r.region, shortDate(r.tripEnd)].filter(Boolean).join(" · "),
       designer: r.designer || null,
-      npsLabel: nps === null ? "NPS —" : `NPS ${nps}`,
+      npsLabel: nps === null ? "NPS -" : `NPS ${nps}`,
       npsCls: `pill pill_${npsToneFor(nps)}`,
       overall: formatScore(r.overall),
       overallCls: `pill pill_${toneFor(r.overall)}`,
