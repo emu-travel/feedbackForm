@@ -33,7 +33,7 @@
 					<tr>
 						<td style="padding: 26px 26px 28px 26px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.65; color: #1f2937;"><span style="font-weight: bold; color: #0f172a;">{{{Recipient.LetterSalutation__c}}},</span><br />
 						<br />
-						wir hoffen, dass Sie {{{Booking__c.Survey_Destination_Phrase__c}}} in bester Erinnerung behalten haben.<br />
+						wir hoffen, dass Sie Ihre Reise in bester Erinnerung behalten haben.<br />
 						<br />
 						Vor einigen Tagen hatten wir Ihnen unser persönliches Feedbackformular zugesandt. Sollten Sie bislang noch keine Gelegenheit gefunden haben, uns Ihre Eindrücke mitzuteilen, ist das selbstverständlich kein Problem. Falls Sie zu einem späteren Zeitpunkt ein paar Minuten Zeit finden, freuen wir uns sehr über Ihr Feedback.<br />
 						<br />
