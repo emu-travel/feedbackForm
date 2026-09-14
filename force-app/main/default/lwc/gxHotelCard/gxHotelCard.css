@@ -80,6 +80,14 @@
   border-color: var(--gx-gold, #e59e0f);
 }
 
+/* 16px is the size below which iOS zooms the page when a field is tapped, on
+   an iPad as much as on a phone. */
+@media (pointer: coarse) {
+  .comment-box {
+    font-size: 1rem;
+  }
+}
+
 @media (max-width: 30rem) {
   .card {
     padding: 0.875rem;

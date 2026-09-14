@@ -207,6 +207,21 @@
   font-size: 0.625rem;
 }
 
+/* Tablets and other touch screens wider than a phone keep ten buttons in a
+   row, but at fingertip height, and with comment text large enough that iPad
+   Safari does not zoom in when the box is tapped. The phone rules below come
+   later and win on phones. */
+@media (pointer: coarse) {
+  .choice,
+  .scale[data-compact="true"] .choice {
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+  }
+  .comment-box {
+    font-size: 1rem;
+  }
+}
+
 /* On a phone ten buttons in a row are too narrow to hit with a thumb, so they
    become two rows of five at full tap height, under the same 1-10 bar as on a
    larger screen. The bar's handle grows to fingertip size. */

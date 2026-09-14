@@ -359,6 +359,17 @@
   color: var(--gx-slate-400);
 }
 
+/* Touch screens of any size: 16px text so iPad Safari does not zoom into a
+   field, and buttons at fingertip height. */
+@media (pointer: coarse) {
+  .textbox {
+    font-size: 1rem;
+  }
+  .btn {
+    min-height: 2.75rem;
+  }
+}
+
 @media (max-width: 30rem) {
   /* On a phone the card is the page: a frame inside a frame only costs the
      rating buttons width they need. */
