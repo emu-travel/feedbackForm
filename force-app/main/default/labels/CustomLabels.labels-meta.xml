@@ -1,0 +1,813 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>Gx_Survey_Loading</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · While loading</shortDescription>
+        <value>Ihre Reisedaten werden geladen …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Invalid_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Broken link · Heading</shortDescription>
+        <value>Dieser Link ist ungültig oder abgelaufen</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Invalid_Text</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Broken link · Text</shortDescription>
+        <value
+    >Bitte öffnen Sie den Link erneut aus unserer E-Mail. Falls das Problem bestehen bleibt, melden Sie sich gerne bei Ihrer Reiseberaterin oder Ihrem Reiseberater.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Submitted_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Already answered · Heading</shortDescription>
+        <value>Vielen Dank!</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Submitted_Text</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Already answered · Text</shortDescription>
+        <value
+    >Für diese Reise haben wir Ihr Feedback bereits erhalten. Wir freuen uns sehr darüber.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Expired_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Link expired · Heading</shortDescription>
+        <value>Dieser Link ist abgelaufen</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Expired_Text</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Link expired · Text</shortDescription>
+        <value
+    >Der Zeitraum für Ihr Feedback zu dieser Reise ist leider vorbei. Wenn Sie uns dennoch etwas mitteilen möchten, wenden Sie sich gerne direkt an Ihre Reiseberaterin oder Ihren Reiseberater.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Empty_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Nothing to rate · Heading</shortDescription>
+        <value>Kein Feedback erforderlich</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Empty_Text</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Nothing to rate · Text</shortDescription>
+        <value
+    >Zu dieser Buchung liegen uns keine bewertbaren Leistungen vor. Bitte wenden Sie sich an Ihre Reiseberaterin oder Ihren Reiseberater.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Step</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Step counter. {0} = this step, {1} = all steps</shortDescription>
+        <value>Schritt {0} von {1}</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Progress</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Progress bar label</shortDescription>
+        <value>Fortschritt</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Button_Next</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Button: next screen</shortDescription>
+        <value>Weiter</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Button_Back</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Button: previous screen</shortDescription>
+        <value>Zurück</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Button_Submit</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · Button on the last screen</shortDescription>
+        <value>Feedback jetzt absenden</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Missing_Note</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · When Weiter is pressed with ratings missing</shortDescription>
+        <value>Bitte wählen Sie für jede markierte Frage eine Bewertung.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Missing_Rating</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Under a rating that still needs a choice</shortDescription>
+        <value>Bitte wählen Sie eine Bewertung.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Error_Not_Saved</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Saving failed (fallback message)</shortDescription>
+        <value>Ihr Feedback konnte nicht gespeichert werden.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Error_Not_Sent</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Survey · No connection when sending</shortDescription>
+        <value
+    >Ihr Feedback konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Months</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Month names for dates, comma-separated, January first</shortDescription>
+        <value
+    >Januar,Februar,März,April,Mai,Juni,Juli,August,September,Oktober,November,Dezember</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Scale_Poor</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Scale, low end (trip, hotels, golf)</shortDescription>
+        <value>Unzureichend</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Scale_Excellent</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Scale, high end (trip, hotels, golf)</shortDescription>
+        <value>Ausgezeichnet</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Scale_Very_Unhappy</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Scale, low end (consultation, travel)</shortDescription>
+        <value>Sehr unzufrieden</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Scale_Very_Happy</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Scale, high end (consultation, travel)</shortDescription>
+        <value>Sehr zufrieden</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Scale_Very_Unlikely</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Scale, low end (recommendation)</shortDescription>
+        <value>Sehr unwahrscheinlich</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Scale_Very_Likely</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · Scale, high end (recommendation)</shortDescription>
+        <value>Sehr wahrscheinlich</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 1 · Heading</shortDescription>
+        <value>Gesamteindruck Ihrer Golfreise</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Overall_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 1 · Question: trip overall</shortDescription>
+        <value>1. Wie bewerten Sie Ihre Golfreise insgesamt?</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Overall_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 1 · Trip overall, read aloud by screen readers</shortDescription>
+        <value>Gesamtbewertung Ihrer Golfreise</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Overall_Prompt</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 1 · Trip overall · Comment question (8 or below)</shortDescription>
+        <value
+    >Was können wir tun, um Ihr Reiseerlebnis künftig noch weiter zu verbessern? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Overall_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 1 · Trip overall · Grey hint in the comment box</shortDescription>
+        <value>z. B. Reiseablauf, Organisation, Unterlagen, …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Consult_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 1 · Question: consultation</shortDescription>
+        <value
+    >2. Wie zufrieden waren Sie mit unserer Beratung und Produktauswahl?</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Consult_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 1 · Consultation, read aloud by screen readers</shortDescription>
+        <value>Bewertung der Beratung und Produktauswahl</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Consult_Prompt</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 1 · Consultation · Comment question (8 or below)</shortDescription>
+        <value
+    >Was können wir tun, um unsere Beratung und Produktauswahl künftig noch weiter zu verbessern? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S1_Consult_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 1 · Consultation · Grey hint in the comment box</shortDescription>
+        <value>z. B. Erreichbarkeit, Angebotsauswahl, Empfehlungen, …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 2 · Heading</shortDescription>
+        <value>Transfer- und Mobilitätsleistungen</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Flight_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 2 · Question: flights</shortDescription>
+        <value>Wie zufrieden waren Sie mit den gebuchten Flugleistungen?</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Flight_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Flights, read aloud by screen readers</shortDescription>
+        <value>Bewertung der Flugleistungen</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Flight_Prompt</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Flights · Comment question (8 or below)</shortDescription>
+        <value
+    >Was können wir tun, um die für Sie gebuchten Flugleistungen künftig noch besser auf Ihre Wünsche abzustimmen? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Flight_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Flights · Grey hint in the comment box</shortDescription>
+        <value>z. B. Flugzeiten, Verbindungen, Sitzplätze, Gepäck, …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Transfer_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 2 · Question: transfers</shortDescription>
+        <value
+    >Wie zufrieden waren Sie mit dem Transfer-/ Chauffeurservice?</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Transfer_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Transfers, read aloud by screen readers</shortDescription>
+        <value>Bewertung des Transfer- und Chauffeurservice</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Transfer_Prompt</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Transfers · Comment question (8 or below)</shortDescription>
+        <value
+    >Was können wir tun, um Ihre Transfer-/ Chauffeurleistungen künftig noch weiter zu verbessern? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Transfer_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Transfers · Grey hint in the comment box</shortDescription>
+        <value>z. B. Pünktlichkeit, Fahrzeug, Fahrerin oder Fahrer, …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Rental_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 2 · Question: rental car</shortDescription>
+        <value>Wie zufrieden waren Sie mit Ihrem Mietwagen?</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Rental_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Rental car, read aloud by screen readers</shortDescription>
+        <value>Bewertung des Mietwagens</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Rental_Prompt</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Rental car · Comment question (8 or below)</shortDescription>
+        <value>Was können wir beim Mietwagen verbessern? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Rental_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Rental car · Grey hint in the comment box</shortDescription>
+        <value
+    >Bitte beschreiben Sie kurz Ihre Erfahrungen bezüglich Fahrzeugkategorie oder Abwicklung...</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Title_One</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 3 · Heading with one hotel</shortDescription>
+        <value>Hotel und Unterkunft</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Title_Many</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Heading with several hotels</shortDescription>
+        <value>Hotels und Unterkunft</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Nights_One</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 3 · Hotel card · One night</shortDescription>
+        <value>1 Nacht</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Nights_Many</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Hotel card · Nights. {0} = number</shortDescription>
+        <value>{0} Nächte</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Hotel_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Hotel rating for screen readers. {0} = hotel</shortDescription>
+        <value>Gesamtbewertung {0}</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Detail_Intro</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Above the detail ratings (hotel below 9)</shortDescription>
+        <value
+    >Vielen Dank für Ihre Offenheit. Damit wir gezielt nachbessern können, bitten wir Sie um eine kurze Einschätzung im Detail (optional).</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Sub_Room</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 3 · Detail rating: room</shortDescription>
+        <value>Zimmer und Ausstattung</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Sub_Service</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 3 · Detail rating: service</shortDescription>
+        <value>Hotelservice und Betreuung vor Ort</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Sub_Catering</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Detail rating: food and drink</shortDescription>
+        <value>Gastronomie</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Sub_Cleanliness</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Detail rating: cleanliness</shortDescription>
+        <value>Sauberkeit</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Hotel_Prompt</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Hotel comment question. {0} = hotel</shortDescription>
+        <value
+    >Welche Aspekte Ihres Aufenthalts im {0} könnten aus Ihrer Sicht verbessert werden? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Hotel_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Grey hint in the hotel comment box</shortDescription>
+        <value
+    >z. B. Zimmerausstattung, Service, Verpflegung, Sauberkeit, Spa, …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S3_Remarks</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Question under all hotels</shortDescription>
+        <value
+    >Weitere Anmerkungen oder Hinweise zu Ihren Hotels (optional):</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S4_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 4 · Heading</shortDescription>
+        <value>Golfplätze</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S4_Tee_Time</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 4 · Course card · Tee time. {0} = time</shortDescription>
+        <value>Startzeit {0}</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S4_Course_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 4 · Course rating for screen readers. {0} = course</shortDescription>
+        <value>Bewertung {0}</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S4_Course_Prompt</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 4 · Course comment question. {0} = course</shortDescription>
+        <value
+    >Welche Aspekte des {0} könnten aus Ihrer Sicht verbessert werden? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S4_Course_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 4 · Grey hint in the course comment box</shortDescription>
+        <value>z. B. Platzzustand, Service, Clubhaus, …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S4_Remarks</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 4 · Question under all courses</shortDescription>
+        <value
+    >Weitere Anmerkungen oder Hinweise zu Ihren Golfplätzen (optional):</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S5_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 5 · Heading</shortDescription>
+        <value>Fazit</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S5_Recommend_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 5 · Question: would you recommend us</shortDescription>
+        <value
+    >Wie wahrscheinlich ist es, dass Sie golf.extra Ihren Freunden, Bekannten oder anderen Golfbegeisterten weiterempfehlen würden?</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S5_Recommend_Aria</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 5 · Recommendation, read aloud by screen readers</shortDescription>
+        <value>Weiterempfehlung von golf.extra</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S5_Wishlist_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 5 · Question: next destination</shortDescription>
+        <value
+    >Welche Destination, welcher Golfplatz oder welches besondere Reiseerlebnis steht als Nächstes auf Ihrer Wunschliste? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S5_Wishlist_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 5 · Grey hint in the next destination box</shortDescription>
+        <value>z. B. Pebble Beach, St. Andrews, Mauritius, Augusta …</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S5_Final_Question</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Screen 5 · Question: final remarks</shortDescription>
+        <value
+    >Gibt es abschließend noch Anregungen, Verbesserungsvorschläge oder persönliche Hinweise, die Sie uns mitgeben möchten? (optional)</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S5_Final_Hint</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 5 · Grey hint in the final remarks box</shortDescription>
+        <value
+    >z. B. persönliche Worte an Ihre Reiseberaterin oder Ihren Reiseberater, Wünsche für zukünftige Reiseangebote oder Hinweise dazu, was wir künftig verbessern können</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Thank-you page · Heading</shortDescription>
+        <value>Vielen Dank!</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Lead</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Thank-you page · First sentence</shortDescription>
+        <value
+    >Wir freuen uns sehr, dass Sie sich die Zeit genommen haben, uns Ihr Feedback mitzuteilen.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Review_Text</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Thank-you page · Review request (recommendation 9 or 10)</shortDescription>
+        <value
+    >Wenn Sie mit Ihrer Reise und unserem Service rundum zufrieden waren, würden wir uns sehr freuen, wenn Sie Ihre Erfahrungen auch auf Trustpilot und Google teilen und uns mit fünf Sternen bewerten. Ihre positive Bewertung bedeutet uns sehr viel und unterstützt zugleich andere Golferinnen und Golfer bei ihrer Reiseentscheidung.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Review_Title</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Thank-you page · Heading above the review buttons</shortDescription>
+        <value>Erfahrung öffentlich teilen</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Trustpilot</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Thank-you page · Trustpilot button</shortDescription>
+        <value>Auf Trustpilot bewerten</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Google</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Thank-you page · Google button</shortDescription>
+        <value>Auf Google bewerten</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Other_Text</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Thank-you page · Instead of the review request (8 or below)</shortDescription>
+        <value
+    >Wir haben Ihre Rückmeldung dankend erhalten und nutzen diese, um unsere Beratung und unseren Service fortlaufend weiterzuentwickeln.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Closing</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Thank-you page · Closing line</shortDescription>
+        <value
+    >Wir hoffen, Sie schon bald auf einer unserer nächsten Reisen begleiten zu dürfen.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Thanks_Reference</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Thank-you page · Reference number. {0} = FB number</shortDescription>
+        <value>Ihre Referenz: {0}</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Unreadable</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Server message · Answer could not be read</shortDescription>
+        <value>Die Übermittlung konnte nicht gelesen werden.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Invalid_Link</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Server message · Link not valid</shortDescription>
+        <value>Dieser Link ist ungültig oder abgelaufen.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Expired</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Server message · Link expired while filling in</shortDescription>
+        <value>Der Link zu dieser Umfrage ist leider abgelaufen.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Already_Answered</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Server message · Answered already</shortDescription>
+        <value
+    >Für diese Reise haben wir Ihr Feedback bereits erhalten. Vielen Dank!</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Not_Saved</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Server message · Saving failed</shortDescription>
+        <value
+    >Ihr Feedback konnte nicht gespeichert werden. Bitte versuchen Sie es später erneut.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Need_Overall</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Server message · Trip overall missing</shortDescription>
+        <value>Bitte bewerten Sie Ihren Gesamteindruck.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Need_Recommend</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Server message · Recommendation missing</shortDescription>
+        <value>Bitte beantworten Sie die Weiterempfehlungsfrage.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Bad_Score</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Server message · Score outside 1-10</shortDescription>
+        <value>Ungültige Bewertung.</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_Server_Not_Processed</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription>Server message · Unexpected error</shortDescription>
+        <value>Ihr Feedback konnte nicht verarbeitet werden.</value>
+    </labels>
+</CustomLabels>

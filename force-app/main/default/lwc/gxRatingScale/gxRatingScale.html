@@ -45,7 +45,7 @@
     </div>
 
     <template lwc:if={showInvalid}>
-      <p class="invalid-note" role="alert">Bitte wählen Sie eine Bewertung.</p>
+      <p class="invalid-note" role="alert">{labels.missingRating}</p>
     </template>
 
     <template lwc:if={showComment}>

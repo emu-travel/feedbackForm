@@ -10,8 +10,8 @@
     <c-gx-rating-scale
       value={score}
       invalid={invalid}
-      min-label="Unzureichend"
-      max-label="Ausgezeichnet"
+      min-label={labels.scalePoor}
+      max-label={labels.scaleExcellent}
       aria-label={ratingAriaLabel}
       no-comment="true"
       onvaluechange={handleScore}
@@ -19,10 +19,7 @@
 
     <template lwc:if={showDetail}>
       <div class="detail">
-        <p class="detail-intro">
-          Vielen Dank für Ihre Offenheit. Damit wir gezielt nachbessern können,
-          bitten wir Sie um eine kurze Einschätzung im Detail (optional).
-        </p>
+        <p class="detail-intro">{labels.s3DetailIntro}</p>
 
         <template for:each={subRatings} for:item="sub">
           <div key={sub.key} class="sub">
@@ -30,8 +27,8 @@
             <c-gx-rating-scale
               value={sub.value}
               data-category={sub.key}
-              min-label="Unzureichend"
-              max-label="Ausgezeichnet"
+              min-label={labels.scalePoor}
+              max-label={labels.scaleExcellent}
               aria-label={sub.label}
               compact="true"
               no-comment="true"

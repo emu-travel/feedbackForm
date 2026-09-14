@@ -14,6 +14,9 @@ deploy-options.json
 # LWC Jest coverage reports
 coverage/
 
+# Custom Label values for Jest, generated from the labels file on every run
+jest-mocks/labels/
+
 # Logs
 logs
 *.log

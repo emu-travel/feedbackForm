@@ -1,5 +1,6 @@
 import { LightningElement, api } from "lwc";
 import { germanDate } from "c/gxSurveyFlow";
+import { LABELS, formatLabel } from "c/gxSurveyLabels";
 
 /**
  * gxCourseCard
@@ -12,6 +13,8 @@ import { germanDate } from "c/gxSurveyFlow";
  * name, the booked service and the tee time instead.
  */
 export default class GxCourseCard extends LightningElement {
+  labels = LABELS;
+
   /** A RateableItem from GxFeedbackService.getContext. */
   @api course;
 
@@ -43,7 +46,7 @@ export default class GxCourseCard extends LightningElement {
       parts.push(this.course.detail);
     }
     if (this.course.teeTime) {
-      parts.push(`Startzeit ${this.course.teeTime}`);
+      parts.push(formatLabel(LABELS.s4TeeTime, this.course.teeTime));
     } else if (this.course.startDate) {
       parts.push(germanDate(this.course.startDate));
     }
@@ -51,15 +54,15 @@ export default class GxCourseCard extends LightningElement {
   }
 
   get commentPrompt() {
-    return `Welche Aspekte des ${this.name} könnten aus Ihrer Sicht verbessert werden? (optional)`;
+    return formatLabel(LABELS.s4CoursePrompt, this.name);
   }
 
   get commentPlaceholder() {
-    return "z. B. Platzzustand, Service, Clubhaus, …";
+    return LABELS.s4CourseHint;
   }
 
   get ratingAriaLabel() {
-    return `Bewertung ${this.name}`;
+    return formatLabel(LABELS.s4CourseAria, this.name);
   }
 
   handleScore(event) {

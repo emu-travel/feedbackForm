@@ -359,7 +359,7 @@ public without sharing class GxFeedbackService {
     try {
       p = (Payload) JSON.deserialize(payloadJson, Payload.class);
     } catch (Exception e) {
-      res.message = 'Die Übermittlung konnte nicht gelesen werden.';
+      res.message = System.Label.Gx_Survey_Server_Unreadable;
       return res;
     }
     if (
@@ -367,13 +367,13 @@ public without sharing class GxFeedbackService {
       String.isBlank(p.bookingNumber) ||
       String.isBlank(p.secret)
     ) {
-      res.message = 'Dieser Link ist ungültig oder abgelaufen.';
+      res.message = System.Label.Gx_Survey_Server_Invalid_Link;
       return res;
     }
 
     Booking__c b = resolveBooking(p.bookingNumber, p.secret);
     if (b == null) {
-      res.message = 'Dieser Link ist ungültig oder abgelaufen.';
+      res.message = System.Label.Gx_Survey_Server_Invalid_Link;
       return res;
     }
 
@@ -381,12 +381,12 @@ public without sharing class GxFeedbackService {
     // per-hour rate limit the Reiseanmeldung form needs, because that form
     // legitimately accepts repeat submissions and this one does not.
     if (isExpired(b)) {
-      res.message = 'Der Link zu dieser Umfrage ist leider abgelaufen.';
+      res.message = System.Label.Gx_Survey_Server_Expired;
       return res;
     }
 
     if (hasExistingResponse(b.Id)) {
-      res.message = 'Für diese Reise haben wir Ihr Feedback bereits erhalten. Vielen Dank!';
+      res.message = System.Label.Gx_Survey_Server_Already_Answered;
       return res;
     }
 
@@ -440,7 +440,7 @@ public without sharing class GxFeedbackService {
     } catch (Exception e) {
       Database.rollback(sp);
       res.ok = false;
-      res.message = 'Ihr Feedback konnte nicht gespeichert werden. Bitte versuchen Sie es später erneut.';
+      res.message = System.Label.Gx_Survey_Server_Not_Saved;
       return res;
     }
   }
@@ -648,13 +648,13 @@ public without sharing class GxFeedbackService {
 
   private static String validate(Payload p) {
     if (!isValidScore(p.overallExperience)) {
-      return 'Bitte bewerten Sie Ihren Gesamteindruck.';
+      return System.Label.Gx_Survey_Server_Need_Overall;
     }
     if (!isValidScore(p.recommendation)) {
-      return 'Bitte beantworten Sie die Weiterempfehlungsfrage.';
+      return System.Label.Gx_Survey_Server_Need_Recommend;
     }
     if (p.consultation != null && !isValidScore(p.consultation)) {
-      return 'Ungültige Bewertung.';
+      return System.Label.Gx_Survey_Server_Bad_Score;
     }
     return null;
   }

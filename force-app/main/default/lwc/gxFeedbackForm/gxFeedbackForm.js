@@ -13,6 +13,7 @@ import {
   buildPayload,
   unansweredOn
 } from "c/gxSurveyFlow";
+import { LABELS, formatLabel } from "c/gxSurveyLabels";
 
 /**
  * gxFeedbackForm
@@ -31,6 +32,8 @@ const LOAD = {
 };
 
 export default class GxFeedbackForm extends LightningElement {
+  /** Every guest-facing text; Custom Labels, see gxSurveyLabels. */
+  labels = LABELS;
   logoUrl = LOGO;
 
   bookingNumber;
@@ -190,7 +193,7 @@ export default class GxFeedbackForm extends LightningElement {
   }
   get stepLabel() {
     const p = this.progress;
-    return `Schritt ${p.step} von ${p.total}`;
+    return formatLabel(LABELS.step, p.step, p.total);
   }
   get progressStyle() {
     return `width: ${this.progress.percent}%`;
@@ -203,7 +206,7 @@ export default class GxFeedbackForm extends LightningElement {
     return isLastQuestionScreen(this.screen, this.ctx);
   }
   get nextLabel() {
-    return this.isFinalStep ? "Feedback jetzt absenden" : "Weiter";
+    return this.isFinalStep ? LABELS.buttonSubmit : LABELS.buttonNext;
   }
   get canGoBack() {
     return previousScreen(this.screen, this.ctx) !== null;
@@ -211,7 +214,11 @@ export default class GxFeedbackForm extends LightningElement {
 
   get hotelsScreenTitle() {
     const many = this.ctx && this.ctx.hotels && this.ctx.hotels.length > 1;
-    return many ? "Hotels und Unterkunft" : "Hotel und Unterkunft";
+    return many ? LABELS.s3TitleMany : LABELS.s3TitleOne;
+  }
+
+  get referenceText() {
+    return formatLabel(LABELS.thanksReference, this.reference);
   }
 
   get flightBadge() {
@@ -424,13 +431,10 @@ export default class GxFeedbackForm extends LightningElement {
         this.screen = SCREEN.THANKS;
         this.scrollToTop();
       } else {
-        this.submitError =
-          (result && result.message) ||
-          "Ihr Feedback konnte nicht gespeichert werden.";
+        this.submitError = (result && result.message) || LABELS.errorNotSaved;
       }
     } catch {
-      this.submitError =
-        "Ihr Feedback konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.";
+      this.submitError = LABELS.errorNotSent;
     } finally {
       this.submitting = false;
     }

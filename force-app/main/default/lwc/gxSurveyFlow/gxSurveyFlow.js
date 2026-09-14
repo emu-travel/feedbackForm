@@ -9,6 +9,8 @@
  * driven by the has* flags GxFeedbackService.getContext returns.
  */
 
+import { LABELS } from "c/gxSurveyLabels";
+
 export const SCREEN = {
   OVERALL: 1,
   MOBILITY: 2,
@@ -215,20 +217,12 @@ export function unansweredOn(screen, context, answers) {
   return missing;
 }
 
-const GERMAN_MONTHS = [
-  "Januar",
-  "Februar",
-  "März",
-  "April",
-  "Mai",
-  "Juni",
-  "Juli",
-  "August",
-  "September",
-  "Oktober",
-  "November",
-  "Dezember"
-];
+/** Month names for dates the guest reads, from a Custom Label, January first. */
+function monthNames() {
+  return String(LABELS.months || "")
+    .split(",")
+    .map((m) => m.trim());
+}
 
 /**
  * "2026-09-04" as a German guest reads it: "4. September 2026". Anything that
@@ -240,7 +234,7 @@ export function germanDate(iso) {
     return iso || "";
   }
   const [, year, month, day] = match;
-  const name = GERMAN_MONTHS[Number(month) - 1];
+  const name = monthNames()[Number(month) - 1];
   return name ? `${Number(day)}. ${name} ${year}` : iso;
 }
 

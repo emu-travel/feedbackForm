@@ -1,5 +1,6 @@
 import { LightningElement, api } from "lwc";
 import { shouldExpandHotelDetail, SUB_CATEGORIES } from "c/gxSurveyFlow";
+import { LABELS, formatLabel } from "c/gxSurveyLabels";
 
 /**
  * gxHotelCard
@@ -14,13 +15,15 @@ import { shouldExpandHotelDetail, SUB_CATEGORIES } from "c/gxSurveyFlow";
 /** Labels only. The keys live in gxSurveyFlow, which has to agree with them
  * when it builds the payload. */
 const SUB_LABELS = {
-  Room: "Zimmer und Ausstattung",
-  Service: "Hotelservice und Betreuung vor Ort",
-  Catering: "Gastronomie",
-  Cleanliness: "Sauberkeit"
+  Room: LABELS.s3SubRoom,
+  Service: LABELS.s3SubService,
+  Catering: LABELS.s3SubCatering,
+  Cleanliness: LABELS.s3SubCleanliness
 };
 
 export default class GxHotelCard extends LightningElement {
+  labels = LABELS;
+
   /** A RateableItem from GxFeedbackService.getContext. */
   @api hotel;
 
@@ -54,7 +57,9 @@ export default class GxHotelCard extends LightningElement {
     }
     if (this.hotel.nights) {
       parts.push(
-        this.hotel.nights === 1 ? "1 Nacht" : `${this.hotel.nights} Nächte`
+        this.hotel.nights === 1
+          ? LABELS.s3NightsOne
+          : formatLabel(LABELS.s3NightsMany, this.hotel.nights)
       );
     }
     if (this.hotel.detail) {
@@ -77,15 +82,15 @@ export default class GxHotelCard extends LightningElement {
   }
 
   get commentPrompt() {
-    return `Welche Aspekte Ihres Aufenthalts im ${this.name} könnten aus Ihrer Sicht verbessert werden? (optional)`;
+    return formatLabel(LABELS.s3HotelPrompt, this.name);
   }
 
   get commentPlaceholder() {
-    return "z. B. Zimmerausstattung, Service, Verpflegung, Sauberkeit, Spa, …";
+    return LABELS.s3HotelHint;
   }
 
   get ratingAriaLabel() {
-    return `Gesamtbewertung ${this.name}`;
+    return formatLabel(LABELS.s3HotelAria, this.name);
   }
 
   handleScore(event) {

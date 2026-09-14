@@ -1,5 +1,6 @@
 import { LightningElement, api } from "lwc";
 import { shouldShowComment } from "c/gxSurveyFlow";
+import { LABELS } from "c/gxSurveyLabels";
 
 const MIN = 1;
 const MAX = 10;
@@ -18,8 +19,10 @@ const MAX = 10;
  * container stays the single source of truth for the guest's answers.
  */
 export default class GxRatingScale extends LightningElement {
-  @api minLabel = "Unzureichend";
-  @api maxLabel = "Ausgezeichnet";
+  @api minLabel = LABELS.scalePoor;
+  @api maxLabel = LABELS.scaleExcellent;
+
+  labels = LABELS;
   @api commentPrompt;
   @api commentPlaceholder;
   @api comment;

@@ -41,7 +41,7 @@ public with sharing class GxFeedbackFormController {
     } catch (Exception e) {
       GxFeedbackService.SubmitResult r = new GxFeedbackService.SubmitResult();
       r.ok = false;
-      r.message = 'Ihr Feedback konnte nicht verarbeitet werden.';
+      r.message = System.Label.Gx_Survey_Server_Not_Processed;
       return r;
     }
   }
