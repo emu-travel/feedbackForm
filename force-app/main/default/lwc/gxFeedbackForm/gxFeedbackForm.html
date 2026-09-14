@@ -4,7 +4,9 @@
       <header class="brand">
         <img src={logoUrl} alt="golf.extra" class="logo" />
         <template lwc:if={showQuestions}>
-          <span class="step">{stepLabel}</span>
+          <!-- translate="no" on text that changes in place: browser translation
+               swaps the text for its own copy, which then never updates. -->
+          <span class="step" translate="no">{stepLabel}</span>
         </template>
       </header>
 
@@ -44,7 +46,7 @@
         <div class="progress">
           <div class="progress-meta">
             <span>{labels.progress}</span>
-            <span>{progressPercentLabel}</span>
+            <span translate="no">{progressPercentLabel}</span>
           </div>
           <div class="progress-rail">
             <div class="progress-fill" style={progressStyle}></div>
@@ -314,6 +316,7 @@
             <button
               type="button"
               class="btn btn_ghost"
+              translate="no"
               disabled={submitting}
               onclick={handleBack}
             >
@@ -323,6 +326,7 @@
           <button
             type="button"
             class="btn btn_primary"
+            translate="no"
             disabled={submitting}
             onclick={handleNext}
           >

@@ -249,6 +249,25 @@ describe("c-gx-feedback-form", () => {
       );
     });
 
+    it("keeps browser translation off the text that changes from step to step", async () => {
+      // A translated copy of this text would stay frozen at "Step 1" while
+      // the bar moves on.
+      const element = mount();
+      withUrl();
+      await flush();
+
+      const root = element.shadowRoot;
+      expect(root.querySelector(".step").getAttribute("translate")).toBe("no");
+      expect(
+        root
+          .querySelector(".progress-meta span:last-child")
+          .getAttribute("translate")
+      ).toBe("no");
+      expect(
+        root.querySelector("button.btn_primary").getAttribute("translate")
+      ).toBe("no");
+    });
+
     it("reverses the same path going back", async () => {
       const element = mount();
       withUrl();
