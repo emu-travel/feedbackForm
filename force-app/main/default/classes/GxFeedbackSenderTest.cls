@@ -416,6 +416,37 @@ private class GxFeedbackSenderTest {
     );
   }
 
+  /**
+   * The reminder query is the first guard, not the only one. A reminder that
+   * reaches the sender for a guest who has answered - by a query change, a
+   * race with the guest submitting, or a hand-run script - is still refused.
+   */
+  @IsTest
+  static void aReminderThatGetsPastTheQueryIsStillRefusedForAnAnsweredGuest() {
+    pinSettings(36, 10);
+    Booking__c b = invitedDaysAgo(READY, 11);
+    insert new Feedback_Response__c(
+      Booking__c = b.Id,
+      Overall_Experience__c = 8,
+      Recommendation_NPS__c = 8
+    );
+
+    GxFeedbackSender.Request r = new GxFeedbackSender.Request();
+    r.bookingId = b.Id;
+    r.allowResend = true;
+    r.markReminder = true;
+    List<GxFeedbackSender.Result> out = GxFeedbackSender.send(
+      new List<GxFeedbackSender.Request>{ r }
+    );
+
+    Assert.isFalse(out[0].sent, 'No reminder goes to a guest who answered');
+    Assert.isTrue(out[0].message.contains('already received'), out[0].message);
+    Assert.isFalse(
+      booking(READY).Survey_Reminder_Sent__c,
+      'And the guest is not marked as reminded'
+    );
+  }
+
   @IsTest
   static void aZeroDelayTurnsRemindersOff() {
     pinSettings(36, 0);
