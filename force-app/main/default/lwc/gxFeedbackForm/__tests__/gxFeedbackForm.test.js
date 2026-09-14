@@ -414,15 +414,22 @@ describe("c-gx-feedback-form", () => {
       ).toHaveLength(1);
     });
 
-    it("badges the flight question with the airline", async () => {
+    it("heads the flight card with the airline, under a small Flug label", async () => {
       const element = mount();
       withUrl();
       await flush();
       await next(element);
 
-      expect(element.shadowRoot.querySelector(".badge").textContent).toBe(
+      const card = element.shadowRoot.querySelector("article.card");
+      expect(card.querySelector(".service-kind").textContent).toBe("Flug");
+      expect(card.querySelector(".service-name").textContent).toBe(
         "AERTicket.de"
       );
+      expect(card.querySelector(".service-question").textContent).toBe(
+        "Wie zufrieden waren Sie mit den gebuchten Flugleistungen?"
+      );
+      expect(card.querySelector("c-gx-service-icon").name).toBe("flight");
+      expect(card.querySelector("c-gx-rating-scale")).not.toBeNull();
     });
   });
 

@@ -307,6 +307,33 @@
         <value>Transfer- und Mobilitätsleistungen</value>
     </labels>
     <labels>
+        <fullName>Gx_Survey_S2_Flight_Kind</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Small label above the airline name</shortDescription>
+        <value>Flug</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Transfer_Kind</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Small label above the transfer company</shortDescription>
+        <value>Transfer</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S2_Rental_Kind</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 2 · Small label above the rental car company</shortDescription>
+        <value>Mietwagen</value>
+    </labels>
+    <labels>
         <fullName>Gx_Survey_S2_Flight_Question</fullName>
         <categories>Golf Extra Feedback Survey</categories>
         <language>de</language>
@@ -433,6 +460,15 @@
         <value>Hotels und Unterkunft</value>
     </labels>
     <labels>
+        <fullName>Gx_Survey_S3_Hotel_Kind</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 3 · Hotel card · Small label above the hotel name</shortDescription>
+        <value>Hotel</value>
+    </labels>
+    <labels>
         <fullName>Gx_Survey_S3_Nights_One</fullName>
         <categories>Golf Extra Feedback Survey</categories>
         <language>de</language>
@@ -539,6 +575,15 @@
         <protected>false</protected>
         <shortDescription>Screen 4 · Heading</shortDescription>
         <value>Golfplätze</value>
+    </labels>
+    <labels>
+        <fullName>Gx_Survey_S4_Course_Kind</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Screen 4 · Course card · Small label above the course name</shortDescription>
+        <value>Golfplatz</value>
     </labels>
     <labels>
         <fullName>Gx_Survey_S4_Tee_Time</fullName>

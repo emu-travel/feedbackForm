@@ -37,6 +37,12 @@ describe("c-gx-hotel-card", () => {
     );
   });
 
+  it("labels itself Hotel with the hotel icon, like every card in the survey", () => {
+    const root = mount().shadowRoot;
+    expect(root.querySelector(".kind").textContent).toBe("Hotel");
+    expect(root.querySelector("c-gx-service-icon").name).toBe("hotel");
+  });
+
   it("says 1 Nacht, not 1 Nächte", () => {
     const element = mount({
       hotel: { ...HOTEL, nights: 1, detail: null }

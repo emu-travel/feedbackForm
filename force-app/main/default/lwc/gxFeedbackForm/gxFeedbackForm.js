@@ -221,13 +221,14 @@ export default class GxFeedbackForm extends LightningElement {
     return formatLabel(LABELS.thanksReference, this.reference);
   }
 
-  get flightBadge() {
+  /** The company names heading each card on screen 2, e.g. "Lufthansa". */
+  get flightNames() {
     return this.joinSuppliers(this.ctx && this.ctx.flightSuppliers);
   }
-  get transferBadge() {
+  get transferNames() {
     return this.joinSuppliers(this.ctx && this.ctx.transferSuppliers);
   }
-  get rentalBadge() {
+  get rentalNames() {
     return this.joinSuppliers(this.ctx && this.ctx.rentalSuppliers);
   }
 

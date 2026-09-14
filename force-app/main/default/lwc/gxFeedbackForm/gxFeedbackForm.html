@@ -101,86 +101,96 @@
           <section class="screen">
             <h2 class="title">{labels.s2Title}</h2>
 
-            <template lwc:if={ctx.hasFlight}>
-              <div class="question">
-                <div class="question-head">
-                  <label class="question-label"
-                    >{labels.s2FlightQuestion}</label
-                  >
-                  <template lwc:if={flightBadge}>
-                    <span class="badge">{flightBadge}</span>
-                  </template>
-                </div>
-                <c-gx-rating-scale
-                  data-field="flight"
-                  data-missing={invalidMap.flight}
-                  invalid={invalidMap.flight}
-                  value={answers.flight.score}
-                  comment={answers.flight.comment}
-                  min-label={labels.scaleVeryUnhappy}
-                  max-label={labels.scaleVeryHappy}
-                  aria-label={labels.s2FlightAria}
-                  comment-prompt={labels.s2FlightPrompt}
-                  comment-placeholder={labels.s2FlightHint}
-                  onvaluechange={handleServiceScore}
-                  oncommentchange={handleServiceComment}
-                ></c-gx-rating-scale>
-              </div>
-            </template>
+            <div class="cards">
+              <template lwc:if={ctx.hasFlight}>
+                <article class="card">
+                  <div class="service-head">
+                    <c-gx-service-icon name="flight"></c-gx-service-icon>
+                    <div class="service-text">
+                      <p class="service-kind">{labels.s2FlightKind}</p>
+                      <template lwc:if={flightNames}>
+                        <h3 class="service-name">{flightNames}</h3>
+                      </template>
+                      <p class="service-question">{labels.s2FlightQuestion}</p>
+                    </div>
+                  </div>
+                  <c-gx-rating-scale
+                    data-field="flight"
+                    data-missing={invalidMap.flight}
+                    invalid={invalidMap.flight}
+                    value={answers.flight.score}
+                    comment={answers.flight.comment}
+                    min-label={labels.scaleVeryUnhappy}
+                    max-label={labels.scaleVeryHappy}
+                    aria-label={labels.s2FlightAria}
+                    comment-prompt={labels.s2FlightPrompt}
+                    comment-placeholder={labels.s2FlightHint}
+                    onvaluechange={handleServiceScore}
+                    oncommentchange={handleServiceComment}
+                  ></c-gx-rating-scale>
+                </article>
+              </template>
 
-            <template lwc:if={ctx.hasTransfers}>
-              <div class="question">
-                <div class="question-head">
-                  <label class="question-label"
-                    >{labels.s2TransferQuestion}</label
-                  >
-                  <template lwc:if={transferBadge}>
-                    <span class="badge">{transferBadge}</span>
-                  </template>
-                </div>
-                <c-gx-rating-scale
-                  data-field="transfer"
-                  data-missing={invalidMap.transfer}
-                  invalid={invalidMap.transfer}
-                  value={answers.transfer.score}
-                  comment={answers.transfer.comment}
-                  min-label={labels.scaleVeryUnhappy}
-                  max-label={labels.scaleVeryHappy}
-                  aria-label={labels.s2TransferAria}
-                  comment-prompt={labels.s2TransferPrompt}
-                  comment-placeholder={labels.s2TransferHint}
-                  onvaluechange={handleServiceScore}
-                  oncommentchange={handleServiceComment}
-                ></c-gx-rating-scale>
-              </div>
-            </template>
+              <template lwc:if={ctx.hasTransfers}>
+                <article class="card">
+                  <div class="service-head">
+                    <c-gx-service-icon name="transfer"></c-gx-service-icon>
+                    <div class="service-text">
+                      <p class="service-kind">{labels.s2TransferKind}</p>
+                      <template lwc:if={transferNames}>
+                        <h3 class="service-name">{transferNames}</h3>
+                      </template>
+                      <p class="service-question">
+                        {labels.s2TransferQuestion}
+                      </p>
+                    </div>
+                  </div>
+                  <c-gx-rating-scale
+                    data-field="transfer"
+                    data-missing={invalidMap.transfer}
+                    invalid={invalidMap.transfer}
+                    value={answers.transfer.score}
+                    comment={answers.transfer.comment}
+                    min-label={labels.scaleVeryUnhappy}
+                    max-label={labels.scaleVeryHappy}
+                    aria-label={labels.s2TransferAria}
+                    comment-prompt={labels.s2TransferPrompt}
+                    comment-placeholder={labels.s2TransferHint}
+                    onvaluechange={handleServiceScore}
+                    oncommentchange={handleServiceComment}
+                  ></c-gx-rating-scale>
+                </article>
+              </template>
 
-            <template lwc:if={ctx.hasRentalCar}>
-              <div class="question">
-                <div class="question-head">
-                  <label class="question-label"
-                    >{labels.s2RentalQuestion}</label
-                  >
-                  <template lwc:if={rentalBadge}>
-                    <span class="badge">{rentalBadge}</span>
-                  </template>
-                </div>
-                <c-gx-rating-scale
-                  data-field="rentalCar"
-                  data-missing={invalidMap.rentalCar}
-                  invalid={invalidMap.rentalCar}
-                  value={answers.rentalCar.score}
-                  comment={answers.rentalCar.comment}
-                  min-label={labels.scaleVeryUnhappy}
-                  max-label={labels.scaleVeryHappy}
-                  aria-label={labels.s2RentalAria}
-                  comment-prompt={labels.s2RentalPrompt}
-                  comment-placeholder={labels.s2RentalHint}
-                  onvaluechange={handleServiceScore}
-                  oncommentchange={handleServiceComment}
-                ></c-gx-rating-scale>
-              </div>
-            </template>
+              <template lwc:if={ctx.hasRentalCar}>
+                <article class="card">
+                  <div class="service-head">
+                    <c-gx-service-icon name="car"></c-gx-service-icon>
+                    <div class="service-text">
+                      <p class="service-kind">{labels.s2RentalKind}</p>
+                      <template lwc:if={rentalNames}>
+                        <h3 class="service-name">{rentalNames}</h3>
+                      </template>
+                      <p class="service-question">{labels.s2RentalQuestion}</p>
+                    </div>
+                  </div>
+                  <c-gx-rating-scale
+                    data-field="rentalCar"
+                    data-missing={invalidMap.rentalCar}
+                    invalid={invalidMap.rentalCar}
+                    value={answers.rentalCar.score}
+                    comment={answers.rentalCar.comment}
+                    min-label={labels.scaleVeryUnhappy}
+                    max-label={labels.scaleVeryHappy}
+                    aria-label={labels.s2RentalAria}
+                    comment-prompt={labels.s2RentalPrompt}
+                    comment-placeholder={labels.s2RentalHint}
+                    onvaluechange={handleServiceScore}
+                    oncommentchange={handleServiceComment}
+                  ></c-gx-rating-scale>
+                </article>
+              </template>
+            </div>
           </section>
         </template>
 

@@ -1,10 +1,14 @@
 <template>
   <article class="card">
     <header class="head">
-      <h3 class="name">{name}</h3>
-      <template lwc:if={subtitle}>
-        <p class="subtitle">{subtitle}</p>
-      </template>
+      <c-gx-service-icon name="golf"></c-gx-service-icon>
+      <div class="head-text">
+        <p class="kind">{labels.s4CourseKind}</p>
+        <h3 class="name">{name}</h3>
+        <template lwc:if={subtitle}>
+          <p class="subtitle">{subtitle}</p>
+        </template>
+      </div>
     </header>
 
     <c-gx-rating-scale

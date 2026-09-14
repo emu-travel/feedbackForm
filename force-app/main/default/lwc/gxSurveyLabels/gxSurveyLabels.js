@@ -43,6 +43,9 @@ import s1ConsultAria from "@salesforce/label/c.Gx_Survey_S1_Consult_Aria";
 import s1ConsultPrompt from "@salesforce/label/c.Gx_Survey_S1_Consult_Prompt";
 import s1ConsultHint from "@salesforce/label/c.Gx_Survey_S1_Consult_Hint";
 import s2Title from "@salesforce/label/c.Gx_Survey_S2_Title";
+import s2FlightKind from "@salesforce/label/c.Gx_Survey_S2_Flight_Kind";
+import s2TransferKind from "@salesforce/label/c.Gx_Survey_S2_Transfer_Kind";
+import s2RentalKind from "@salesforce/label/c.Gx_Survey_S2_Rental_Kind";
 import s2FlightQuestion from "@salesforce/label/c.Gx_Survey_S2_Flight_Question";
 import s2FlightAria from "@salesforce/label/c.Gx_Survey_S2_Flight_Aria";
 import s2FlightPrompt from "@salesforce/label/c.Gx_Survey_S2_Flight_Prompt";
@@ -57,6 +60,7 @@ import s2RentalPrompt from "@salesforce/label/c.Gx_Survey_S2_Rental_Prompt";
 import s2RentalHint from "@salesforce/label/c.Gx_Survey_S2_Rental_Hint";
 import s3TitleOne from "@salesforce/label/c.Gx_Survey_S3_Title_One";
 import s3TitleMany from "@salesforce/label/c.Gx_Survey_S3_Title_Many";
+import s3HotelKind from "@salesforce/label/c.Gx_Survey_S3_Hotel_Kind";
 import s3NightsOne from "@salesforce/label/c.Gx_Survey_S3_Nights_One";
 import s3NightsMany from "@salesforce/label/c.Gx_Survey_S3_Nights_Many";
 import s3HotelAria from "@salesforce/label/c.Gx_Survey_S3_Hotel_Aria";
@@ -69,6 +73,7 @@ import s3HotelPrompt from "@salesforce/label/c.Gx_Survey_S3_Hotel_Prompt";
 import s3HotelHint from "@salesforce/label/c.Gx_Survey_S3_Hotel_Hint";
 import s3Remarks from "@salesforce/label/c.Gx_Survey_S3_Remarks";
 import s4Title from "@salesforce/label/c.Gx_Survey_S4_Title";
+import s4CourseKind from "@salesforce/label/c.Gx_Survey_S4_Course_Kind";
 import s4TeeTime from "@salesforce/label/c.Gx_Survey_S4_Tee_Time";
 import s4CourseAria from "@salesforce/label/c.Gx_Survey_S4_Course_Aria";
 import s4CoursePrompt from "@salesforce/label/c.Gx_Survey_S4_Course_Prompt";
@@ -127,6 +132,9 @@ export const LABELS = {
   s1ConsultPrompt,
   s1ConsultHint,
   s2Title,
+  s2FlightKind,
+  s2TransferKind,
+  s2RentalKind,
   s2FlightQuestion,
   s2FlightAria,
   s2FlightPrompt,
@@ -141,6 +149,7 @@ export const LABELS = {
   s2RentalHint,
   s3TitleOne,
   s3TitleMany,
+  s3HotelKind,
   s3NightsOne,
   s3NightsMany,
   s3HotelAria,
@@ -153,6 +162,7 @@ export const LABELS = {
   s3HotelHint,
   s3Remarks,
   s4Title,
+  s4CourseKind,
   s4TeeTime,
   s4CourseAria,
   s4CoursePrompt,
