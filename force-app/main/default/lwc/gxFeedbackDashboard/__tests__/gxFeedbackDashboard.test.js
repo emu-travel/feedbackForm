@@ -6,6 +6,7 @@ import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findRe
 import findWaiting from "@salesforce/apex/GxFeedbackDashboardController.findWaiting";
 import exportResponses from "@salesforce/apex/GxFeedbackDashboardController.exportResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
+import getVenueScores from "@salesforce/apex/GxFeedbackDashboardController.getVenueScores";
 import updateFollowUp from "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp";
 import GxResponseModal from "c/gxResponseModal";
 
@@ -42,6 +43,14 @@ jest.mock(
   { virtual: true }
 );
 jest.mock(
+  "@salesforce/apex/GxFeedbackDashboardController.getVenueScores",
+  () => {
+    const { createApexTestWireAdapter } = require("@salesforce/sfdx-lwc-jest");
+    return { default: createApexTestWireAdapter(jest.fn()) };
+  },
+  { virtual: true }
+);
+jest.mock(
   "@salesforce/apex/GxFeedbackDashboardController.exportResponses",
   () => ({ default: jest.fn() }),
   { virtual: true }
@@ -68,7 +77,6 @@ jest.mock(
 );
 
 const DATA = {
-  minRatings: 3,
   kpis: {
     responses: 4,
     invited: 5,
@@ -94,36 +102,6 @@ const DATA = {
       detractors: 0,
       total: 1,
       nps: 100
-    }
-  ],
-  hotels: [
-    {
-      category: "Hotel",
-      name: "Conrad Algarve",
-      average: 7,
-      ratings: 3,
-      ranked: true
-    }
-  ],
-  golf: [],
-  suppliers: [
-    {
-      category: "Airline",
-      name: "Lufthansa",
-      average: 7,
-      ratings: 2,
-      ranked: false
-    }
-  ],
-  hotelDetail: [
-    {
-      hotel: "Conrad Algarve",
-      cells: [
-        { subCategory: "Room", average: 6, ratings: 2 },
-        { subCategory: "Service", average: 7.5, ratings: 2 },
-        { subCategory: "Catering", average: 8, ratings: 2 },
-        { subCategory: "Cleanliness", average: 7.5, ratings: 2 }
-      ]
     }
   ],
   followUps: [
@@ -157,6 +135,41 @@ const DATA = {
       bookingId: "b01",
       bookingNumber: "GXD-2",
       guest: "Test Gast"
+    }
+  ]
+};
+
+/** What getVenueScores sends: its own call, apart from getDashboard. */
+const VENUE_DATA = {
+  minRatings: 3,
+  hotels: [
+    {
+      category: "Hotel",
+      name: "Conrad Algarve",
+      average: 7,
+      ratings: 3,
+      ranked: true
+    }
+  ],
+  golf: [],
+  suppliers: [
+    {
+      category: "Airline",
+      name: "Lufthansa",
+      average: 7,
+      ratings: 2,
+      ranked: false
+    }
+  ],
+  hotelDetail: [
+    {
+      hotel: "Conrad Algarve",
+      cells: [
+        { subCategory: "Room", average: 6, ratings: 2 },
+        { subCategory: "Service", average: 7.5, ratings: 2 },
+        { subCategory: "Catering", average: 8, ratings: 2 },
+        { subCategory: "Cleanliness", average: 7.5, ratings: 2 }
+      ]
     }
   ]
 };
@@ -238,6 +251,8 @@ describe("c-gx-feedback-dashboard", () => {
     const el = mount();
     getDashboard.emit(DATA);
     await flush();
+    getVenueScores.emit(VENUE_DATA);
+    await flush();
     const t = text(el);
     expect(t).toContain("Zu laut");
     expect(t).toContain("Schottland");
@@ -274,19 +289,25 @@ describe("c-gx-feedback-dashboard", () => {
   });
 
   it("opens every rating for a venue when it is selected", async () => {
-    getVenueDetail.mockResolvedValue([
-      {
-        responseId: "r1",
-        bookingId: "b01",
-        bookingNumber: "GXD-2",
-        guest: "Test Gast",
-        score: 5,
-        comment: "Laut",
-        subScores: []
-      }
-    ]);
+    getVenueDetail.mockResolvedValue({
+      total: 1,
+      rows: [
+        {
+          responseId: "r1",
+          bookingId: "b01",
+          bookingNumber: "GXD-2",
+          guest: "Test Gast",
+          score: 5,
+          comment: "Laut",
+          subScores: []
+        }
+      ]
+    });
     const el = mount();
     getDashboard.emit(DATA);
+    await flush();
+
+    getVenueScores.emit(VENUE_DATA);
     await flush();
 
     const board = el.shadowRoot.querySelector("c-gx-venue-board");
@@ -348,9 +369,12 @@ describe("c-gx-feedback-dashboard usability", () => {
   });
 
   it("opens a hotel from the detail grid as well as the leaderboard", async () => {
-    getVenueDetail.mockResolvedValue([]);
+    getVenueDetail.mockResolvedValue({ rows: [], total: 0 });
     const el = mount();
     getDashboard.emit(DATA);
+    await flush();
+
+    getVenueScores.emit(VENUE_DATA);
     await flush();
 
     el.shadowRoot.querySelector("button.link-btn").click();
@@ -789,6 +813,165 @@ describe("c-gx-feedback-dashboard exports and chases", () => {
   });
 });
 
+describe("c-gx-feedback-dashboard at scale", () => {
+  afterEach(() => {
+    while (document.body.firstChild) {
+      document.body.removeChild(document.body.firstChild);
+    }
+    jest.clearAllMocks();
+  });
+
+  const manyHotels = Array.from({ length: 23 }, (_, i) => ({
+    category: "Hotel",
+    name: `Hotel ${i + 1}`,
+    average: 9,
+    ratings: 5,
+    ranked: true
+  }));
+
+  it("keeps a leaderboard on its page when a venue opens below it", async () => {
+    getVenueDetail.mockResolvedValue({ rows: [], total: 0 });
+    const el = mount();
+    getDashboard.emit(DATA);
+    getVenueScores.emit({ ...VENUE_DATA, hotels: manyHotels });
+    await flush();
+
+    const board = el.shadowRoot.querySelector("c-gx-venue-board");
+    board.shadowRoot
+      .querySelector("c-gx-pager")
+      .dispatchEvent(new CustomEvent("pagechange", { detail: { page: 3 } }));
+    await flush();
+    board.dispatchEvent(
+      new CustomEvent("select", {
+        detail: { name: "Hotel 21", category: "Hotel" }
+      })
+    );
+    await flush();
+    await flush();
+
+    const names = [...board.shadowRoot.querySelectorAll(".venue-name")].map(
+      (n) => n.textContent
+    );
+    expect(names[0]).toBe("Hotel 21");
+  });
+
+  it("says when venue scores are too many to total, and still shows the rest", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    getVenueScores.error({
+      message: "Venue scores for this selection would average 52000 ratings"
+    });
+    await flush();
+
+    expect(
+      el.shadowRoot.querySelector('[data-section="venues"] .notice').textContent
+    ).toContain("52000 ratings");
+    const values = [...el.shadowRoot.querySelectorAll(".kpi-value")].map(
+      (n) => n.textContent
+    );
+    expect(values).toContain("+25");
+  });
+
+  it("narrows the hotel detail to the venue search", async () => {
+    const cells = (score) =>
+      ["Room", "Service", "Catering", "Cleanliness"].map((subCategory) => ({
+        subCategory,
+        average: score,
+        ratings: 1
+      }));
+    const el = mount();
+    getDashboard.emit(DATA);
+    getVenueScores.emit({
+      ...VENUE_DATA,
+      hotelDetail: [
+        ...VENUE_DATA.hotelDetail,
+        { hotel: "Pine Cliffs", cells: cells(9) }
+      ]
+    });
+    await flush();
+    expect(el.shadowRoot.querySelectorAll("td.heat")).toHaveLength(8);
+
+    el.shadowRoot
+      .querySelector("lightning-input.venue-search")
+      .dispatchEvent(new CustomEvent("change", { detail: { value: "pine" } }));
+    await flush();
+
+    expect(el.shadowRoot.querySelectorAll("td.heat")).toHaveLength(4);
+    expect(text(el)).toContain('1 hotel matching "pine"');
+  });
+
+  it("shows the latest guests of a busy venue and says how many there are", async () => {
+    getVenueDetail.mockResolvedValue({
+      total: 640,
+      rows: [
+        {
+          responseId: "r1",
+          bookingNumber: "GXD-2",
+          guest: "Test Gast",
+          score: 5,
+          subScores: []
+        }
+      ]
+    });
+    const el = mount();
+    getDashboard.emit(DATA);
+    getVenueScores.emit(VENUE_DATA);
+    await flush();
+
+    el.shadowRoot.querySelector("c-gx-venue-board").dispatchEvent(
+      new CustomEvent("select", {
+        detail: { name: "Conrad Algarve", category: "Hotel" }
+      })
+    );
+    await flush();
+    await flush();
+
+    expect(el.shadowRoot.querySelector(".drill-count").textContent).toBe(
+      "640 guests"
+    );
+    expect(text(el)).toContain("Showing the latest 1 of 640");
+  });
+
+  it("filters the waiting list by whether the link still works", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    await flush();
+
+    const expired = el.shadowRoot.querySelector(
+      '.waiting-chips button[data-value="expired"]'
+    );
+    expired.click();
+    await flush();
+
+    expect(findWaiting.getLastConfig()).toEqual(
+      expect.objectContaining({ stateName: "expired", pageNumber: 1 })
+    );
+    expect(expired.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("stops the pager where paging stops, and says so", async () => {
+    const el = mount();
+    getDashboard.emit(DATA);
+    findResponses.emit({
+      total: 5000,
+      reachable: 2010,
+      capped: true,
+      page: 1,
+      pageSize: 10,
+      rows: [{ responseId: "r1", guest: "Ali Haider", nps: 10 }]
+    });
+    await flush();
+
+    const pager = [...el.shadowRoot.querySelectorAll("c-gx-pager")].find(
+      (p) => p.label === "Pages of responses"
+    );
+    expect(pager.total).toBe(2010);
+    expect(text(el)).toContain(
+      "Paging reaches the first 2,010 of 5,000 responses."
+    );
+  });
+});
+
 describe("c-gx-feedback-dashboard finding a venue", () => {
   afterEach(() => {
     while (document.body.firstChild) {
@@ -798,7 +981,7 @@ describe("c-gx-feedback-dashboard finding a venue", () => {
   });
 
   const VENUES = {
-    ...DATA,
+    ...VENUE_DATA,
     hotels: [
       {
         category: "Hotel",
@@ -833,7 +1016,8 @@ describe("c-gx-feedback-dashboard finding a venue", () => {
 
   it("finds a hotel or golf course by name, with its score and standing", async () => {
     const el = mount();
-    getDashboard.emit(VENUES);
+    getDashboard.emit(DATA);
+    getVenueScores.emit(VENUES);
     await flush();
 
     search(el, "sao lourenco");
@@ -849,9 +1033,10 @@ describe("c-gx-feedback-dashboard finding a venue", () => {
   });
 
   it("opens every rating for the venue picked from the results", async () => {
-    getVenueDetail.mockResolvedValue([]);
+    getVenueDetail.mockResolvedValue({ rows: [], total: 0 });
     const el = mount();
-    getDashboard.emit(VENUES);
+    getDashboard.emit(DATA);
+    getVenueScores.emit(VENUES);
     await flush();
 
     search(el, "conrad");
@@ -866,7 +1051,8 @@ describe("c-gx-feedback-dashboard finding a venue", () => {
 
   it("says when nothing matches, and looks across all dates on request", async () => {
     const el = mount();
-    getDashboard.emit(VENUES);
+    getDashboard.emit(DATA);
+    getVenueScores.emit(VENUES);
     await flush();
 
     search(el, "Belfry");
@@ -881,7 +1067,8 @@ describe("c-gx-feedback-dashboard finding a venue", () => {
     expect(filters.fromDate).toBeUndefined();
     expect(filters.toDate).toBeUndefined();
 
-    getDashboard.emit(VENUES);
+    getDashboard.emit(DATA);
+    getVenueScores.emit(VENUES);
     await flush();
     expect(
       el.shadowRoot.querySelector("lightning-input.venue-search").value
@@ -891,7 +1078,8 @@ describe("c-gx-feedback-dashboard finding a venue", () => {
 
   it("brings the leaderboards back when the search is cleared", async () => {
     const el = mount();
-    getDashboard.emit(VENUES);
+    getDashboard.emit(DATA);
+    getVenueScores.emit(VENUES);
     await flush();
 
     search(el, "pine");

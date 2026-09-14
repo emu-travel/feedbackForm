@@ -218,7 +218,7 @@
             </ul>
             <c-gx-pager
               label="Pages of responses"
-              total={responsesTotal}
+              total={responsesPagerTotal}
               page={responsesPageNo}
               page-size={responsesPageSize}
               onpagechange={handleResponsePage}
@@ -369,75 +369,86 @@
               <span><i class="sw heat_good"></i>9 and above</span>
             </div>
 
-            <template lwc:if={venueSearching}>
-              <div class="venue-found">
-                <span class="panel-count" aria-live="polite"
-                  >{venueSearchSummary}</span
-                >
-                <template lwc:if={venueCanWiden}>
-                  <button
-                    class="link-btn full-btn venue-widen"
-                    onclick={handleAllTime}
-                  >
-                    Search all dates
-                  </button>
-                </template>
-              </div>
-              <template lwc:if={hasVenueResults}>
-                <ul class="vlist">
-                  <template for:each={venueResultPage.rows} for:item="v">
-                    <li key={v.key}>
-                      <button
-                        class="vrow"
-                        data-name={v.name}
-                        data-category={v.category}
-                        onclick={handleVenuePick}
-                        title="Show every rating for this venue"
-                      >
-                        <span class="vrow-main">
-                          <span class="vrow-name">{v.name}</span>
-                          <span class="vrow-place">{v.place}</span>
-                        </span>
-                        <span class="vrow-bar" aria-hidden="true">
-                          <span class={v.fillCls} style={v.barStyle}></span>
-                        </span>
-                        <span class={v.pillCls}>{v.score}</span>
-                        <span class="vrow-n">{v.ratingsLabel}</span>
-                        <span class="vrow-chev" aria-hidden="true">›</span>
-                      </button>
-                    </li>
-                  </template>
-                </ul>
-                <c-gx-pager
-                  data-list="venues"
-                  label="Pages of matching venues"
-                  total={venueResultPage.total}
-                  page={venueResultPage.page}
-                  onpagechange={handlePage}
-                ></c-gx-pager>
-              </template>
+            <template lwc:if={venuesError}>
+              <div class="notice" role="alert">{venuesError}</div>
+            </template>
+            <template lwc:elseif={venuesPending}>
+              <p class="panel-note">Loading venue scores…</p>
             </template>
             <template lwc:else>
-              <div class="boards">
-                <c-gx-venue-board
-                  title="Hotels"
-                  board={hotelBoard}
-                  min-ratings={minRatings}
-                  onselect={handleVenueSelect}
-                ></c-gx-venue-board>
-                <c-gx-venue-board
-                  title="Golf courses"
-                  board={golfBoard}
-                  min-ratings={minRatings}
-                  onselect={handleVenueSelect}
-                ></c-gx-venue-board>
-                <c-gx-venue-board
-                  title="Airlines, transfers and rental cars"
-                  board={supplierBoard}
-                  min-ratings={minRatings}
-                  onselect={handleVenueSelect}
-                ></c-gx-venue-board>
-              </div>
+              <template lwc:if={venuesCapNote}>
+                <p class="panel-note">{venuesCapNote}</p>
+              </template>
+              <template lwc:if={venueSearching}>
+                <div class="venue-found">
+                  <span class="panel-count" aria-live="polite"
+                    >{venueSearchSummary}</span
+                  >
+                  <template lwc:if={venueCanWiden}>
+                    <button
+                      class="link-btn full-btn venue-widen"
+                      onclick={handleAllTime}
+                    >
+                      Search all dates
+                    </button>
+                  </template>
+                </div>
+                <template lwc:if={hasVenueResults}>
+                  <ul class="vlist">
+                    <template for:each={venueResultPage.rows} for:item="v">
+                      <li key={v.key}>
+                        <button
+                          class="vrow"
+                          data-name={v.name}
+                          data-category={v.category}
+                          onclick={handleVenuePick}
+                          title="Show every rating for this venue"
+                        >
+                          <span class="vrow-main">
+                            <span class="vrow-name">{v.name}</span>
+                            <span class="vrow-place">{v.place}</span>
+                          </span>
+                          <span class="vrow-bar" aria-hidden="true">
+                            <span class={v.fillCls} style={v.barStyle}></span>
+                          </span>
+                          <span class={v.pillCls}>{v.score}</span>
+                          <span class="vrow-n">{v.ratingsLabel}</span>
+                          <span class="vrow-chev" aria-hidden="true">›</span>
+                        </button>
+                      </li>
+                    </template>
+                  </ul>
+                  <c-gx-pager
+                    data-list="venues"
+                    label="Pages of matching venues"
+                    total={venueResultPage.total}
+                    page={venueResultPage.page}
+                    onpagechange={handlePage}
+                  ></c-gx-pager>
+                </template>
+              </template>
+              <template lwc:else>
+                <div class="boards">
+                  <c-gx-venue-board
+                    title="Hotels"
+                    board={hotelBoard}
+                    min-ratings={minRatings}
+                    onselect={handleVenueSelect}
+                  ></c-gx-venue-board>
+                  <c-gx-venue-board
+                    title="Golf courses"
+                    board={golfBoard}
+                    min-ratings={minRatings}
+                    onselect={handleVenueSelect}
+                  ></c-gx-venue-board>
+                  <c-gx-venue-board
+                    title="Airlines, transfers and rental cars"
+                    board={supplierBoard}
+                    min-ratings={minRatings}
+                    onselect={handleVenueSelect}
+                  ></c-gx-venue-board>
+                </div>
+              </template>
             </template>
 
             <template lwc:if={drill}>
@@ -459,6 +470,9 @@
                     onclick={closeDrill}
                   ></lightning-button-icon>
                 </div>
+                <template lwc:if={drillCapNote}>
+                  <p class="panel-note">{drillCapNote}</p>
+                </template>
                 <template lwc:if={drill.loading}>
                   <p class="panel-note">Loading ratings…</p>
                 </template>
@@ -520,50 +534,58 @@
               <p class="panel-note">
                 Guests only see these four questions when they score a hotel
                 below 9, so this is where the reasons for low hotel scores show
-                up.
+                up. Weakest hotels first; the venue search above narrows it.
               </p>
-              <div class="heat-wrap">
-                <table class="heat-table">
-                  <thead>
-                    <tr>
-                      <th scope="col" class="heat-hotel">Hotel</th>
-                      <th scope="col">Room</th>
-                      <th scope="col">Service</th>
-                      <th scope="col">Catering</th>
-                      <th scope="col">Cleanliness</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <template for:each={heatPage.rows} for:item="row">
-                      <tr key={row.key}>
-                        <th scope="row" class="heat-hotel">
-                          <button
-                            class="link-btn"
-                            data-name={row.hotel}
-                            data-category="Hotel"
-                            title="Show every rating for this hotel"
-                            onclick={handleHeatSelect}
-                          >
-                            {row.hotel}
-                          </button>
-                        </th>
-                        <template for:each={row.cells} for:item="c">
-                          <td key={c.key} class={c.cls} title={c.title}>
-                            {c.value}
-                          </td>
-                        </template>
+              <template lwc:if={heatSearchNote}>
+                <p class="panel-count heat-found">{heatSearchNote}</p>
+              </template>
+              <template lwc:if={heatCapNote}>
+                <p class="panel-note">{heatCapNote}</p>
+              </template>
+              <template lwc:if={hasHeatRowsShown}>
+                <div class="heat-wrap">
+                  <table class="heat-table">
+                    <thead>
+                      <tr>
+                        <th scope="col" class="heat-hotel">Hotel</th>
+                        <th scope="col">Room</th>
+                        <th scope="col">Service</th>
+                        <th scope="col">Catering</th>
+                        <th scope="col">Cleanliness</th>
                       </tr>
-                    </template>
-                  </tbody>
-                </table>
-              </div>
-              <c-gx-pager
-                data-list="heat"
-                label="Pages of hotels"
-                total={heatPage.total}
-                page={heatPage.page}
-                onpagechange={handlePage}
-              ></c-gx-pager>
+                    </thead>
+                    <tbody>
+                      <template for:each={heatPage.rows} for:item="row">
+                        <tr key={row.key}>
+                          <th scope="row" class="heat-hotel">
+                            <button
+                              class="link-btn"
+                              data-name={row.hotel}
+                              data-category="Hotel"
+                              title="Show every rating for this hotel"
+                              onclick={handleHeatSelect}
+                            >
+                              {row.hotel}
+                            </button>
+                          </th>
+                          <template for:each={row.cells} for:item="c">
+                            <td key={c.key} class={c.cls} title={c.title}>
+                              {c.value}
+                            </td>
+                          </template>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <c-gx-pager
+                  data-list="heat"
+                  label="Pages of hotels"
+                  total={heatPage.total}
+                  page={heatPage.page}
+                  onpagechange={handlePage}
+                ></c-gx-pager>
+              </template>
             </section>
           </template>
 
@@ -779,6 +801,19 @@
             asked first. One reminder goes out automatically; a personal word
             from the travel designer often does more.
           </p>
+          <div class="chips waiting-chips" role="group" aria-label="Show">
+            <template for:each={waitingChips} for:item="c">
+              <button
+                key={c.value}
+                class={c.cls}
+                data-value={c.value}
+                aria-pressed={c.pressed}
+                onclick={handleWaitingState}
+              >
+                {c.label}
+              </button>
+            </template>
+          </div>
           <template lwc:if={hasWaiting}>
             <ul class="rlist">
               <template for:each={waitingList} for:item="w">
@@ -806,16 +841,17 @@
             </ul>
             <c-gx-pager
               label="Pages of guests waiting"
-              total={waitingTotal}
+              total={waitingPagerTotal}
               page={waitingPageNo}
               page-size={waitingPageSize}
               onpagechange={handleWaitingPage}
             ></c-gx-pager>
+            <template lwc:if={waitingCapNote}>
+              <p class="panel-note">{waitingCapNote}</p>
+            </template>
           </template>
           <template lwc:else>
-            <p class="panel-note">
-              Everyone invited in this selection has answered.
-            </p>
+            <p class="panel-note">{waitingEmptyText}</p>
           </template>
         </section>
       </template>

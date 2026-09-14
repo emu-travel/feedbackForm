@@ -8,6 +8,9 @@ import {
   searchKey,
   venueMatches,
   venueSearchSummary,
+  nameMatches,
+  pagingNote,
+  waitingSummary,
   isOpenFollowUp,
   defaultFilters,
   filtersPayload,
@@ -343,6 +346,39 @@ describe("hotel detail heatmap", () => {
       "heat heat_none"
     ]);
     expect(row.cells[3].title).toBe("No ratings");
+  });
+});
+
+describe("finding by name", () => {
+  it("matches every word of the search, in any order", () => {
+    expect(nameMatches("Pine Cliffs Resort", "cliffs pine")).toBe(true);
+    expect(nameMatches("Pine Cliffs Resort", "pine lago")).toBe(false);
+    expect(nameMatches("Schloß Elmau", "schloss")).toBe(true);
+  });
+});
+
+describe("long lists", () => {
+  it("says where server paging stops, with the numbers written out", () => {
+    expect(
+      pagingNote(
+        { capped: true, reachable: 2010, total: 5000 },
+        "responses",
+        "Search to reach the rest."
+      )
+    ).toBe(
+      "Paging reaches the first 2,010 of 5,000 responses. Search to reach the rest."
+    );
+    expect(
+      pagingNote({ capped: false, total: 12 }, "responses", "")
+    ).toBeNull();
+    expect(pagingNote(undefined, "responses", "")).toBeNull();
+  });
+
+  it("names the waiting list by what it shows", () => {
+    expect(waitingSummary(3, "all")).toBe("3 guests not answered yet");
+    expect(waitingSummary(1, "open")).toBe("1 guest whose link still works");
+    expect(waitingSummary(2, "expired")).toBe("2 guests whose link ran out");
+    expect(waitingSummary(0, "all")).toBe("");
   });
 });
 

@@ -329,6 +329,15 @@ export function searchKey(text) {
     .trim();
 }
 
+/** True when the name holds every word of the search, in any order. */
+export function nameMatches(name, term) {
+  const key = searchKey(name);
+  return searchKey(term)
+    .split(" ")
+    .filter(Boolean)
+    .every((w) => key.includes(w));
+}
+
 /**
  * Every hotel, golf course and partner whose name holds all the typed words,
  * in any order, each with where it stands on its own leaderboard. Names that
@@ -336,18 +345,14 @@ export function searchKey(text) {
  * partners, best score first, as on the boards.
  */
 export function venueMatches(data, term) {
-  const words = searchKey(term).split(" ").filter(Boolean);
-  if (!words.length) {
+  const start = searchKey(term);
+  if (!start) {
     return [];
   }
-  const start = words.join(" ");
   const out = [];
   VENUE_BOARDS.forEach(({ list, many }) => {
     const { ranked, unranked } = venueList(data && data[list]);
-    const found = (v) => {
-      const name = searchKey(v.name);
-      return words.every((w) => name.includes(w));
-    };
+    const found = (v) => nameMatches(v.name, term);
     ranked.forEach((v, i) => {
       if (found(v)) {
         out.push({
@@ -499,6 +504,22 @@ export function rangeLabel(page, total, size = PAGE_SIZE) {
   const from = (page - 1) * size + 1;
   const to = Math.min(page * size, total);
   return `${from}–${to} of ${total}`;
+}
+
+/** A count with a thousands separator: 5,000. */
+export function formatCount(n) {
+  return Number(n || 0).toLocaleString("en-GB");
+}
+
+/**
+ * Said under a server-paged list that holds more than paging can reach -
+ * SOQL cannot skip past 2,000 rows - with what to do about it.
+ */
+export function pagingNote(page, what, how) {
+  const p = page || {};
+  return p.capped
+    ? `Paging reaches the first ${formatCount(p.reachable)} of ${formatCount(p.total)} ${what}. ${how}`
+    : null;
 }
 
 // ------------------------------------------------------------------
@@ -787,6 +808,26 @@ export function designerRows(rows, activeId) {
 
 // ------------------------------------------------------------------
 // Waiting for an answer
+
+export const WAITING_OPTIONS = [
+  { label: "All", value: "all" },
+  { label: "Link still open", value: "open" },
+  { label: "Link expired", value: "expired" }
+];
+
+/** What the waiting list is showing, in words. */
+export function waitingSummary(total, state) {
+  if (!total) {
+    return "";
+  }
+  if (state === "open") {
+    return `${plural(total, "guest", "guests")} whose link still works`;
+  }
+  if (state === "expired") {
+    return `${plural(total, "guest", "guests")} whose link ran out`;
+  }
+  return `${plural(total, "guest", "guests")} not answered yet`;
+}
 
 const WAITING_STATES = {
   waiting: "wtag wtag_waiting",

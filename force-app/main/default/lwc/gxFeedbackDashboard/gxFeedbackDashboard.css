@@ -314,6 +314,15 @@
   margin-bottom: 0.75rem;
 }
 
+.heat-found {
+  display: block;
+  margin: 0 0 0.5rem;
+}
+
+.waiting-chips {
+  margin-bottom: 0.75rem;
+}
+
 .venue-found {
   display: flex;
   flex-wrap: wrap;

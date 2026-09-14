@@ -174,6 +174,14 @@ private class GxFeedbackDashboardControllerTest {
     );
   }
 
+  private static GxFeedbackDashboardController.VenueScores scores(
+    Map<String, Object> filters
+  ) {
+    return GxFeedbackDashboardController.getVenueScores(
+      filters == null ? null : JSON.serialize(filters)
+    );
+  }
+
   private static GxFeedbackDashboardController.Venue find(
     List<GxFeedbackDashboardController.Venue> venues,
     String name
@@ -236,7 +244,7 @@ private class GxFeedbackDashboardControllerTest {
   @IsTest
   static void venueAveragesLeaveSubRatingsOut() {
     GxFeedbackDashboardController.Venue conrad = find(
-      load(null).hotels,
+      scores(null).hotels,
       CONRAD
     );
 
@@ -248,7 +256,7 @@ private class GxFeedbackDashboardControllerTest {
 
   @IsTest
   static void aVenueWithTooFewRatingsIsListedButNotRanked() {
-    List<GxFeedbackDashboardController.Venue> hotels = load(null).hotels;
+    List<GxFeedbackDashboardController.Venue> hotels = scores(null).hotels;
 
     Assert.areEqual(
       CONRAD,
@@ -263,7 +271,7 @@ private class GxFeedbackDashboardControllerTest {
   @IsTest
   static void suppliersAreRankedByName() {
     GxFeedbackDashboardController.Venue lh = find(
-      load(null).suppliers,
+      scores(null).suppliers,
       LUFTHANSA
     );
     Assert.isNotNull(lh, 'Airlines appear under their own name');
@@ -273,7 +281,7 @@ private class GxFeedbackDashboardControllerTest {
 
   @IsTest
   static void theHotelDetailGridAlwaysHasFourColumnsInOrder() {
-    List<GxFeedbackDashboardController.HeatRow> rows = load(null).hotelDetail;
+    List<GxFeedbackDashboardController.HeatRow> rows = scores(null).hotelDetail;
 
     Assert.areEqual(1, rows.size(), 'Only Conrad has sub-ratings');
     List<GxFeedbackDashboardController.HeatCell> cells = rows[0].cells;
@@ -296,8 +304,12 @@ private class GxFeedbackDashboardControllerTest {
     Assert.areEqual(1, d.kpis.responses, 'Only GXD-5 answered in Mallorca');
     Assert.areEqual(2, d.kpis.invited, 'GXD-4 and GXD-5 were invited');
     Assert.areEqual(50, d.kpis.responseRate, '1 of 2');
-    Assert.areEqual(1, d.hotels.size(), 'Only Finca');
-    Assert.areEqual(FINCA, d.hotels[0].name, 'Only Finca');
+    List<GxFeedbackDashboardController.Venue> hotels = scores(
+        new Map<String, Object>{ 'region' => 'Mallorca' }
+      )
+      .hotels;
+    Assert.areEqual(1, hotels.size(), 'Only Finca');
+    Assert.areEqual(FINCA, hotels[0].name, 'Only Finca');
   }
 
   @IsTest
@@ -319,9 +331,12 @@ private class GxFeedbackDashboardControllerTest {
       d.kpis.responses,
       'NPS is about the whole trip, not the golf'
     );
-    Assert.isTrue(d.hotels.isEmpty(), 'No hotels when looking at golf');
-    Assert.isTrue(d.hotelDetail.isEmpty(), 'Nor hotel detail');
-    Assert.areEqual(QUINTA, d.golf[0].name, 'The golf is there');
+    GxFeedbackDashboardController.VenueScores s = scores(
+      new Map<String, Object>{ 'category' => 'Golfclub' }
+    );
+    Assert.isTrue(s.hotels.isEmpty(), 'No hotels when looking at golf');
+    Assert.isTrue(s.hotelDetail.isEmpty(), 'Nor hotel detail');
+    Assert.areEqual(QUINTA, s.golf[0].name, 'The golf is there');
   }
 
   @IsTest
@@ -443,13 +458,15 @@ private class GxFeedbackDashboardControllerTest {
 
   @IsTest
   static void aVenueDrillsDownToEachGuest() {
-    List<GxFeedbackDashboardController.VenueRating> rows = GxFeedbackDashboardController.getVenueDetail(
+    GxFeedbackDashboardController.VenueDetail detail = GxFeedbackDashboardController.getVenueDetail(
       null,
       'Hotel',
       CONRAD
     );
+    List<GxFeedbackDashboardController.VenueRating> rows = detail.rows;
 
     Assert.areEqual(3, rows.size(), 'One row per guest who rated Conrad');
+    Assert.areEqual(3, detail.total, 'and all of them are sent');
     Integer withBreakdown = 0;
     for (GxFeedbackDashboardController.VenueRating r : rows) {
       Assert.isNotNull(r.score, 'Each has an overall score');
@@ -458,6 +475,18 @@ private class GxFeedbackDashboardControllerTest {
       }
     }
     Assert.areEqual(2, withBreakdown, 'Two guests opened the detail panel');
+  }
+
+  @IsTest
+  static void aBusyVenueSendsItsLatestGuestsAndSaysHowManyInAll() {
+    GxFeedbackDashboardController.maxDrillGuests = 2;
+    GxFeedbackDashboardController.VenueDetail detail = GxFeedbackDashboardController.getVenueDetail(
+      null,
+      'Hotel',
+      CONRAD
+    );
+    Assert.areEqual(2, detail.rows.size(), 'Stops at the limit');
+    Assert.areEqual(3, detail.total, 'but counts every guest');
   }
 
   // ------------------------------------------------------------------
@@ -471,7 +500,11 @@ private class GxFeedbackDashboardControllerTest {
     Assert.areEqual(0, d.kpis.responses, 'Nothing answered');
     Assert.isNull(d.kpis.nps, 'No NPS rather than a misleading zero');
     Assert.isNull(d.kpis.responseRate, 'No rate rather than divide-by-zero');
-    Assert.isTrue(d.hotels.isEmpty() && d.trend.isEmpty(), 'Nothing to chart');
+    Assert.isTrue(d.trend.isEmpty(), 'Nothing to chart');
+    Assert.isTrue(
+      scores(new Map<String, Object>{ 'region' => 'Nowhere' }).hotels.isEmpty(),
+      'No venues either'
+    );
   }
 
   @IsTest
@@ -532,13 +565,78 @@ private class GxFeedbackDashboardControllerTest {
 
   @IsTest
   static void aSelectionTooLargeToTotalIsRefusedRatherThanHalfDone() {
-    GxFeedbackDashboardController.maxRatingsInView = 5;
+    GxFeedbackDashboardController.maxResponsesInView = 3;
     try {
       load(null);
-      Assert.fail('Too many ratings to total must be refused up front');
+      Assert.fail('Too many responses to total must be refused up front');
     } catch (AuraHandledException e) {
       Assert.isNotNull(e.getMessage(), 'It says what to do instead');
     }
+  }
+
+  @IsTest
+  static void tooManyRatingsRefusesOnlyTheVenueScores() {
+    GxFeedbackDashboardController.maxRatingsInView = 5;
+    try {
+      scores(null);
+      Assert.fail('Too many ratings to average must be refused up front');
+    } catch (AuraHandledException e) {
+      Assert.isNotNull(e.getMessage(), 'It says what to do instead');
+    }
+    Assert.areEqual(4, load(null).kpis.responses, 'The rest still loads');
+  }
+
+  @IsTest
+  static void venuesBeyondOneListAreCutAndSaySo() {
+    Assert.isFalse(scores(null).venuesCapped, 'Four venues fit easily');
+
+    GxFeedbackDashboardController.maxVenueRows = 1;
+    GxFeedbackDashboardController.VenueScores s = scores(null);
+    Assert.isTrue(s.venuesCapped, 'The page is told more exist');
+    Assert.areEqual(
+      1,
+      s.hotels.size() + s.golf.size() + s.suppliers.size(),
+      'Only the most-rated venue is kept'
+    );
+    Assert.isTrue(s.hotelDetailCapped, 'The grid is cut too');
+    Assert.isTrue(
+      s.hotelDetail.isEmpty(),
+      'and a hotel cut part way is left out, not shown with gaps'
+    );
+  }
+
+  @IsTest
+  static void theHotelDetailPutsTheWeakestHotelFirst() {
+    insert subs(
+      new Feedback_Response__c(Id = responseOf('GXD-5')),
+      FINCA,
+      4,
+      9,
+      9,
+      10
+    );
+
+    List<GxFeedbackDashboardController.HeatRow> rows = scores(null).hotelDetail;
+    Assert.areEqual(FINCA, rows[0].hotel, 'A room at 4 is the weakest cell');
+    Assert.areEqual(CONRAD, rows[1].hotel, 'Conrad, lowest 6.0, comes next');
+  }
+
+  @IsTest
+  static void pagingSaysWhereItStops() {
+    GxFeedbackDashboardController.responsePageSize = 1;
+    GxFeedbackDashboardController.maxOffset = 1;
+
+    GxFeedbackDashboardController.ResponsePage p = find(
+      null,
+      null,
+      null,
+      null,
+      9
+    );
+    Assert.areEqual(4, p.total, 'Every response is counted');
+    Assert.isTrue(p.capped, 'but paging cannot reach them all');
+    Assert.areEqual(2, p.reachable, 'It reaches two');
+    Assert.areEqual(2, p.page, 'and a deeper page lands on the last of those');
   }
 
   @IsTest
@@ -879,8 +977,11 @@ private class GxFeedbackDashboardControllerTest {
 
     GxFeedbackDashboardController.WaitingPage w = GxFeedbackDashboardController.findWaiting(
       null,
+      null,
       1
     );
+    Assert.isFalse(w.capped, 'One guest pages easily');
+    Assert.areEqual(1, w.reachable, 'and paging reaches them');
 
     // GXD-6 carries only the old flow's flag and was never sent this survey.
     Assert.areEqual(1, w.total, 'Only GXD-4 was invited and never answered');
@@ -897,7 +998,7 @@ private class GxFeedbackDashboardControllerTest {
     linkRules(5, 10);
     Assert.areEqual(
       'expired',
-      GxFeedbackDashboardController.findWaiting(null, 1).rows[0].state,
+      GxFeedbackDashboardController.findWaiting(null, null, 1).rows[0].state,
       'Sent eight days ago, valid for five'
     );
   }
@@ -909,10 +1010,38 @@ private class GxFeedbackDashboardControllerTest {
       0,
       GxFeedbackDashboardController.findWaiting(
           JSON.serialize(new Map<String, Object>{ 'region' => 'Algarve' }),
+          null,
           1
         )
         .total,
       'GXD-4 went to Mallorca'
+    );
+  }
+
+  @IsTest
+  static void theWaitingListSeparatesOpenLinksFromExpiredOnes() {
+    linkRules(14, 10);
+    Assert.areEqual(
+      1,
+      GxFeedbackDashboardController.findWaiting(null, 'open', 1).total,
+      'Sent eight days ago, valid for fourteen: still open'
+    );
+    Assert.areEqual(
+      0,
+      GxFeedbackDashboardController.findWaiting(null, 'expired', 1).total,
+      'so not expired'
+    );
+
+    linkRules(5, 10);
+    Assert.areEqual(
+      0,
+      GxFeedbackDashboardController.findWaiting(null, 'open', 1).total,
+      'Valid for five: no longer open'
+    );
+    Assert.areEqual(
+      1,
+      GxFeedbackDashboardController.findWaiting(null, 'expired', 1).total,
+      'but expired'
     );
   }
 

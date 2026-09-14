@@ -9,6 +9,7 @@ import findResponses from "@salesforce/apex/GxFeedbackDashboardController.findRe
 import findWaiting from "@salesforce/apex/GxFeedbackDashboardController.findWaiting";
 import exportResponses from "@salesforce/apex/GxFeedbackDashboardController.exportResponses";
 import getVenueDetail from "@salesforce/apex/GxFeedbackDashboardController.getVenueDetail";
+import getVenueScores from "@salesforce/apex/GxFeedbackDashboardController.getVenueScores";
 import updateFollowUp from "@salesforce/apex/GxFeedbackDashboardController.updateFollowUp";
 import {
   CATEGORY_OPTIONS,
@@ -35,7 +36,11 @@ import {
   designerRows,
   waitingRows,
   exportMessage,
-  plural
+  nameMatches,
+  pagingNote,
+  plural,
+  WAITING_OPTIONS,
+  waitingSummary
 } from "c/gxDashboardView";
 
 /** How long typing pauses before the search runs. */
@@ -44,9 +49,11 @@ const SEARCH_DELAY_MS = 350;
 /**
  * gxFeedbackDashboard
  *
- * The team's view of post-trip feedback. The numbers are computed by
- * GxFeedbackDashboardController in one call per filter change; the response
- * list is its own call, so searching and paging it never reloads the rest.
+ * The team's view of post-trip feedback, from GxFeedbackDashboardController:
+ * headline numbers and lists in one call, venue scores in another - each has
+ * its own row limit, so a selection too big for one still shows the other -
+ * and the response and waiting lists in calls of their own, so searching and
+ * paging them never reloads the rest.
  * This component holds the filters, the search, the follow-up drafts, the
  * open drill-down and which page each list is on. Every response it shows
  * opens in full in gxResponseModal.
@@ -80,6 +87,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   // Invited guests who have not answered yet.
   waitingPage = 1;
+  waitingState = "all";
   waiting;
   wiredWaitingResult;
 
@@ -95,6 +103,29 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   wiredDashboard;
 
+  // Venue and partner scores: a call of their own.
+  venues;
+  venuesError;
+  venuesLoading = true;
+  wiredVenuesResult;
+
+  /** Derived lists, each rebuilt only when what it is built from changes. */
+  _memo = {};
+
+  memo(name, deps, build) {
+    const hit = this._memo[name];
+    if (
+      hit &&
+      hit.deps.length === deps.length &&
+      hit.deps.every((d, i) => d === deps[i])
+    ) {
+      return hit.value;
+    }
+    const value = build();
+    this._memo[name] = { deps, value };
+    return value;
+  }
+
   @wire(getDashboard, { filtersJson: "$filtersJson" })
   wiredData(result) {
     this.wiredDashboard = result;
@@ -106,6 +137,20 @@ export default class GxFeedbackDashboard extends NavigationMixin(
       this.error = messageOf(result.error);
       this.data = undefined;
       this.loading = false;
+    }
+  }
+
+  @wire(getVenueScores, { filtersJson: "$filtersJson" })
+  wiredVenues(result) {
+    this.wiredVenuesResult = result;
+    if (result.data) {
+      this.venues = result.data;
+      this.venuesError = undefined;
+      this.venuesLoading = false;
+    } else if (result.error) {
+      this.venues = undefined;
+      this.venuesError = messageOf(result.error);
+      this.venuesLoading = false;
     }
   }
 
@@ -152,6 +197,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   @wire(findWaiting, {
     filtersJson: "$filtersJson",
+    stateName: "$waitingState",
     pageNumber: "$waitingPage"
   })
   wiredWaiting(result) {
@@ -175,7 +221,16 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   // The response list
 
   get responseRows() {
-    return responseListRows(this.responses && this.responses.rows);
+    return this.memo("responseRows", [this.responses], () =>
+      responseListRows(this.responses && this.responses.rows)
+    );
+  }
+
+  /** The pager counts what paging can reach, so "next" never dead-ends. */
+  get responsesPagerTotal() {
+    return this.responses && this.responses.capped
+      ? this.responses.reachable
+      : this.responsesTotal;
   }
 
   get hasResponseRows() {
@@ -199,9 +254,11 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get responsesCapNote() {
-    return this.responses && this.responses.capped
-      ? "Paging stops here. Search, or narrow the dates, to reach older responses."
-      : null;
+    return pagingNote(
+      this.responses,
+      "responses",
+      "Search, pick a group, or narrow the dates to reach the rest."
+    );
   }
 
   get groupChips() {
@@ -298,7 +355,9 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   // Waiting for an answer
 
   get waitingList() {
-    return waitingRows(this.waiting && this.waiting.rows);
+    return this.memo("waitingList", [this.waiting], () =>
+      waitingRows(this.waiting && this.waiting.rows)
+    );
   }
 
   get hasWaiting() {
@@ -318,9 +377,40 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get waitingSummary() {
-    return this.waitingTotal
-      ? `${plural(this.waitingTotal, "guest", "guests")} not answered yet`
-      : "";
+    return waitingSummary(this.waitingTotal, this.waitingState);
+  }
+
+  get waitingChips() {
+    return WAITING_OPTIONS.map((o) => ({
+      ...o,
+      pressed: o.value === this.waitingState ? "true" : "false",
+      cls: o.value === this.waitingState ? "chip chip_on" : "chip"
+    }));
+  }
+
+  get waitingPagerTotal() {
+    return this.waiting && this.waiting.capped
+      ? this.waiting.reachable
+      : this.waitingTotal;
+  }
+
+  get waitingCapNote() {
+    return pagingNote(
+      this.waiting,
+      "guests",
+      "Pick a link state, or narrow the dates, to reach the rest."
+    );
+  }
+
+  get waitingEmptyText() {
+    return this.waitingState === "all"
+      ? "Everyone invited in this selection has answered."
+      : "No guest in this selection matches.";
+  }
+
+  handleWaitingState(event) {
+    this.waitingState = event.currentTarget.dataset.value;
+    this.waitingPage = 1;
   }
 
   handleWaitingPage(event) {
@@ -332,9 +422,8 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   // Travel designers
 
   get designers() {
-    return designerRows(
-      this.data && this.data.designers,
-      this.filters.designer
+    return this.memo("designers", [this.data, this.filters.designer], () =>
+      designerRows(this.data && this.data.designers, this.filters.designer)
     );
   }
 
@@ -363,10 +452,12 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get kpis() {
-    return kpiTiles(this.data && this.data.kpis).map((k) => ({
-      ...k,
-      cls: k.alert ? "kpi kpi_alert" : "kpi"
-    }));
+    return this.memo("kpis", [this.data], () =>
+      kpiTiles(this.data && this.data.kpis).map((k) => ({
+        ...k,
+        cls: k.alert ? "kpi kpi_alert" : "kpi"
+      }))
+    );
   }
 
   get isEmpty() {
@@ -374,7 +465,9 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get trend() {
-    return trendBars(this.data && this.data.trend);
+    return this.memo("trend", [this.data], () =>
+      trendBars(this.data && this.data.trend)
+    );
   }
 
   get hasTrend() {
@@ -382,19 +475,40 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get minRatings() {
-    return (this.data && this.data.minRatings) || 3;
+    return (this.venues && this.venues.minRatings) || 3;
   }
 
+  /**
+   * Built once per set of venue scores. A fresh object would reach the board
+   * as a new board and send it back to page one on every re-render - opening
+   * a venue, or typing a follow-up note, would lose the reader's place.
+   */
   get hotelBoard() {
-    return venueList(this.data && this.data.hotels);
+    return this.memo("hotelBoard", [this.venues], () =>
+      venueList(this.venues && this.venues.hotels)
+    );
   }
 
   get golfBoard() {
-    return venueList(this.data && this.data.golf);
+    return this.memo("golfBoard", [this.venues], () =>
+      venueList(this.venues && this.venues.golf)
+    );
   }
 
   get supplierBoard() {
-    return venueList(this.data && this.data.suppliers);
+    return this.memo("supplierBoard", [this.venues], () =>
+      venueList(this.venues && this.venues.suppliers)
+    );
+  }
+
+  get venuesPending() {
+    return this.venuesLoading && !this.venues;
+  }
+
+  get venuesCapNote() {
+    return this.venues && this.venues.venuesCapped
+      ? "Only the most-rated venues are listed: there are more than one list holds. Narrow the dates or pick a category to see the rest."
+      : null;
   }
 
   get rankingHint() {
@@ -420,7 +534,9 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get venueResults() {
-    return venueMatches(this.data, this.venueTerm);
+    return this.memo("venueResults", [this.venues, this.venueTerm], () =>
+      venueMatches(this.venues, this.venueTerm)
+    );
   }
 
   get hasVenueResults() {
@@ -443,7 +559,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
 
   handleVenueSearch(event) {
     this.venueInput = event.detail.value || "";
-    this.setPage("venues", 1);
+    this.pages = { ...this.pages, venues: 1, heat: 1 };
   }
 
   handleVenuePick(event) {
@@ -452,30 +568,65 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get hotelDetail() {
-    return heatRows(this.data && this.data.hotelDetail);
+    return this.memo("hotelDetail", [this.venues], () =>
+      heatRows(this.venues && this.venues.hotelDetail)
+    );
   }
 
   get hasHotelDetail() {
     return this.hotelDetail.length > 0;
   }
 
+  /** The grid follows the venue search, so one hotel's reasons are a search away. */
+  get heatRowsShown() {
+    return this.memo(
+      "heatRowsShown",
+      [this.hotelDetail, this.venueTerm],
+      () => {
+        const term = this.venueTerm;
+        return term
+          ? this.hotelDetail.filter((row) => nameMatches(row.hotel, term))
+          : this.hotelDetail;
+      }
+    );
+  }
+
+  get hasHeatRowsShown() {
+    return this.heatRowsShown.length > 0;
+  }
+
   get heatPage() {
-    return pageOf(this.hotelDetail, this.pages.heat);
+    return pageOf(this.heatRowsShown, this.pages.heat);
+  }
+
+  get heatSearchNote() {
+    if (!this.venueSearching) {
+      return null;
+    }
+    const n = this.heatRowsShown.length;
+    return n
+      ? `${plural(n, "hotel", "hotels")} matching "${this.venueTerm}"`
+      : `No hotel detail matching "${this.venueTerm}" in this selection.`;
+  }
+
+  get heatCapNote() {
+    return this.venues && this.venues.hotelDetailCapped
+      ? "More hotels have detail ratings than the grid holds, so those late in the alphabet are left out. Search for one, or narrow the dates."
+      : null;
   }
 
   get followUps() {
-    return followUpRows(this.data && this.data.followUps, this.showHandled).map(
-      (r) => {
-        const draft = this.drafts[r.key] || {};
-        return {
-          ...r,
-          draftStatus: draft.status !== undefined ? draft.status : r.status,
-          draftNote:
-            draft.note !== undefined ? draft.note : r.followUpNote || "",
-          saving: this.savingId === r.key
-        };
-      }
-    );
+    return this.memo("followUpRows", [this.data, this.showHandled], () =>
+      followUpRows(this.data && this.data.followUps, this.showHandled)
+    ).map((r) => {
+      const draft = this.drafts[r.key] || {};
+      return {
+        ...r,
+        draftStatus: draft.status !== undefined ? draft.status : r.status,
+        draftNote: draft.note !== undefined ? draft.note : r.followUpNote || "",
+        saving: this.savingId === r.key
+      };
+    });
   }
 
   get hasFollowUps() {
@@ -506,7 +657,9 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get destinations() {
-    return destinationRows(this.data && this.data.nextDestinations);
+    return this.memo("destinations", [this.data], () =>
+      destinationRows(this.data && this.data.nextDestinations)
+    );
   }
 
   get hasDestinations() {
@@ -524,8 +677,10 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   get comments() {
-    const rows = commentRows(this.data && this.data.comments);
-    return this.lowOnly ? rows.filter((c) => c.low) : rows;
+    return this.memo("comments", [this.data, this.lowOnly], () => {
+      const rows = commentRows(this.data && this.data.comments);
+      return this.lowOnly ? rows.filter((c) => c.low) : rows;
+    });
   }
 
   get lowOnlyLabel() {
@@ -578,8 +733,23 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     if (!this.drill || this.drill.loading) {
       return "";
     }
-    const n = this.drill.rows.length;
-    return n === 1 ? "1 guest" : `${n} guests`;
+    return plural(
+      Math.max(this.drill.total || 0, this.drill.rows.length),
+      "guest",
+      "guests"
+    );
+  }
+
+  /** Said when a busy venue has more guests than one drill-down shows. */
+  get drillCapNote() {
+    if (
+      !this.drill ||
+      this.drill.loading ||
+      this.drill.total <= this.drill.rows.length
+    ) {
+      return null;
+    }
+    return `Showing the latest ${this.drill.rows.length} of ${this.drill.total}. Narrow the dates to see earlier guests.`;
   }
 
   get drillPage() {
@@ -648,6 +818,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     const json = filtersPayload(next);
     if (json !== this.filtersJson) {
       this.loading = true;
+      this.venuesLoading = true;
       this.drill = undefined;
       this.pages = {};
       this.responsePage = 1;
@@ -661,6 +832,7 @@ export default class GxFeedbackDashboard extends NavigationMixin(
     try {
       await Promise.all([
         refreshApex(this.wiredDashboard),
+        refreshApex(this.wiredVenuesResult),
         refreshApex(this.wiredResponsesResult),
         refreshApex(this.wiredWaitingResult)
       ]);
@@ -684,17 +856,24 @@ export default class GxFeedbackDashboard extends NavigationMixin(
   }
 
   async openDrill(name, category) {
-    this.drill = { name, category, rows: [], loading: true };
+    this.drill = { name, category, rows: [], total: 0, loading: true };
     this.setPage("drill", 1);
     // Opened from further down the page, the panel would appear off screen.
     Promise.resolve().then(() => this.scrollToSection("drill"));
     try {
-      const rows = await getVenueDetail({
+      const detail = await getVenueDetail({
         filtersJson: this.filtersJson,
         category,
         itemName: name
       });
-      this.drill = { name, category, rows: drillRows(rows), loading: false };
+      const rows = drillRows(detail && detail.rows);
+      this.drill = {
+        name,
+        category,
+        rows,
+        total: (detail && detail.total) || rows.length,
+        loading: false
+      };
     } catch (e) {
       this.drill = undefined;
       this.toast("Couldn't load that venue", messageOf(e), "error");

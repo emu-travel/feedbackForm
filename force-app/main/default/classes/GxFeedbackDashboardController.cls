@@ -1,7 +1,9 @@
 /**
  * GxFeedbackDashboardController
  *
- * Everything the feedback dashboard shows, computed server-side in one call.
+ * Everything the feedback dashboard shows, computed server-side. Venue scores
+ * are a call of their own (getVenueScores), so the most expensive averages
+ * never share one request's row limit with the rest.
  *
  * `with sharing`, so a user sees feedback only for bookings they can see.
  * Queries run in system mode for field access: the dashboard is gated by the
@@ -41,24 +43,41 @@ public with sharing class GxFeedbackDashboardController {
   @TestVisible
   private static Integer maxDestinations = 500;
 
-  /** Newest responses read for their free text (comments, next destinations). */
-  private static final Integer MAX_RESPONSES = 2000;
+  /**
+   * Newest responses read for their free text (comments, next destinations).
+   * Their long text sits in the request's 6 MB heap, so this stays modest.
+   */
+  private static final Integer MAX_RESPONSES = 1000;
 
   /**
-   * Averages count every rating they cover against the 50,000-row limit per
-   * request. Beyond this many in one selection the page asks for narrower
-   * dates rather than failing half way. At ~10 ratings per response this is
-   * about 4,000 responses in one view.
+   * An AVG counts every row it averages against the 50,000-row limit of one
+   * request; a COUNT costs one row per result. Measured in the sandbox,
+   * getDashboard costs about two rows per response in view plus the ~2,000
+   * rows its lists read, and getVenueScores about one row per rating. Each
+   * refuses a selection past its own ceiling with a message instead of
+   * failing half way - and as separate requests, a selection too big for
+   * venue scores still shows everything else.
    */
   @TestVisible
-  private static Integer maxRatingsInView = 40000;
+  private static Integer maxResponsesInView = 20000;
+  @TestVisible
+  private static Integer maxRatingsInView = 45000;
+
+  /** A grouped query returns at most 2,000 rows; the venue lists stop there. */
+  @TestVisible
+  private static Integer maxVenueRows = 2000;
+
+  /** Guests shown in one venue's drill-down, newest first. */
+  @TestVisible
+  private static Integer maxDrillGuests = 200;
 
   /** The response list is paged on the server, this many rows at a time. */
   @TestVisible
   private static Integer responsePageSize = 10;
 
   /** SOQL cannot skip further than this, so deeper pages ask for a search. */
-  private static final Integer MAX_OFFSET = 2000;
+  @TestVisible
+  private static Integer maxOffset = 2000;
 
   /** Most responses one export file holds; more asks for narrower dates. */
   @TestVisible
@@ -111,21 +130,11 @@ public with sharing class GxFeedbackDashboardController {
     @AuraEnabled
     public List<MonthPoint> trend = new List<MonthPoint>();
     @AuraEnabled
-    public List<Venue> hotels = new List<Venue>();
-    @AuraEnabled
-    public List<Venue> golf = new List<Venue>();
-    @AuraEnabled
-    public List<Venue> suppliers = new List<Venue>();
-    @AuraEnabled
-    public List<HeatRow> hotelDetail = new List<HeatRow>();
-    @AuraEnabled
     public List<ResponseRow> followUps = new List<ResponseRow>();
     @AuraEnabled
     public List<ResponseRow> nextDestinations = new List<ResponseRow>();
     @AuraEnabled
     public List<CommentRow> comments = new List<CommentRow>();
-    @AuraEnabled
-    public Integer minRatings = MIN_RATINGS;
 
     /** Every detractor in the selection; followUps may hold fewer. */
     @AuraEnabled
@@ -140,6 +149,26 @@ public with sharing class GxFeedbackDashboardController {
     /** How each travel designer's guests rated the trip and our advice. */
     @AuraEnabled
     public List<DesignerRow> designers = new List<DesignerRow>();
+  }
+
+  /** Venue and partner scores: a request of their own, see maxRatingsInView. */
+  public class VenueScores {
+    @AuraEnabled
+    public List<Venue> hotels = new List<Venue>();
+    @AuraEnabled
+    public List<Venue> golf = new List<Venue>();
+    @AuraEnabled
+    public List<Venue> suppliers = new List<Venue>();
+    @AuraEnabled
+    public List<HeatRow> hotelDetail = new List<HeatRow>();
+    @AuraEnabled
+    public Integer minRatings = MIN_RATINGS;
+    /** True when there were more venues than one list holds. */
+    @AuraEnabled
+    public Boolean venuesCapped = false;
+    /** True when more hotels had detail ratings than the grid holds. */
+    @AuraEnabled
+    public Boolean hotelDetailCapped = false;
   }
 
   public class DesignerRow {
@@ -176,6 +205,9 @@ public with sharing class GxFeedbackDashboardController {
     /** True when there are more rows than paging can reach. */
     @AuraEnabled
     public Boolean capped = false;
+    /** How many rows paging can reach: what the pager counts. */
+    @AuraEnabled
+    public Integer reachable = 0;
   }
 
   /** A spreadsheet of responses, ready to download. */
@@ -230,6 +262,12 @@ public with sharing class GxFeedbackDashboardController {
     public Integer page = 1;
     @AuraEnabled
     public Integer pageSize;
+    /** True when there are more rows than paging can reach. */
+    @AuraEnabled
+    public Boolean capped = false;
+    /** How many rows paging can reach: what the pager counts. */
+    @AuraEnabled
+    public Integer reachable = 0;
   }
 
   /** A response as a list row: who, which trip, and what stood out. */
@@ -426,6 +464,15 @@ public with sharing class GxFeedbackDashboardController {
     public List<HeatCell> subScores = new List<HeatCell>();
   }
 
+  /** One venue's guests, newest first, and how many there are in all. */
+  public class VenueDetail {
+    @AuraEnabled
+    public List<VenueRating> rows = new List<VenueRating>();
+    /** Every guest who rated it in the selection; rows may hold fewer. */
+    @AuraEnabled
+    public Integer total = 0;
+  }
+
   /** One whole survey answer, in the order the guest filled it in. */
   public class ResponseDetail {
     @AuraEnabled
@@ -543,13 +590,11 @@ public with sharing class GxFeedbackDashboardController {
   public static Dashboard getDashboard(String filtersJson) {
     Filters f = parse(filtersJson);
     Dashboard d = new Dashboard();
-    guardVolume(f);
+    guardResponses(f);
 
     applyKpis(d.kpis, f);
     d.trend = trend(f);
     countInvitations(d.kpis, f);
-    applyVenues(d, f);
-    d.hotelDetail = hotelDetail(f);
     d.designers = designers(f);
 
     d.followUps = followUps(f);
@@ -559,6 +604,23 @@ public with sharing class GxFeedbackDashboardController {
     applyDestinations(d, recent, d.kpis.responses > recent.size());
     applyComments(d, f, recent);
     return d;
+  }
+
+  /**
+   * Venue and partner scores and the hotel detail grid. Apart from
+   * getDashboard because averaging every rating in a busy selection is the
+   * most expensive thing the dashboard does: as its own request it has its
+   * own row limit, and if a selection is too big for it, only this section
+   * says so.
+   */
+  @AuraEnabled(cacheable=true)
+  public static VenueScores getVenueScores(String filtersJson) {
+    Filters f = parse(filtersJson);
+    guardRatings(f);
+    VenueScores s = new VenueScores();
+    applyVenues(s, f);
+    applyHotelDetail(s, f);
+    return s;
   }
 
   /**
@@ -651,9 +713,14 @@ public with sharing class GxFeedbackDashboardController {
     return d;
   }
 
-  /** Every rating a venue received, grouped by the guest who gave it. */
+  /**
+   * A venue's guests, newest first, each with their score, comment and hotel
+   * sub-ratings. At most maxDrillGuests are sent, with the count of all of
+   * them, so a busy venue says how many more there are instead of stopping
+   * part way without a word.
+   */
   @AuraEnabled(cacheable=true)
-  public static List<VenueRating> getVenueDetail(
+  public static VenueDetail getVenueDetail(
     String filtersJson,
     String category,
     String itemName
@@ -670,44 +737,74 @@ public with sharing class GxFeedbackDashboardController {
     clauses.addAll(
       bookingClauses('Feedback_Response__r.Booking__r.', f, binds)
     );
+    List<String> overall = clauses.clone();
+    overall.add('Sub_Category__c = null');
+
+    VenueDetail out = new VenueDetail();
+    out.total = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Feedback_Rating__c WHERE ' +
+      String.join(overall, ' AND '),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
 
     Map<Id, VenueRating> byResponse = new Map<Id, VenueRating>();
     for (
       Feedback_Rating__c r : (List<Feedback_Rating__c>) Database.queryWithBinds(
-        'SELECT Score__c, Sub_Category__c, Comment__c, Feedback_Response__c, ' +
+        'SELECT Score__c, Comment__c, Feedback_Response__c, ' +
           'Feedback_Response__r.Booking__c, ' +
           'Feedback_Response__r.Booking__r.BookingNumber__c, ' +
           'Feedback_Response__r.Contact__r.Name, ' +
           'Feedback_Response__r.Submitted_On__c ' +
           'FROM Feedback_Rating__c WHERE ' +
-          String.join(clauses, ' AND ') +
-          ' ORDER BY Feedback_Response__r.Submitted_On__c DESC LIMIT 500',
+          String.join(overall, ' AND ') +
+          ' ORDER BY Feedback_Response__r.Submitted_On__c DESC NULLS LAST, Id DESC' +
+          ' LIMIT ' +
+          maxDrillGuests,
         binds,
         AccessLevel.SYSTEM_MODE
       )
     ) {
-      VenueRating v = byResponse.get(r.Feedback_Response__c);
-      if (v == null) {
-        v = new VenueRating();
-        v.responseId = r.Feedback_Response__c;
-        v.bookingId = r.Feedback_Response__r.Booking__c;
-        v.bookingNumber = r.Feedback_Response__r.Booking__r.BookingNumber__c;
-        v.guest = r.Feedback_Response__r.Contact__r?.Name;
-        v.submittedOn = r.Feedback_Response__r.Submitted_On__c;
-        byResponse.put(r.Feedback_Response__c, v);
+      if (byResponse.containsKey(r.Feedback_Response__c)) {
+        continue;
       }
-      if (String.isBlank(r.Sub_Category__c)) {
-        v.score = r.Score__c;
-        v.comment = r.Comment__c;
-      } else {
-        HeatCell c = new HeatCell();
-        c.subCategory = r.Sub_Category__c;
-        c.average = r.Score__c;
-        c.ratings = 1;
-        v.subScores.add(c);
-      }
+      VenueRating v = new VenueRating();
+      v.responseId = r.Feedback_Response__c;
+      v.bookingId = r.Feedback_Response__r.Booking__c;
+      v.bookingNumber = r.Feedback_Response__r.Booking__r.BookingNumber__c;
+      v.guest = r.Feedback_Response__r.Contact__r?.Name;
+      v.submittedOn = r.Feedback_Response__r.Submitted_On__c;
+      v.score = r.Score__c;
+      v.comment = r.Comment__c;
+      byResponse.put(r.Feedback_Response__c, v);
+      out.rows.add(v);
     }
-    return byResponse.values();
+    if (byResponse.isEmpty()) {
+      return out;
+    }
+
+    // Sub-ratings only for the guests being sent, in one query.
+    binds.put('responseIds', byResponse.keySet());
+    List<String> subs = clauses.clone();
+    subs.add('Sub_Category__c != null');
+    subs.add('Feedback_Response__c IN :responseIds');
+    for (
+      Feedback_Rating__c r : (List<Feedback_Rating__c>) Database.queryWithBinds(
+        'SELECT Sub_Category__c, Score__c, Feedback_Response__c ' +
+          'FROM Feedback_Rating__c WHERE ' +
+          String.join(subs, ' AND ') +
+          ' ORDER BY CreatedDate, Id',
+        binds,
+        AccessLevel.SYSTEM_MODE
+      )
+    ) {
+      HeatCell c = new HeatCell();
+      c.subCategory = r.Sub_Category__c;
+      c.average = r.Score__c;
+      c.ratings = 1;
+      byResponse.get(r.Feedback_Response__c).subScores.add(c);
+    }
+    return out;
   }
 
   /** Only the values that actually occur on surveyed trips - no dead options. */
@@ -727,6 +824,7 @@ public with sharing class GxFeedbackDashboardController {
         Booking__r.Region__c,
         Booking__r.DestinationCountry__c,
         Booking__r.Travel_Type__c
+      LIMIT 2000
     ]) {
       addIfPresent(regions, ar.get('region'));
       addIfPresent(countries, ar.get('country'));
@@ -747,6 +845,7 @@ public with sharing class GxFeedbackDashboardController {
       FROM Feedback_Response__c
       GROUP BY Booking__r.TravelDesigner__c, Booking__r.TravelDesigner__r.Name
       ORDER BY Booking__r.TravelDesigner__r.Name
+      LIMIT 2000
     ]) {
       Object designer = ar.get('designer');
       if (designer == null) {
@@ -797,8 +896,9 @@ public with sharing class GxFeedbackDashboardController {
       1,
       Math.ceil((Decimal) out.total / responsePageSize).intValue()
     );
-    Integer reachable = MAX_OFFSET / responsePageSize + 1;
+    Integer reachable = maxOffset / responsePageSize + 1;
     out.capped = lastPage > reachable;
+    out.reachable = Math.min(out.total, reachable * responsePageSize);
     out.page = Math.min(
       Math.max(pageNumber == null ? 1 : pageNumber, 1),
       Math.min(lastPage, reachable)
@@ -884,15 +984,33 @@ public with sharing class GxFeedbackDashboardController {
 
   /**
    * Refuses a selection too large to total in one request, with a message the
-   * page can show, instead of hitting the row limit part way through.
+   * page can show, instead of hitting the row limit part way through. A COUNT
+   * costs one row, so asking is cheap.
    */
-  private static void guardVolume(Filters f) {
+  private static void guardResponses(Filters f) {
+    Integer responses = countResponses(f, null, null);
+    if (responses > maxResponsesInView) {
+      throw new AuraHandledException(
+        'This selection covers ' +
+          responses +
+          ' responses, more than the dashboard can total at once. ' +
+          'Narrow the dates, or pick a region or country.'
+      );
+    }
+  }
+
+  /** The same, for the venue averages, which cost a row per rating. */
+  private static void guardRatings(Filters f) {
     Map<String, Object> binds = new Map<String, Object>();
     List<String> clauses = bookingClauses(
       'Feedback_Response__r.Booking__r.',
       f,
       binds
     );
+    if (String.isNotBlank(f.category)) {
+      clauses.add('Category__c = :category');
+      binds.put('category', f.category);
+    }
     Integer ratings = Database.countQueryWithBinds(
       'SELECT COUNT() FROM Feedback_Rating__c' + whereOf(clauses),
       binds,
@@ -900,10 +1018,11 @@ public with sharing class GxFeedbackDashboardController {
     );
     if (ratings > maxRatingsInView) {
       throw new AuraHandledException(
-        'This selection covers ' +
+        'Venue scores for this selection would average ' +
           ratings +
-          ' ratings, more than the dashboard can total at once. ' +
-          'Narrow the dates, or pick a region or country.'
+          ' ratings, more than can be done at once. Narrow the dates, or ' +
+          'pick a region, country or category. The rest of the dashboard ' +
+          'still covers the whole selection.'
       );
     }
   }
@@ -1327,16 +1446,24 @@ public with sharing class GxFeedbackDashboardController {
   @AuraEnabled(cacheable=true)
   public static WaitingPage findWaiting(
     String filtersJson,
+    String stateName,
     Integer pageNumber
   ) {
     Filters f = parse(filtersJson);
     WaitingPage out = new WaitingPage();
     out.pageSize = responsePageSize;
 
+    Decimal validity = GxFeedbackSettings.linkValidityDays();
+    Decimal reminderDelay = GxFeedbackSettings.reminderDelayDays();
+
     Map<String, Object> binds = new Map<String, Object>();
     List<String> clauses = bookingClauses('', f, binds);
     clauses.add('Survey_Sent_On__c != null');
     clauses.add('Id NOT IN (SELECT Booking__c FROM Feedback_Response__c)');
+    String linkClause = linkStateClause(stateName, validity, binds);
+    if (linkClause != null) {
+      clauses.add(linkClause);
+    }
 
     out.total = Database.countQueryWithBinds(
       'SELECT COUNT() FROM Booking__c' + whereOf(clauses),
@@ -1347,13 +1474,13 @@ public with sharing class GxFeedbackDashboardController {
       1,
       Math.ceil((Decimal) out.total / responsePageSize).intValue()
     );
+    Integer reachable = maxOffset / responsePageSize + 1;
+    out.capped = lastPage > reachable;
+    out.reachable = Math.min(out.total, reachable * responsePageSize);
     out.page = Math.min(
       Math.max(pageNumber == null ? 1 : pageNumber, 1),
-      Math.min(lastPage, MAX_OFFSET / responsePageSize + 1)
+      Math.min(lastPage, reachable)
     );
-
-    Decimal validity = GxFeedbackSettings.linkValidityDays();
-    Decimal reminderDelay = GxFeedbackSettings.reminderDelayDays();
     for (
       Booking__c b : (List<Booking__c>) Database.queryWithBinds(
         'SELECT Id, BookingNumber__c, MainContact__r.Name, TravelDesigner__r.Name,' +
@@ -1395,6 +1522,36 @@ public with sharing class GxFeedbackDashboardController {
       out.rows.add(row);
     }
     return out;
+  }
+
+  /**
+   * 'open' keeps guests whose link still works, 'expired' those whose link
+   * ran out; anything else keeps both. A link runs from the day it was last
+   * sent - the rule each waiting row is marked by - so the cut-off is the
+   * start of the first day that no longer counts.
+   */
+  private static String linkStateClause(
+    String stateName,
+    Decimal validity,
+    Map<String, Object> binds
+  ) {
+    if (stateName != 'open' && stateName != 'expired') {
+      return null;
+    }
+    if (validity == null || validity <= 0) {
+      // Links that never run out: every guest is open, none expired.
+      return stateName == 'open' ? null : 'Id = null';
+    }
+    binds.put(
+      'linkCutoff',
+      Datetime.newInstance(
+        Date.today().addDays(-validity.intValue()),
+        Time.newInstance(0, 0, 0, 0)
+      )
+    );
+    return stateName == 'open'
+      ? 'Survey_Sent_On__c >= :linkCutoff'
+      : 'Survey_Sent_On__c < :linkCutoff';
   }
 
   private static final List<String> EXPORT_HEADER = new List<String>{
@@ -1818,8 +1975,11 @@ public with sharing class GxFeedbackDashboardController {
    * Overall venue scores only. Sub-ratings are excluded here, or a hotel's
    * overall score would be averaged together with its room and catering
    * scores - which is exactly the mistake the report builder invites.
+   *
+   * One grouped query returns at most maxVenueRows venues. Past that the most
+   * rated are kept, and the page is told.
    */
-  private static void applyVenues(Dashboard d, Filters f) {
+  private static void applyVenues(VenueScores s, Filters f) {
     Map<String, Object> binds = new Map<String, Object>();
     List<String> clauses = new List<String>{ 'Sub_Category__c = null' };
     clauses.addAll(
@@ -1830,17 +1990,19 @@ public with sharing class GxFeedbackDashboardController {
       binds.put('category', f.category);
     }
 
-    for (
-      AggregateResult ar : (List<AggregateResult>) Database.queryWithBinds(
-        'SELECT Category__c category, Item_Name__c item, ' +
-          'AVG(Score__c) average, COUNT(Id) n ' +
-          'FROM Feedback_Rating__c WHERE ' +
-          String.join(clauses, ' AND ') +
-          ' GROUP BY Category__c, Item_Name__c',
-        binds,
-        AccessLevel.SYSTEM_MODE
-      )
-    ) {
+    List<AggregateResult> found = (List<AggregateResult>) Database.queryWithBinds(
+      'SELECT Category__c category, Item_Name__c item, ' +
+        'AVG(Score__c) average, COUNT(Id) n ' +
+        'FROM Feedback_Rating__c WHERE ' +
+        String.join(clauses, ' AND ') +
+        ' GROUP BY Category__c, Item_Name__c' +
+        ' ORDER BY COUNT(Id) DESC LIMIT ' +
+        maxVenueRows,
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    s.venuesCapped = found.size() >= maxVenueRows;
+    for (AggregateResult ar : found) {
       Venue v = new Venue();
       v.category = (String) ar.get('category');
       v.name = (String) ar.get('item');
@@ -1849,21 +2011,26 @@ public with sharing class GxFeedbackDashboardController {
       v.ranked = v.ratings >= MIN_RATINGS;
 
       if (v.category == HOTEL) {
-        d.hotels.add(v);
+        s.hotels.add(v);
       } else if (v.category == GOLF) {
-        d.golf.add(v);
+        s.golf.add(v);
       } else if (SUPPLIER_TYPES.contains(v.category)) {
-        d.suppliers.add(v);
+        s.suppliers.add(v);
       }
     }
-    d.hotels.sort(new ByRankThenScore());
-    d.golf.sort(new ByRankThenScore());
-    d.suppliers.sort(new ByRankThenScore());
+    s.hotels.sort(new ByRankThenScore());
+    s.golf.sort(new ByRankThenScore());
+    s.suppliers.sort(new ByRankThenScore());
   }
 
-  private static List<HeatRow> hotelDetail(Filters f) {
+  /**
+   * The four hotel sub-ratings per hotel, weakest hotel first. Cut at
+   * maxVenueRows cells, a hotel the cut went through is left out rather than
+   * shown with gaps.
+   */
+  private static void applyHotelDetail(VenueScores s, Filters f) {
     if (String.isNotBlank(f.category) && f.category != HOTEL) {
-      return new List<HeatRow>();
+      return;
     }
     Map<String, Object> binds = new Map<String, Object>{ 'hotel' => HOTEL };
     List<String> clauses = new List<String>{
@@ -1874,18 +2041,22 @@ public with sharing class GxFeedbackDashboardController {
       bookingClauses('Feedback_Response__r.Booking__r.', f, binds)
     );
 
+    List<AggregateResult> found = (List<AggregateResult>) Database.queryWithBinds(
+      'SELECT Item_Name__c item, Sub_Category__c sub, ' +
+        'AVG(Score__c) average, COUNT(Id) n ' +
+        'FROM Feedback_Rating__c WHERE ' +
+        String.join(clauses, ' AND ') +
+        ' GROUP BY Item_Name__c, Sub_Category__c' +
+        ' ORDER BY Item_Name__c, Sub_Category__c LIMIT ' +
+        maxVenueRows,
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    s.hotelDetailCapped = found.size() >= maxVenueRows;
+
     Map<String, Map<String, HeatCell>> byHotel = new Map<String, Map<String, HeatCell>>();
-    for (
-      AggregateResult ar : (List<AggregateResult>) Database.queryWithBinds(
-        'SELECT Item_Name__c item, Sub_Category__c sub, ' +
-          'AVG(Score__c) average, COUNT(Id) n ' +
-          'FROM Feedback_Rating__c WHERE ' +
-          String.join(clauses, ' AND ') +
-          ' GROUP BY Item_Name__c, Sub_Category__c',
-        binds,
-        AccessLevel.SYSTEM_MODE
-      )
-    ) {
+    String lastHotel;
+    for (AggregateResult ar : found) {
       String hotel = (String) ar.get('item');
       if (!byHotel.containsKey(hotel)) {
         byHotel.put(hotel, new Map<String, HeatCell>());
@@ -1895,6 +2066,10 @@ public with sharing class GxFeedbackDashboardController {
       c.average = ((Decimal) ar.get('average')).setScale(1);
       c.ratings = (Integer) ar.get('n');
       byHotel.get(hotel).put(c.subCategory, c);
+      lastHotel = hotel;
+    }
+    if (s.hotelDetailCapped && lastHotel != null) {
+      byHotel.remove(lastHotel);
     }
 
     List<String> hotels = new List<String>(byHotel.keySet());
@@ -1915,7 +2090,8 @@ public with sharing class GxFeedbackDashboardController {
       }
       rows.add(row);
     }
-    return rows;
+    rows.sort(new ByWeakestCell());
+    s.hotelDetail = rows;
   }
 
   // ------------------------------------------------------------------
@@ -2219,6 +2395,34 @@ public with sharing class GxFeedbackDashboardController {
         return a.ratings > b.ratings ? -1 : 1;
       }
       return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+    }
+  }
+
+  /** Weakest hotel first: by its lowest sub-rating, then by name. */
+  private class ByWeakestCell implements Comparator<HeatRow> {
+    public Integer compare(HeatRow a, HeatRow b) {
+      Decimal x = lowestOf(a);
+      Decimal y = lowestOf(b);
+      if (x != y) {
+        if (x == null) {
+          return 1;
+        }
+        if (y == null) {
+          return -1;
+        }
+        return x < y ? -1 : 1;
+      }
+      return a.hotel < b.hotel ? -1 : (a.hotel > b.hotel ? 1 : 0);
+    }
+
+    private Decimal lowestOf(HeatRow row) {
+      Decimal lowest;
+      for (HeatCell c : row.cells) {
+        if (c.average != null && (lowest == null || c.average < lowest)) {
+          lowest = c.average;
+        }
+      }
+      return lowest;
     }
   }
 
