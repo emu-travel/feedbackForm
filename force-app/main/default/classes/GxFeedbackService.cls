@@ -779,6 +779,7 @@ public without sharing class GxFeedbackService {
         Travel_Location__r.Name,
         Travel_Location__r.BillingCity,
         Travel_Location__r.BillingCountry,
+        Travel_Location__r.BillingCountryCode,
         Service__r.Name
       FROM Reservation__c
       WHERE
@@ -828,10 +829,50 @@ public without sharing class GxFeedbackService {
     if (String.isNotBlank(r.Travel_Location__r.BillingCity)) {
       parts.add(r.Travel_Location__r.BillingCity);
     }
-    if (String.isNotBlank(r.Travel_Location__r.BillingCountry)) {
-      parts.add(r.Travel_Location__r.BillingCountry);
+    String country = countryName(
+      r.Travel_Location__r.BillingCountryCode,
+      r.Travel_Location__r.BillingCountry
+    );
+    if (String.isNotBlank(country)) {
+      parts.add(country);
     }
     return parts.isEmpty() ? null : String.join(parts, ', ');
+  }
+
+  /**
+   * The guest reads German, but venue addresses keep the country in English
+   * ("Spain"). Booking__c.DestinationCountry__c already holds the team's German
+   * names by ISO code ("ES" => "Spanien"), so the code is looked up there.
+   * GB is the exception: that list calls it "England", which would be wrong
+   * for a hotel in Scotland. Without a usable code, the address text stays.
+   */
+  @TestVisible
+  private static String countryName(String code, String fallback) {
+    if (String.isNotBlank(code)) {
+      if (code == 'GB') {
+        return 'Großbritannien';
+      }
+      String german = germanCountries().get(code);
+      if (String.isNotBlank(german)) {
+        return german;
+      }
+    }
+    return fallback;
+  }
+
+  private static Map<String, String> germanCountryNames;
+
+  private static Map<String, String> germanCountries() {
+    if (germanCountryNames == null) {
+      germanCountryNames = new Map<String, String>();
+      for (
+        Schema.PicklistEntry e : Booking__c.DestinationCountry__c.getDescribe()
+          .getPicklistValues()
+      ) {
+        germanCountryNames.put(e.getValue(), e.getLabel());
+      }
+    }
+    return germanCountryNames;
   }
 
   /** Review links live in custom metadata so marketing can change them without a deploy. */

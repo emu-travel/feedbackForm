@@ -912,6 +912,42 @@ private class GxFeedbackServiceTest {
   }
 
   @IsTest
+  static void theHotelCountryIsShownInGermanNotAsTheAddressSpellsIt() {
+    // Venue addresses say "Spain"; the guest reads the German name the team
+    // keeps on Booking__c.DestinationCountry__c for that code.
+    String spain;
+    for (
+      Schema.PicklistEntry e : Booking__c.DestinationCountry__c.getDescribe()
+        .getPicklistValues()
+    ) {
+      if (e.getValue() == 'ES') {
+        spain = e.getLabel();
+      }
+    }
+    Assert.areEqual(
+      spain,
+      GxFeedbackService.countryName('ES', 'Spain'),
+      'The German name for the code, not the English address text'
+    );
+    Assert.areNotEqual('Spain', spain, 'and that name really is German');
+    Assert.areEqual(
+      'Großbritannien',
+      GxFeedbackService.countryName('GB', 'United Kingdom'),
+      'Not "England": a Scottish hotel is in Großbritannien'
+    );
+    Assert.areEqual(
+      'Spain',
+      GxFeedbackService.countryName(null, 'Spain'),
+      'Without a code, the address text still shows'
+    );
+    Assert.areEqual(
+      'Atlantis',
+      GxFeedbackService.countryName('XX', 'Atlantis'),
+      'An unknown code falls back too'
+    );
+  }
+
+  @IsTest
   static void getContextExposesTheReviewLinks() {
     GxFeedbackService.Context c = GxFeedbackService.getContext(
       BOOKING_NUM,
