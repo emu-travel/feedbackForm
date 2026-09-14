@@ -174,6 +174,8 @@ public with sharing class GxFeedbackDashboardController {
     @AuraEnabled
     public Integer promoters = 0;
     @AuraEnabled
+    public Integer neutrals = 0;
+    @AuraEnabled
     public Integer detractors = 0;
     @AuraEnabled
     public Decimal nps;
@@ -265,7 +267,7 @@ public with sharing class GxFeedbackDashboardController {
     @AuraEnabled
     public Integer promoters = 0;
     @AuraEnabled
-    public Integer passives = 0;
+    public Integer neutrals = 0;
     @AuraEnabled
     public Integer detractors = 0;
     @AuraEnabled
@@ -288,7 +290,7 @@ public with sharing class GxFeedbackDashboardController {
     @AuraEnabled
     public Integer promoters = 0;
     @AuraEnabled
-    public Integer passives = 0;
+    public Integer neutrals = 0;
     @AuraEnabled
     public Integer detractors = 0;
     @AuraEnabled
@@ -779,7 +781,7 @@ public with sharing class GxFeedbackDashboardController {
    * A search finds a guest by name, email, booking number or FB reference
    * across every response, ignoring the dashboard filters - when a guest is
    * on the phone, the trip date is exactly what nobody wants to guess. The
-   * group ('promoters', 'passives', 'detractors', 'open') and the order
+   * group ('promoters', 'neutrals', 'detractors', 'open') and the order
    * ('newest', 'lowest') apply either way.
    */
   @AuraEnabled(cacheable=true)
@@ -954,7 +956,7 @@ public with sharing class GxFeedbackDashboardController {
       'Recommendation_NPS__c <= :detractorMax',
       new Map<String, Object>{ 'detractorMax' => DETRACTOR_MAX }
     );
-    k.passives = countResponses(
+    k.neutrals = countResponses(
       f,
       'Recommendation_NPS__c > :detractorMax AND Recommendation_NPS__c < :promoterMin',
       new Map<String, Object>{
@@ -976,7 +978,11 @@ public with sharing class GxFeedbackDashboardController {
         'closed' => CLOSED_STATUSES
       }
     );
-    k.nps = npsOf(k.promoters, k.detractors, k.responses);
+    k.nps = npsOf(
+      k.promoters,
+      k.detractors,
+      k.promoters + k.neutrals + k.detractors
+    );
 
     Map<String, Object> binds = new Map<String, Object>();
     List<String> clauses = bookingClauses('Booking__r.', f, binds);
@@ -1036,7 +1042,7 @@ public with sharing class GxFeedbackDashboardController {
         'detractorMax' => DETRACTOR_MAX,
         'promoterMin' => PROMOTER_MIN
       },
-      'passive'
+      'neutral'
     );
 
     List<String> keys = new List<String>(months.keySet());
@@ -1044,7 +1050,11 @@ public with sharing class GxFeedbackDashboardController {
     List<MonthPoint> points = new List<MonthPoint>();
     for (String key : keys) {
       MonthPoint m = months.get(key);
-      m.nps = npsOf(m.promoters, m.detractors, m.total);
+      m.nps = npsOf(
+        m.promoters,
+        m.detractors,
+        m.promoters + m.neutrals + m.detractors
+      );
       points.add(m);
     }
     return points;
@@ -1098,7 +1108,7 @@ public with sharing class GxFeedbackDashboardController {
       } else if (bucket == 'detractor') {
         point.detractors = n;
       } else {
-        point.passives = n;
+        point.neutrals = n;
       }
     }
   }
@@ -1495,8 +1505,8 @@ public with sharing class GxFeedbackDashboardController {
     if (bucket == 'promoter') {
       return 'Promoter';
     }
-    if (bucket == 'passive') {
-      return 'Passive';
+    if (bucket == 'neutral') {
+      return 'Neutral';
     }
     return bucket == 'detractor' ? 'Detractor' : null;
   }
@@ -1562,12 +1572,20 @@ public with sharing class GxFeedbackDashboardController {
       byId.put(row.id, row);
     }
 
-    for (String bucket : new List<String>{ 'promoter', 'detractor' }) {
+    for (
+      String bucket : new List<String>{ 'promoter', 'neutral', 'detractor' }
+    ) {
       Map<String, Object> bucketBinds = binds.clone();
       List<String> bucketClauses = clauses.clone();
       if (bucket == 'promoter') {
         bucketClauses.add('Recommendation_NPS__c >= :promoterMin');
         bucketBinds.put('promoterMin', PROMOTER_MIN);
+      } else if (bucket == 'neutral') {
+        bucketClauses.add(
+          'Recommendation_NPS__c > :detractorMax AND Recommendation_NPS__c < :promoterMin'
+        );
+        bucketBinds.put('promoterMin', PROMOTER_MIN);
+        bucketBinds.put('detractorMax', DETRACTOR_MAX);
       } else {
         bucketClauses.add('Recommendation_NPS__c <= :detractorMax');
         bucketBinds.put('detractorMax', DETRACTOR_MAX);
@@ -1591,6 +1609,8 @@ public with sharing class GxFeedbackDashboardController {
         }
         if (bucket == 'promoter') {
           row.promoters = (Integer) ar.get('n');
+        } else if (bucket == 'neutral') {
+          row.neutrals = (Integer) ar.get('n');
         } else {
           row.detractors = (Integer) ar.get('n');
         }
@@ -1599,7 +1619,11 @@ public with sharing class GxFeedbackDashboardController {
 
     List<DesignerRow> rows = byId.values();
     for (DesignerRow row : rows) {
-      row.nps = npsOf(row.promoters, row.detractors, row.responses);
+      row.nps = npsOf(
+        row.promoters,
+        row.detractors,
+        row.promoters + row.neutrals + row.detractors
+      );
     }
     rows.sort(new ByResponsesDescending());
     return rows;
@@ -1613,7 +1637,7 @@ public with sharing class GxFeedbackDashboardController {
       binds.put('promoterMin', PROMOTER_MIN);
       return 'Recommendation_NPS__c >= :promoterMin';
     }
-    if (groupName == 'passives') {
+    if (groupName == 'neutrals') {
       binds.put('promoterMin', PROMOTER_MIN);
       binds.put('detractorMax', DETRACTOR_MAX);
       return 'Recommendation_NPS__c > :detractorMax AND Recommendation_NPS__c < :promoterMin';
@@ -1947,20 +1971,27 @@ public with sharing class GxFeedbackDashboardController {
     if (score >= PROMOTER_MIN) {
       return 'promoter';
     }
-    return score <= DETRACTOR_MAX ? 'detractor' : 'passive';
+    return score <= DETRACTOR_MAX ? 'detractor' : 'neutral';
   }
 
-  /** Percentage of promoters minus percentage of detractors. Not an average. */
+  /**
+   * Net Promoter Score as Bain & Company define it: the percentage of
+   * promoters (9-10) minus the percentage of detractors (6 and below), out of
+   * every guest who answered the question, neutrals (7-8) included. To one
+   * decimal, e.g. 42.9, and below zero when detractors outnumber promoters.
+   * Not an average.
+   */
   @TestVisible
   private static Decimal npsOf(
     Integer promoters,
     Integer detractors,
-    Integer total
+    Integer answered
   ) {
-    if (total == null || total == 0) {
+    if (answered == null || answered == 0) {
       return null;
     }
-    return (Decimal.valueOf(promoters - detractors) / total * 100).setScale(0);
+    return (Decimal.valueOf((promoters - detractors) * 100) / answered)
+      .setScale(1, System.RoundingMode.HALF_UP);
   }
 
   private static ResponseRow toRow(Feedback_Response__c r) {

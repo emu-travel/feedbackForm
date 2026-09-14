@@ -192,7 +192,7 @@ private class GxDetractorAlertTest {
   }
 
   @IsTest
-  static void aPassiveOrPromoterRaisesNothing() {
+  static void aNeutralOrPromoterRaisesNothing() {
     settings(true, TEAM);
     GxDetractorAlert.sandboxOverride = false;
 

@@ -2,7 +2,7 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Follow_Up_Status__c</fullName>
     <description
-  >Where the team has got to with an unhappy guest. Blank means nobody has picked it up, and the dashboard treats blank and Open alike as open work, so no automation is needed to set a starting value. Only meaningful for detractors, but not restricted to them - a passive with a pointed comment may deserve a call too.</description>
+  >Where the team has got to with an unhappy guest. Blank means nobody has picked it up, and the dashboard treats blank and Open alike as open work, so no automation is needed to set a starting value. Only meaningful for detractors, but not restricted to them - a neutral with a pointed comment may deserve a call too.</description>
     <externalId>false</externalId>
     <inlineHelpText
   >Open, Contacted or Resolved. Set from the feedback dashboard.</inlineHelpText>

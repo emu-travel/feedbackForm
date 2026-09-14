@@ -74,7 +74,7 @@ const DATA = {
     answeredInvitations: 4,
     responseRate: 80,
     promoters: 2,
-    passives: 1,
+    neutrals: 1,
     detractors: 1,
     nps: 25,
     avgOverall: 8,
@@ -87,7 +87,7 @@ const DATA = {
       year: 2026,
       month: 7,
       promoters: 1,
-      passives: 0,
+      neutrals: 0,
       detractors: 0,
       total: 1,
       nps: 100
@@ -189,7 +189,7 @@ describe("c-gx-feedback-dashboard", () => {
       (n) => n.textContent
     );
     expect(values).toContain("80%");
-    expect(values).toContain("+25");
+    expect(values).toContain("25.0");
   });
 
   it("marks open follow-ups as needing attention", async () => {
@@ -793,7 +793,7 @@ describe("c-gx-feedback-dashboard at scale", () => {
     const values = [...el.shadowRoot.querySelectorAll(".kpi-value")].map(
       (n) => n.textContent
     );
-    expect(values).toContain("+25");
+    expect(values).toContain("25.0");
   });
 
   it("narrows the hotel detail to the venue search", async () => {

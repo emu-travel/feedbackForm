@@ -6,7 +6,7 @@
  *
  *   GXD-1  Algarve   answered  NPS 10  promoter   wants Schottland next
  *   GXD-2  Algarve   answered  NPS 3   detractor  reminded first; complains
- *   GXD-3  Algarve   answered  NPS 8   passive
+ *   GXD-3  Algarve   answered  NPS 8   neutral
  *   GXD-4  Mallorca  invited, never answered
  *   GXD-5  Mallorca  answered  NPS 9   promoter   wants Japan next
  *   GXD-6  Algarve   SurveySent__c only, from the old survey - not our invitation
@@ -203,7 +203,7 @@ private class GxFeedbackDashboardControllerTest {
 
     Assert.areEqual(4, k.responses, 'Four trips answered');
     Assert.areEqual(2, k.promoters, 'NPS 10 and 9');
-    Assert.areEqual(1, k.passives, 'NPS 8');
+    Assert.areEqual(1, k.neutrals, 'NPS 8');
     Assert.areEqual(1, k.detractors, 'NPS 3');
     Assert.areEqual(8.0, k.avgOverall, '(9 + 5 + 8 + 10) / 4');
     Assert.areEqual(
@@ -217,7 +217,24 @@ private class GxFeedbackDashboardControllerTest {
   static void npsIsPromotersMinusDetractorsNotAnAverage() {
     // 2 promoters, 1 detractor, 4 responses: (2 - 1) / 4 = 25.
     // The average recommendation score is 7.5, which is not NPS at all.
-    Assert.areEqual(25, load(null).kpis.nps);
+    Assert.areEqual(25.0, load(null).kpis.nps);
+  }
+
+  /**
+   * The team's worked example (Bain & Company): 5x10, 3x9, 2x8, 2x7, 1x4 and
+   * 1x2 is 8 promoters, 4 neutrals and 2 detractors out of 14 answers.
+   * 57.1% - 14.3% = 42.9, to one decimal. NPS can go below zero.
+   */
+  @IsTest
+  static void npsMatchesTheTeamsWorkedExampleToOneDecimal() {
+    Assert.areEqual(42.9, GxFeedbackDashboardController.npsOf(8, 2, 14));
+    Assert.areEqual(-42.9, GxFeedbackDashboardController.npsOf(2, 8, 14));
+    Assert.areEqual(0.0, GxFeedbackDashboardController.npsOf(3, 3, 14));
+    Assert.areEqual(100.0, GxFeedbackDashboardController.npsOf(14, 0, 14));
+    Assert.isNull(
+      GxFeedbackDashboardController.npsOf(0, 0, 0),
+      'No answers, no NPS'
+    );
   }
 
   @IsTest
@@ -491,8 +508,8 @@ private class GxFeedbackDashboardControllerTest {
   @IsTest
   static void bucketBoundariesMatchTheNpsDefinition() {
     Assert.areEqual('promoter', GxFeedbackDashboardController.bucketFor(9));
-    Assert.areEqual('passive', GxFeedbackDashboardController.bucketFor(8));
-    Assert.areEqual('passive', GxFeedbackDashboardController.bucketFor(7));
+    Assert.areEqual('neutral', GxFeedbackDashboardController.bucketFor(8));
+    Assert.areEqual('neutral', GxFeedbackDashboardController.bucketFor(7));
     Assert.areEqual('detractor', GxFeedbackDashboardController.bucketFor(6));
     Assert.isNull(GxFeedbackDashboardController.bucketFor(null));
   }
@@ -503,7 +520,7 @@ private class GxFeedbackDashboardControllerTest {
     for (GxFeedbackDashboardController.MonthPoint m : load(null).trend) {
       total += m.total;
       Assert.areEqual(
-        m.promoters + m.passives + m.detractors,
+        m.promoters + m.neutrals + m.detractors,
         m.total,
         'Every response lands in exactly one bucket'
       );
@@ -803,7 +820,7 @@ private class GxFeedbackDashboardControllerTest {
   @IsTest
   static void theListNarrowsToOneGroupOfGuests() {
     Assert.areEqual(2, find(null, null, 'promoters', null, 1).total);
-    Assert.areEqual(1, find(null, null, 'passives', null, 1).total);
+    Assert.areEqual(1, find(null, null, 'neutrals', null, 1).total);
     Assert.areEqual(1, find(null, null, 'detractors', null, 1).total);
     Assert.areEqual(1, find(null, null, 'open', null, 1).total);
   }
@@ -891,7 +908,7 @@ private class GxFeedbackDashboardControllerTest {
       'then the designer'
     );
     Assert.areEqual(10, rows[1].consultation, 'with the consultation score');
-    Assert.areEqual(100, rows[1].nps, 'and the NPS of their one promoter');
+    Assert.areEqual(100.0, rows[1].nps, 'and the NPS of their one promoter');
 
     GxFeedbackDashboardController.Dashboard mine = load(
       new Map<String, Object>{ 'designer' => UserInfo.getUserId() }

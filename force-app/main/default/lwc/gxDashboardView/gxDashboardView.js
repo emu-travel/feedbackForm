@@ -122,16 +122,16 @@ export function formatScore(value) {
   return value === null || value === undefined ? "-" : Number(value).toFixed(1);
 }
 
-/** NPS carries its sign: +25, 0, −10. A missing NPS is a dash, not zero. */
+/**
+ * NPS to one decimal, as the team reports it: 42.9, 0.0, -12.5. It goes below
+ * zero when detractors outnumber promoters. A missing NPS is a dash, not zero.
+ */
 export function formatNps(value) {
   if (value === null || value === undefined) {
     return "-";
   }
-  const n = Math.round(Number(value));
-  if (n > 0) {
-    return `+${n}`;
-  }
-  return n < 0 ? `−${Math.abs(n)}` : "0";
+  const fixed = (Math.round(Number(value) * 10) / 10).toFixed(1);
+  return fixed === "-0.0" ? "0.0" : fixed;
 }
 
 export function formatPercent(value) {
@@ -165,7 +165,7 @@ export function plural(n, one, many) {
 }
 
 /**
- * NPS answers use NPS bands: 9-10 promoter, 7-8 passive, 1-6 detractor. The
+ * NPS answers use NPS bands: 9-10 promoter, 7-8 neutral, 1-6 detractor. The
  * score bands now share those cut-offs, but NPS is defined by them, so it
  * keeps its own rule rather than borrowing the score's.
  */
@@ -260,9 +260,9 @@ export function trendBars(trend) {
       total,
       nps: formatNps(m.nps),
       promoterStyle: `width:${share(m.promoters)}%`,
-      passiveStyle: `width:${share(m.passives)}%`,
+      neutralStyle: `width:${share(m.neutrals)}%`,
       detractorStyle: `width:${share(m.detractors)}%`,
-      summary: `${m.promoters} promoters, ${m.passives} passives, ${m.detractors} detractors`
+      summary: `${m.promoters} promoters, ${m.neutrals} neutrals, ${m.detractors} detractors`
     };
   });
 }
@@ -678,7 +678,7 @@ function standoutOf(sections) {
 export const GROUP_OPTIONS = [
   { label: "All", value: "all" },
   { label: "Promoters", value: "promoters" },
-  { label: "Passives", value: "passives" },
+  { label: "Neutrals", value: "neutrals" },
   { label: "Detractors", value: "detractors" },
   { label: "Open follow-ups", value: "open" }
 ];

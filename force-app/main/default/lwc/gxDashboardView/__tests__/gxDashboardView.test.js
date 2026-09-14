@@ -37,10 +37,14 @@ import {
 } from "c/gxDashboardView";
 
 describe("number formatting", () => {
-  it("gives NPS its sign, and a dash when there is none", () => {
-    expect(formatNps(25)).toBe("+25");
-    expect(formatNps(0)).toBe("0");
-    expect(formatNps(-10)).toBe("−10");
+  it("shows NPS to one decimal, below zero too, and a dash when there is none", () => {
+    expect(formatNps(42.9)).toBe("42.9");
+    expect(formatNps(42.857)).toBe("42.9");
+    expect(formatNps(25)).toBe("25.0");
+    expect(formatNps(0)).toBe("0.0");
+    expect(formatNps(-0.04)).toBe("0.0");
+    expect(formatNps(-12.5)).toBe("-12.5");
+    expect(formatNps(-42.9)).toBe("-42.9");
     expect(formatNps(null)).toBe("-");
     expect(formatNps(undefined)).toBe("-");
   });
@@ -137,7 +141,7 @@ describe("KPI tiles", () => {
     expect(byKey.responses.value).toBe("4");
     expect(byKey.rate.value).toBe("80%");
     expect(byKey.rate.note).toBe("1 still open");
-    expect(byKey.nps.value).toBe("+25");
+    expect(byKey.nps.value).toBe("25.0");
     expect(byKey.followups.alert).toBe(true);
   });
 
@@ -159,7 +163,7 @@ describe("trend", () => {
         year: 2026,
         month: 7,
         promoters: 1,
-        passives: 1,
+        neutrals: 1,
         detractors: 2,
         total: 4,
         nps: -25
@@ -167,8 +171,10 @@ describe("trend", () => {
     ]);
     expect(m.label).toBe("Jul 2026");
     expect(m.promoterStyle).toBe("width:25%");
+    expect(m.neutralStyle).toBe("width:25%");
     expect(m.detractorStyle).toBe("width:50%");
-    expect(m.nps).toBe("−25");
+    expect(m.summary).toBe("1 promoters, 1 neutrals, 2 detractors");
+    expect(m.nps).toBe("-25.0");
   });
 });
 
@@ -718,7 +724,7 @@ describe("travel designers", () => {
     expect(rows[0].active).toBe(true);
     expect(rows[0].rowCls).toBe("drow drow_active");
     expect(rows[0].consultation).toBe("9.1");
-    expect(rows[0].nps).toBe("+50");
+    expect(rows[0].nps).toBe("50.0");
     expect(rows[1].active).toBe(false);
     expect(rows[1].nps).toBe("-");
   });

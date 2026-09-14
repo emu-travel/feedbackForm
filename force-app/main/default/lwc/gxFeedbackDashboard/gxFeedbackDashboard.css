@@ -13,7 +13,7 @@
   --gx-mid-wash: #fbf0d6;
   --gx-bad: #a6402e;
   --gx-bad-wash: #f8e6e2;
-  --gx-passive: #c9d1cc;
+  --gx-neutral: #c9d1cc;
 }
 
 .dash {
@@ -207,8 +207,8 @@
   background: var(--gx-good);
 }
 
-.sw_pas {
-  background: var(--gx-passive);
+.sw_neu {
+  background: var(--gx-neutral);
 }
 
 .sw_det {
@@ -274,8 +274,8 @@
   background: var(--gx-good);
 }
 
-.seg_pas {
-  background: var(--gx-passive);
+.seg_neu {
+  background: var(--gx-neutral);
 }
 
 .seg_det {
