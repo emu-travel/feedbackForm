@@ -32,7 +32,7 @@
 					<tr>
 						<td style="padding: 26px 26px 28px 26px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.65; color: #1f2937;"><span style="font-weight: bold; color: #0f172a;">{{{Recipient.LetterSalutation__c}}},</span><br />
 						<br />
-						Herzlich willkommen zurück aus Ihrem Urlaub. Wir hoffen sehr, dass Sie eine rundum schöne Reise verbringen konnten und mit vielen besonderen Eindrücken nach Hause zurückgekehrt sind.<br />
+						wir hoffen sehr, dass Sie eine rundum schöne Reise verbringen konnten und mit vielen besonderen Eindrücken nach Hause zurückgekehrt sind.<br />
 						<br />
 						Es war uns eine große Freude, Ihre Reise begleiten und für Sie gestalten zu dürfen. Für das Vertrauen, das Sie unserem Team entgegengebracht haben, möchten wir uns nochmals ganz herzlich bedanken.<br />
 						<br />
