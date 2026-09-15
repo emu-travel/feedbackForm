@@ -50,6 +50,9 @@ Gx_Detractor_Alert__e → GxDetractorAlert (email to the travel designer)
 - The survey is German. The hotel's country is shown with the German name from
   `Booking__c.DestinationCountry__c`.
 - A link stops working 14 days after the last invitation or reminder.
+- Answers are kept on the guest's device as they go (browser storage, nothing is sent before
+  submitting). Reopening the link on the same device resumes on the same step. The draft is
+  deleted on submit, when the link is answered or expired, and is never restored after 14 days.
 
 ### Sending
 
