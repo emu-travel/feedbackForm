@@ -25,6 +25,16 @@ describe("c-gx-service-icon", () => {
     }
   );
 
+  it("has a small size for dense lists", () => {
+    const element = mount("hotel");
+    element.size = "small";
+    return Promise.resolve().then(() => {
+      expect(element.shadowRoot.querySelector(".tile").className).toBe(
+        "tile tile_small"
+      );
+    });
+  });
+
   it("draws nothing for a name it does not know", () => {
     const element = mount("boat");
     expect(element.shadowRoot.querySelectorAll("svg")).toHaveLength(0);

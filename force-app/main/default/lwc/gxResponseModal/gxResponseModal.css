@@ -146,11 +146,16 @@
 .item-label {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   column-gap: 0.5rem;
   margin: 0;
   font-weight: 600;
   color: var(--gx-ink);
+}
+
+/* The survey's icon, so a flight, hotel or course reads as it did for the guest. */
+.item-icon {
+  margin-right: -0.125rem;
 }
 
 .tag {

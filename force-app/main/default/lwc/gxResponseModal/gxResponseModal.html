@@ -80,6 +80,13 @@
                 <span class={item.cls}>{item.score}</span>
                 <div class="item-main">
                   <p class="item-label">
+                    <template lwc:if={item.icon}>
+                      <c-gx-service-icon
+                        class="item-icon"
+                        name={item.icon}
+                        size="small"
+                      ></c-gx-service-icon>
+                    </template>
                     <span>{item.label}</span>
                     <template lwc:if={item.tag}>
                       <span class="tag">{item.tag}</span>

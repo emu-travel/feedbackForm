@@ -86,6 +86,16 @@ describe("c-gx-response-modal", () => {
     );
   });
 
+  it("marks hotels and courses with the survey's icons", async () => {
+    getResponseDetail.mockResolvedValue(DETAIL);
+    const el = mount();
+    await flush();
+
+    const icons = [...el.shadowRoot.querySelectorAll("c-gx-service-icon")];
+    expect(icons.map((i) => i.name)).toEqual(["hotel", "golf"]);
+    icons.forEach((i) => expect(i.size).toBe("small"));
+  });
+
   it("leads with what stood out", async () => {
     getResponseDetail.mockResolvedValue({ ...DETAIL, designer: "Silke" });
     const el = mount();

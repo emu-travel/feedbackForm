@@ -148,6 +148,19 @@ export function categoryLabel(category) {
   return CATEGORY_LABELS[category] || category || "";
 }
 
+/** The survey's icon for a category (c-gx-service-icon), so both read alike. */
+const CATEGORY_ICONS = {
+  Hotel: "hotel",
+  Golfclub: "golf",
+  Airline: "flight",
+  TransferCompany: "transfer",
+  CarRentalCompany: "car"
+};
+
+export function iconFor(category) {
+  return CATEGORY_ICONS[category] || null;
+}
+
 /** 'bad' below 7, 'mid' from 7, 'good' from 9 - the dashboard's three bands. */
 export function toneFor(score) {
   if (score === null || score === undefined) {
@@ -555,7 +568,8 @@ export function responseView(detail) {
           `service-${i}`,
           `${categoryLabel(s.category)} · ${s.name}`,
           s.score,
-          s.comment
+          s.comment,
+          { icon: iconFor(s.category) }
         )
       ),
       texts: []
@@ -568,6 +582,7 @@ export function responseView(detail) {
       title: "Hotels",
       items: (d.hotels || []).map((h, i) =>
         scored(`hotel-${i}`, h.name, h.score, h.comment, {
+          icon: iconFor("Hotel"),
           subs: (h.subScores || []).map((c) => ({
             key: `hotel-${i}-${c.subCategory}`,
             label: SUB_LABELS[c.subCategory] || c.subCategory,
@@ -584,7 +599,9 @@ export function responseView(detail) {
       key: "golf",
       title: "Golf courses",
       items: (d.golf || []).map((g, i) =>
-        scored(`golf-${i}`, g.name, g.score, g.comment)
+        scored(`golf-${i}`, g.name, g.score, g.comment, {
+          icon: iconFor("Golfclub")
+        })
       ),
       texts: textRows([["About the golf in general", d.generalGolfComment]])
     });

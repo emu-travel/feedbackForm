@@ -587,6 +587,24 @@ describe("one whole response", () => {
     ]);
   });
 
+  it("gives services, hotels and courses the survey's icons, and nothing else", () => {
+    const v = responseView({
+      ...DETAIL,
+      services: [
+        ...DETAIL.services,
+        { category: "CarRentalCompany", name: "Sixt", score: 8 }
+      ],
+      golf: [{ name: "Quinta do Lago", score: 9 }]
+    });
+    const icons = (key) =>
+      v.sections.find((s) => s.key === key).items.map((i) => i.icon || null);
+    expect(icons("overall")).toEqual([null, null]);
+    expect(icons("services")).toEqual(["flight", "transfer", "car"]);
+    expect(icons("hotels")).toEqual(["hotel"]);
+    expect(icons("golf")).toEqual(["golf"]);
+    expect(icons("close")).toEqual([null]);
+  });
+
   it("puts a hotel's detail ratings underneath it", () => {
     const [hotel] = responseView(DETAIL).sections[2].items;
     expect(hotel.subs.map((s) => `${s.label} ${s.value}`)).toEqual([

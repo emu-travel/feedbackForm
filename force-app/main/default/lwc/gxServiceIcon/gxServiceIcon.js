@@ -13,6 +13,13 @@ export default class GxServiceIcon extends LightningElement {
   /** flight | transfer | car | hotel | golf */
   @api name;
 
+  /** "small" for dense lists such as the dashboard's full response. */
+  @api size;
+
+  get tileClass() {
+    return this.size === "small" ? "tile tile_small" : "tile";
+  }
+
   get isFlight() {
     return this.name === "flight";
   }
