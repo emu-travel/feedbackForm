@@ -216,6 +216,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
+        <field>Booking__c.Feedback_Received_On__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
         <field>Booking__c.Survey_Logo_URL__c</field>
         <readable>true</readable>
     </fieldPermissions>

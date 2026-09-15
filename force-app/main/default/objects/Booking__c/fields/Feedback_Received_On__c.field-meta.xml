@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Feedback_Received_On__c</fullName>
+    <description
+  >When the guest's post-trip feedback arrived: the latest Feedback_Response__c.Submitted_On__c. Calculated by Salesforce (roll-up), so it fills in the moment the survey is submitted and clears if the response is deleted. With Status__c = Feedback, empty means invited but not answered yet.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >Wann das Feedback des Gastes eingegangen ist. Wird automatisch gesetzt, sobald der Gast die Umfrage absendet. Leer bedeutet: noch keine Antwort.</inlineHelpText>
+    <label>Feedback erhalten am</label>
+    <summarizedField>Feedback_Response__c.Submitted_On__c</summarizedField>
+    <summaryForeignKey>Feedback_Response__c.Booking__c</summaryForeignKey>
+    <summaryOperation>max</summaryOperation>
+    <trackTrending>false</trackTrending>
+    <type>Summary</type>
+</CustomField>

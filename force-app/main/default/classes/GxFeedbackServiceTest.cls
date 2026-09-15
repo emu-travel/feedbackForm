@@ -531,6 +531,16 @@ private class GxFeedbackServiceTest {
       }
     );
 
+    Assert.isNull(
+      [
+        SELECT Feedback_Received_On__c
+        FROM Booking__c
+        WHERE BookingNumber__c = :BOOKING_NUM
+      ]
+      .Feedback_Received_On__c,
+      'Before the guest answers, the booking shows no feedback date'
+    );
+
     Test.startTest();
     GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
       JSON.serialize(payload)
@@ -543,6 +553,22 @@ private class GxFeedbackServiceTest {
       'A recommendation of 10 earns the public review prompt'
     );
     Assert.isNotNull(r.reference, 'The guest gets a reference number back');
+
+    Booking__c afterSubmit = [
+      SELECT Feedback_Received_On__c, Status__c
+      FROM Booking__c
+      WHERE BookingNumber__c = :BOOKING_NUM
+    ];
+    Feedback_Response__c stored = [
+      SELECT Submitted_On__c
+      FROM Feedback_Response__c
+      WHERE Booking__r.BookingNumber__c = :BOOKING_NUM
+    ];
+    Assert.areEqual(
+      stored.Submitted_On__c,
+      afterSubmit.Feedback_Received_On__c,
+      'The booking shows when the feedback arrived'
+    );
 
     Feedback_Response__c saved = [
       SELECT
