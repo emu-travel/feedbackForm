@@ -8,6 +8,7 @@
     <inlineHelpText
   >Whether this guest has already had a feedback reminder. Set automatically.</inlineHelpText>
     <label>Survey Reminder Sent</label>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>Checkbox</type>
 </CustomField>

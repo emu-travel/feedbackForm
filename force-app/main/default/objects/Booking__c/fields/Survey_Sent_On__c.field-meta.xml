@@ -8,6 +8,7 @@
   >When we last asked this guest for feedback. Set automatically.</inlineHelpText>
     <label>Survey Sent On</label>
     <required>false</required>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>DateTime</type>
 </CustomField>
