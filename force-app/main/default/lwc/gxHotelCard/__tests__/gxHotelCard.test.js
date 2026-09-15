@@ -109,6 +109,16 @@ describe("c-gx-hotel-card", () => {
     expect(subs[3].value).toBe(9); // Cleanliness
   });
 
+  it("shows a comment the guest wrote before", async () => {
+    const element = mount({
+      answer: { score: 5, comment: "Der Spa war geschlossen" }
+    });
+    await Promise.resolve();
+    expect(element.shadowRoot.querySelector(".comment-box").value).toBe(
+      "Der Spa war geschlossen"
+    );
+  });
+
   it("names the hotel in its improvement question", () => {
     const element = mount({ answer: { score: 4 } });
     expect(

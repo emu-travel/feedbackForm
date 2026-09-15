@@ -25,6 +25,7 @@ import buttonSubmit from "@salesforce/label/c.Gx_Survey_Button_Submit";
 import missingNote from "@salesforce/label/c.Gx_Survey_Missing_Note";
 import missingRating from "@salesforce/label/c.Gx_Survey_Missing_Rating";
 import errorNotSaved from "@salesforce/label/c.Gx_Survey_Error_Not_Saved";
+import draftRestored from "@salesforce/label/c.Gx_Survey_Draft_Restored";
 import errorNotSent from "@salesforce/label/c.Gx_Survey_Error_Not_Sent";
 import months from "@salesforce/label/c.Gx_Survey_Months";
 import scalePoor from "@salesforce/label/c.Gx_Survey_Scale_Poor";
@@ -114,6 +115,7 @@ export const LABELS = {
   missingNote,
   missingRating,
   errorNotSaved,
+  draftRestored,
   errorNotSent,
   months,
   scalePoor,

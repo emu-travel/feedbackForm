@@ -128,6 +128,8 @@ describe("c-gx-feedback-form", () => {
       document.body.removeChild(document.body.firstChild);
     }
     jest.clearAllMocks();
+    // Answers saved on the "device" would otherwise resume in the next test.
+    window.localStorage.clear();
   });
 
   describe("opening the link", () => {
@@ -554,6 +556,119 @@ describe("c-gx-feedback-form", () => {
       await flush();
 
       expect(submit).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("resuming on the same device", () => {
+    const KEY = "gxFeedbackDraft:L000187ES";
+
+    beforeEach(() => window.localStorage.clear());
+    afterEach(() => window.localStorage.clear());
+
+    it("saves the answers on the device as the guest goes", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+      await next(element);
+
+      const saved = JSON.parse(window.localStorage.getItem(KEY));
+      expect(saved.answers.overallExperience).toBe(10);
+      expect(saved.screen).toBe(2);
+      expect(title(element)).toBe("Transfer- und Mobilitätsleistungen");
+    });
+
+    it("puts the answers and the step back when the link is opened again", async () => {
+      const first = mount();
+      withUrl();
+      await flush();
+      await next(first);
+      await next(first);
+      document.body.removeChild(first);
+
+      const again = mount();
+      withUrl();
+      await flush();
+
+      expect(title(again)).toBe("Hotel und Unterkunft");
+      expect(again.shadowRoot.querySelector(".restored").textContent).toContain(
+        "Willkommen zurück"
+      );
+
+      backButton(again).click();
+      await flush();
+      backButton(again).click();
+      await flush();
+      const overall = again.shadowRoot.querySelector(
+        'c-gx-rating-scale[data-field="overallExperience"]'
+      );
+      expect(overall.value).toBe(10);
+      expect(again.shadowRoot.querySelector(".restored")).toBeNull();
+    });
+
+    it("keeps a typed remark when the guest steps back and forth", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+      await next(element);
+      await next(element);
+
+      const box = element.shadowRoot.querySelector(
+        'textarea[data-field="generalHotelComment"]'
+      );
+      box.value = "Frühstück sehr gut";
+      box.dispatchEvent(new CustomEvent("input"));
+      await flush();
+
+      await next(element);
+      backButton(element).click();
+      await flush();
+
+      expect(
+        element.shadowRoot.querySelector(
+          'textarea[data-field="generalHotelComment"]'
+        ).value
+      ).toBe("Frühstück sehr gut");
+      expect(
+        JSON.parse(window.localStorage.getItem(KEY)).answers.generalHotelComment
+      ).toBe("Frühstück sehr gut");
+    });
+
+    it("forgets the answers once the feedback is sent", async () => {
+      const element = mount();
+      withUrl();
+      await flush();
+      await walkToEnd(element);
+
+      await next(element);
+
+      expect(title(element)).toBe("Vielen Dank!");
+      expect(window.localStorage.getItem(KEY)).toBeNull();
+    });
+
+    it("forgets them when the link was already answered", async () => {
+      window.localStorage.setItem(KEY, "{}");
+      getContext.mockResolvedValue({ ok: false, message: "submitted" });
+      mount();
+      withUrl();
+      await flush();
+
+      expect(window.localStorage.getItem(KEY)).toBeNull();
+    });
+
+    it("still works when the browser refuses to store anything", async () => {
+      const setItem = jest
+        .spyOn(Storage.prototype, "setItem")
+        .mockImplementation(() => {
+          throw new Error("blocked");
+        });
+      const element = mount();
+      withUrl();
+      await flush();
+
+      await next(element);
+
+      expect(title(element)).toBe("Transfer- und Mobilitätsleistungen");
+      setItem.mockRestore();
     });
   });
 });

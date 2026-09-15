@@ -87,6 +87,18 @@
   overflow: hidden;
 }
 
+/* Said once, when answers saved on this device were put back. */
+.restored {
+  margin: -0.5rem 0 1.25rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--gx-gold-border);
+  border-radius: 0.75rem;
+  background: var(--gx-gold-soft);
+  color: var(--gx-forest);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
 .progress-fill {
   height: 100%;
   background: var(--gx-gold);

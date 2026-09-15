@@ -11,7 +11,10 @@ import {
   progressFor,
   earnsPublicReview,
   buildPayload,
-  unansweredOn
+  unansweredOn,
+  draftKey,
+  makeDraft,
+  readDraft
 } from "c/gxSurveyFlow";
 import { LABELS, formatLabel } from "c/gxSurveyLabels";
 
@@ -48,6 +51,9 @@ export default class GxFeedbackForm extends LightningElement {
 
   /** Set once the guest has pressed Weiter on this screen with ratings missing. */
   checked = false;
+
+  /** Answers from an earlier visit on this device were put back. */
+  restored = false;
 
   @track ctx;
   // Every rating starts empty: nothing is chosen on the guest's behalf.
@@ -119,10 +125,13 @@ export default class GxFeedbackForm extends LightningElement {
       });
       if (context && context.ok) {
         this.ctx = context;
+        this.restoreDraft();
         this.loadState = LOAD.READY;
         return;
       }
       this.loadState = this.mapMessage(context && context.message);
+      // An answered, expired or broken link has nothing left to resume.
+      this.clearDraft();
     } catch {
       this.loadState = LOAD.INVALID;
     }
@@ -186,6 +195,9 @@ export default class GxFeedbackForm extends LightningElement {
   }
   get showQuestions() {
     return this.isReady && !this.onThanks;
+  }
+  get showRestored() {
+    return this.restored && this.showQuestions;
   }
 
   get progress() {
@@ -307,6 +319,7 @@ export default class GxFeedbackForm extends LightningElement {
   handleScore(event) {
     const field = event.currentTarget.dataset.field;
     this.answers[field] = event.detail.value;
+    this.saveDraft();
   }
 
   /**
@@ -315,10 +328,12 @@ export default class GxFeedbackForm extends LightningElement {
    */
   handleOverallComment(event) {
     this.answers.overallExperienceComment = event.detail.comment;
+    this.saveDraft();
   }
 
   handleConsultationComment(event) {
     this.answers.consultationComment = event.detail.comment;
+    this.saveDraft();
   }
 
   handleServiceScore(event) {
@@ -327,6 +342,7 @@ export default class GxFeedbackForm extends LightningElement {
       ...this.answers[field],
       score: event.detail.value
     };
+    this.saveDraft();
   }
 
   handleServiceComment(event) {
@@ -335,10 +351,12 @@ export default class GxFeedbackForm extends LightningElement {
       ...this.answers[field],
       comment: event.detail.comment
     };
+    this.saveDraft();
   }
 
   handleText(event) {
     this.answers[event.currentTarget.dataset.field] = event.target.value;
+    this.saveDraft();
   }
 
   handleHotelScore(event) {
@@ -382,6 +400,23 @@ export default class GxFeedbackForm extends LightningElement {
       ...this.answers[collection],
       [reservationId]: { ...existing, ...patch }
     };
+    this.saveDraft();
+  }
+
+  /**
+   * The remark boxes are not bound to a value, so what the guest wrote - on an
+   * earlier visit, or before stepping back and forth - is put back here. Only
+   * when it differs, so typing never moves the cursor.
+   */
+  renderedCallback() {
+    this.template
+      .querySelectorAll("textarea.textbox[data-field]")
+      .forEach((box) => {
+        const incoming = this.answers[box.dataset.field] || "";
+        if (box.value !== incoming) {
+          box.value = incoming;
+        }
+      });
   }
 
   // ------------------------------------------------------------------
@@ -391,7 +426,9 @@ export default class GxFeedbackForm extends LightningElement {
     const previous = previousScreen(this.screen, this.ctx);
     if (previous !== null) {
       this.checked = false;
+      this.restored = false;
       this.screen = previous;
+      this.saveDraft();
       this.scrollToTop();
     }
   }
@@ -407,7 +444,9 @@ export default class GxFeedbackForm extends LightningElement {
       this.send();
       return;
     }
+    this.restored = false;
     this.screen = nextScreen(this.screen, this.ctx);
+    this.saveDraft();
     this.scrollToTop();
   }
 
@@ -429,6 +468,8 @@ export default class GxFeedbackForm extends LightningElement {
       const result = await submit({ payloadJson: JSON.stringify(payload) });
       if (result && result.ok) {
         this.reference = result.reference;
+        this.clearDraft();
+        this.restored = false;
         this.screen = SCREEN.THANKS;
         this.scrollToTop();
       } else {
@@ -438,6 +479,63 @@ export default class GxFeedbackForm extends LightningElement {
       this.submitError = LABELS.errorNotSent;
     } finally {
       this.submitting = false;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Answers kept on this device (see gxSurveyFlow readDraft)
+
+  restoreDraft() {
+    const draft = readDraft(this.readStoredDraft(), {
+      secret: this.secret,
+      context: this.ctx
+    });
+    if (draft) {
+      this.answers = draft.answers;
+      this.screen = draft.screen;
+      this.restored = true;
+    }
+  }
+
+  saveDraft() {
+    if (!this.isReady || this.onThanks) {
+      return;
+    }
+    this.writeStoredDraft(
+      makeDraft({
+        secret: this.secret,
+        screen: this.screen,
+        answers: this.answers
+      })
+    );
+  }
+
+  clearDraft() {
+    this.writeStoredDraft(null);
+  }
+
+  readStoredDraft() {
+    try {
+      return window.localStorage.getItem(draftKey(this.bookingNumber));
+    } catch {
+      return null;
+    }
+  }
+
+  writeStoredDraft(value) {
+    if (!this.bookingNumber) {
+      return;
+    }
+    try {
+      const key = draftKey(this.bookingNumber);
+      if (value === null) {
+        window.localStorage.removeItem(key);
+      } else {
+        window.localStorage.setItem(key, value);
+      }
+    } catch {
+      // Private browsing or storage switched off: the survey still works, it
+      // just cannot resume later.
     }
   }
 

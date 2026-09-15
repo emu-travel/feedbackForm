@@ -145,6 +145,16 @@
         <value>Ihr Feedback konnte nicht gespeichert werden.</value>
     </labels>
     <labels>
+        <fullName>Gx_Survey_Draft_Restored</fullName>
+        <categories>Golf Extra Feedback Survey</categories>
+        <language>de</language>
+        <protected>false</protected>
+        <shortDescription
+    >Survey · When answers saved on this device were restored</shortDescription>
+        <value
+    >Willkommen zurück! Ihre bisherigen Antworten sind gespeichert, Sie können direkt dort weitermachen, wo Sie aufgehört haben.</value>
+    </labels>
+    <labels>
         <fullName>Gx_Survey_Error_Not_Sent</fullName>
         <categories>Golf Extra Feedback Survey</categories>
         <language>de</language>

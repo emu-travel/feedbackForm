@@ -362,3 +362,158 @@ function emptyToNull(value) {
   const trimmed = value.trim();
   return trimmed.length ? trimmed : null;
 }
+
+// ------------------------------------------------------------------
+// Answers kept on the guest's device
+//
+// A guest who closes the window half way through finds their answers again
+// when they reopen the link on the same device. Nothing leaves the device until
+// they submit; the form deletes the draft once the feedback is sent, and a
+// draft never outlives the link itself.
+
+/** As long as the link stays valid after an invitation or reminder. */
+export const DRAFT_MAX_AGE_DAYS = 14;
+const DRAFT_VERSION = 1;
+const DRAFT_TEXT_MAX = 4000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function draftKey(bookingNumber) {
+  return `gxFeedbackDraft:${bookingNumber}`;
+}
+
+/**
+ * A short hash of the link's secret, so a draft is only restored for the link
+ * it was written for - without keeping the secret itself on the device.
+ */
+function linkFingerprint(secret) {
+  const s = String(secret || "");
+  let hash = 5381;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) + hash + s.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function makeDraft({ secret, screen, answers, now = Date.now() }) {
+  return JSON.stringify({
+    v: DRAFT_VERSION,
+    k: linkFingerprint(secret),
+    savedAt: now,
+    screen,
+    answers
+  });
+}
+
+/**
+ * The saved answers and the step to continue on, or null when there is nothing
+ * trustworthy to restore: another link, older than the link's validity, or not
+ * a draft at all. Only valid scores and only hotels and courses still on the
+ * booking come back.
+ */
+export function readDraft(raw, { secret, context, now = Date.now() }) {
+  let draft;
+  try {
+    draft = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (
+    !draft ||
+    draft.v !== DRAFT_VERSION ||
+    draft.k !== linkFingerprint(secret) ||
+    typeof draft.savedAt !== "number" ||
+    now - draft.savedAt > DRAFT_MAX_AGE_DAYS * DAY_MS
+  ) {
+    return null;
+  }
+  const answers = cleanDraftAnswers(draft.answers, context);
+  if (!hasAnyAnswer(answers)) {
+    return null;
+  }
+  return { answers, screen: resumeScreen(draft.screen, context, answers) };
+}
+
+function cleanDraftAnswers(given, context) {
+  const g = given && typeof given === "object" ? given : {};
+  const ctx = context || {};
+  const score = (value) => {
+    return isScore(value) ? value : null;
+  };
+  const text = (value) => {
+    return typeof value === "string" ? value.slice(0, DRAFT_TEXT_MAX) : "";
+  };
+  const single = (entry) => ({
+    score: score(entry && entry.score),
+    comment: text(entry && entry.comment)
+  });
+  const items = (list, byReservation, withSubRatings) => {
+    const out = {};
+    (list || []).forEach(({ reservationId }) => {
+      const entry = byReservation && byReservation[reservationId];
+      if (!entry || typeof entry !== "object") {
+        return;
+      }
+      const kept = { score: score(entry.score), comment: text(entry.comment) };
+      if (withSubRatings && entry.sub && typeof entry.sub === "object") {
+        kept.sub = {};
+        SUB_CATEGORIES.forEach((key) => {
+          if (isScore(entry.sub[key])) {
+            kept.sub[key] = entry.sub[key];
+          }
+        });
+      }
+      out[reservationId] = kept;
+    });
+    return out;
+  };
+  return {
+    overallExperience: score(g.overallExperience),
+    overallExperienceComment: text(g.overallExperienceComment),
+    consultation: score(g.consultation),
+    consultationComment: text(g.consultationComment),
+    flight: single(g.flight),
+    transfer: single(g.transfer),
+    rentalCar: single(g.rentalCar),
+    hotels: items(ctx.hotels, g.hotels, true),
+    golfCourses: items(ctx.golfCourses, g.golfCourses, false),
+    generalHotelComment: text(g.generalHotelComment),
+    generalGolfComment: text(g.generalGolfComment),
+    recommendation: score(g.recommendation),
+    nextDestination: text(g.nextDestination),
+    improvementSuggestions: text(g.improvementSuggestions)
+  };
+}
+
+function hasAnyAnswer(answers) {
+  const values = [];
+  const collect = (value) => {
+    if (value && typeof value === "object") {
+      Object.values(value).forEach(collect);
+    } else {
+      values.push(value);
+    }
+  };
+  collect(answers);
+  return values.some((value) => {
+    if (typeof value === "string") {
+      return value.trim() !== "";
+    }
+    return value !== null;
+  });
+}
+
+/**
+ * The step the guest was on - unless an earlier step still misses a rating
+ * (the itinerary may have changed), then that one, so submitting stays possible.
+ */
+function resumeScreen(saved, context, answers) {
+  const screens = visibleScreens(context);
+  if (!screens.length) {
+    return SCREEN.OVERALL;
+  }
+  const target = screens.includes(saved) ? saved : screens[0];
+  const earlierGap = screens
+    .slice(0, screens.indexOf(target))
+    .find((screen) => unansweredOn(screen, context, answers).length > 0);
+  return earlierGap || target;
+}

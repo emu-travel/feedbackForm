@@ -72,6 +72,22 @@ export default class GxHotelCard extends LightningElement {
     return shouldExpandHotelDetail(this.score);
   }
 
+  /**
+   * The comment box is not bound to a value, so a comment the guest wrote
+   * earlier - restored from this device - is put back into it here. Only when
+   * it differs, so typing never moves the cursor.
+   */
+  renderedCallback() {
+    const box = this.template.querySelector(".comment-box");
+    if (!box) {
+      return;
+    }
+    const incoming = this.comment || "";
+    if (box.value !== incoming) {
+      box.value = incoming;
+    }
+  }
+
   get subRatings() {
     const given = (this.answer && this.answer.sub) || {};
     return SUB_CATEGORIES.map((key) => ({

@@ -53,6 +53,10 @@
           </div>
         </div>
 
+        <template lwc:if={showRestored}>
+          <p class="restored" role="status">{labels.draftRestored}</p>
+        </template>
+
         <!-- SCREEN 1 -->
         <template lwc:if={onOverall}>
           <section class="screen">
@@ -223,6 +227,7 @@
                 class="textbox"
                 rows="2"
                 data-field="generalHotelComment"
+                oninput={handleText}
                 onchange={handleText}
               ></textarea>
             </div>
@@ -257,6 +262,7 @@
                 class="textbox"
                 rows="2"
                 data-field="generalGolfComment"
+                oninput={handleText}
                 onchange={handleText}
               ></textarea>
             </div>
@@ -293,6 +299,7 @@
                 rows="2"
                 data-field="nextDestination"
                 placeholder={labels.s5WishlistHint}
+                oninput={handleText}
                 onchange={handleText}
               ></textarea>
             </div>
@@ -307,6 +314,7 @@
                 rows="4"
                 data-field="improvementSuggestions"
                 placeholder={labels.s5FinalHint}
+                oninput={handleText}
                 onchange={handleText}
               ></textarea>
             </div>
