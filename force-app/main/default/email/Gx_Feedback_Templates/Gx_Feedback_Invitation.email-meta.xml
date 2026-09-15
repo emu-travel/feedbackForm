@@ -7,7 +7,8 @@
     <name>golf.extra Feedback Einladung</name>
     <relatedEntityType>Booking__c</relatedEntityType>
     <style>none</style>
-    <subject>Willkommen zurück – wir freuen uns auf Ihr Feedback!</subject>
+    <subject
+  >Ihre Meinung liegt uns am Herzen – wir freuen uns auf Ihr Feedback</subject>
     <type>custom</type>
     <uiType>SFX</uiType>
 </EmailTemplate>
