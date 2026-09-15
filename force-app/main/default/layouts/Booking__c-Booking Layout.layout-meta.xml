@@ -474,6 +474,7 @@
         <fields>Recommendation_NPS__c</fields>
         <fields>NPS_Category__c</fields>
         <fields>Submitted_On__c</fields>
+        <excludeButtons>New</excludeButtons>
         <relatedList>Feedback_Response__c.Booking__c</relatedList>
     </relatedLists>
     <showEmailCheckbox>false</showEmailCheckbox>
