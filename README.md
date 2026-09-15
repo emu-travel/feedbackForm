@@ -12,7 +12,6 @@ force-app/main/default/     Salesforce source - everything below is deployed
 scripts/apex/               Anonymous Apex for dispatch and go-live
 manifest/package.xml        Deployment manifest
 config/                     Scratch org definition
-reference-app/              Original React prototype - never deployed (.forceignore)
 ```
 
 ## How it works

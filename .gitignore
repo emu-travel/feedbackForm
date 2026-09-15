@@ -50,14 +50,8 @@ $RECYCLE.BIN/
 **/.venv/
 **/venv/
 
-# Reference app (React prototype) build output
-reference-app/dist/
-reference-app/build/
-reference-app/node_modules/
-
-# Local env files (keep the example)
+# Local env files
 .env*
-!reference-app/.env.example
 
 # Retrieved org metadata kept locally for study, not part of this project's source
 .org-study/
