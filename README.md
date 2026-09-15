@@ -1,125 +1,115 @@
-# Golf Extra — Post-Trip Feedback Form (Salesforce)
+# Golf Extra - Post-Trip Feedback (Salesforce)
 
-Salesforce implementation of the golf.extra / EMU exclusive travel post-trip guest feedback
-survey. Guests receive an email after their golf trip and complete a personalised survey built
-from the itinerary they actually booked.
+The golf.extra / EMU exclusive travel post-trip feedback survey and the team's Feedback
+Dashboard. After a golf trip the guest receives an email with a personal link, rates exactly
+what they booked (flights, transfers, rental car, each hotel, each golf course) and the team
+reads the answers on the dashboard.
 
 ## Repository layout
 
 ```
-force-app/main/default/     Salesforce source (objects, classes, lwc, permissionsets)
-config/                     Scratch org definition
+force-app/main/default/     Salesforce source - everything below is deployed
+scripts/apex/               Anonymous Apex for dispatch and go-live
 manifest/package.xml        Deployment manifest
-scripts/                    Anonymous Apex + SOQL helper scripts
-reference-app/              React/Vite prototype — VISUAL SPEC ONLY, never deployed
+config/                     Scratch org definition
+reference-app/              Original React prototype - never deployed (.forceignore)
 ```
 
-`reference-app/` is the original AI Studio prototype. It is the source of truth for
-_behaviour and design_, not for production code, and is excluded from deployment via
-`.forceignore`. Its functional write-up is in
-[`reference-app/TECHNICAL_DOCUMENTATION.md`](reference-app/TECHNICAL_DOCUMENTATION.md).
-
-## Architecture
-
-All data already lives in Salesforce. There is no external system and no integration layer.
-The survey reads the itinerary directly from the existing booking model and writes feedback
-into two new objects.
+## How it works
 
 ```
-Booking__c  (trip header — already exists)
-   │  SendSurvey__c / SurveySent__c / Form_Secret__c  ← already exist
-   │
-   ├── Reservation__c (itinerary line items — already exist)
-   │      AccountType__c: Hotel | Golfclub | Airline | TransferCompany | CarRentalCompany | …
-   │      Travel_Location__r.Name → the hotel / golf club / supplier
-   │
+GxFeedbackScheduler (nightly, 07:00)
+   │  invites trips that ended 36 h ago; one reminder 10 days later, never after an answer
    ▼
-Email with tokenised link  →  Experience Cloud public page
-   https://…/feedback?b={BookingNumber__c}&k={Form_Secret__c}
-   │
+Gx_Feedback_Invitation / Gx_Feedback_Reminder   (Lightning email templates, German)
+   │  personal link: https://…/feedback/?b={BookingNumber__c}&k={Form_Secret__c}
    ▼
-gxFeedbackForm (LWC)
-   │
+LWR site "Golf Extra Feedback"  →  gxFeedbackForm (LWC)
+   │  GxFeedbackFormController  (the only Apex the guest may call)
+   │  GxFeedbackService         (link check, itinerary, validation, save)
    ▼
-GxFeedbackFormController   thin, `with sharing`, the only Apex the guest may call
-GxFeedbackService          `without sharing`, token check + rate limit + all logic
-   │
-   ▼
-Feedback_Response__c  +  Feedback_Rating__c        ← the only new objects
-   │
-   ▼
-Reports & dashboards (NPS by month, average score per hotel / course, detractor list)
+Feedback_Response__c  +  Feedback_Rating__c
+   │                                   │
+   │  recommendation 6 or below        ▼
+   ▼                            Feedback Dashboard (gxFeedbackDashboard, GxFeedbackDashboardController)
+Gx_Detractor_Alert__e → GxDetractorAlert (email to the travel designer)
 ```
 
-### Reusing what the org already has
+### The survey
 
-This org already solved guest access for the **Reiseanmeldung** booking-confirmation form.
-We follow that pattern rather than inventing a parallel one:
+- Screens follow the booking: overall and consultation, then flights / transfers / rental car,
+  hotels, golf courses, conclusion. A screen the trip did not have is skipped.
+- Only delivered travel is rated. The itinerary comes from `Reservation__c`; the category is
+  **`AccountType__c`** (`Type__c` is empty on every row), the name is
+  `Travel_Location__r.Name`. Repeat rows for the same venue become one card.
+- A rating of 8 or below opens an optional comment. A hotel below 9 opens four detail ratings
+  (room, service, catering, cleanliness).
+- A recommendation of 9 or 10 shows the Trustpilot and Google review buttons on the thank-you page.
+- Every guest-facing text is a Custom Label `Gx_Survey_*` (category "Golf Extra Feedback
+  Survey"), so the wording can change in Setup. The site serves a compiled copy: **publish the
+  site after editing a label**, and retrieve the labels into this repo before the next deploy.
+- The survey is German. The hotel's country is shown with the German name from
+  `Booking__c.DestinationCountry__c`.
+- A link stops working 14 days after the last invitation or reminder.
 
-| Existing                                                 | Reused for                                      |
-| -------------------------------------------------------- | ----------------------------------------------- |
-| `Booking__c.Form_Secret__c`                              | The invitation token — no new invitation object |
-| `ReiseanmeldungFormController` / `ReiseanmeldungService` | Shape of our controller/service pair            |
-| LWC `reiseanmeldungForm` (reads `?b=` and `?k=`)         | URL parameter handling                          |
-| `Booking__c.SendSurvey__c` / `SurveySent__c`             | Dispatch flags, already flow-driven             |
-| Experience Cloud public site pattern                     | Where the form is hosted                        |
+### Sending
 
-### Reading the itinerary — important
+- `GxFeedbackScheduler` → `GxFeedbackDispatch` → `GxFeedbackSender`. Rules and addresses live
+  in the custom metadata record `Gx_Feedback_Setting.Default` (start date, delays, link
+  validity, sender `anfrage@golf-extra.com`, review links, alert switch and copy address).
+- Only trips that ended on or after `Survey_Start_Date__c` and within `Max_Trip_Age_Days__c`
+  are invited, so switching the job on never mails old guests.
+- A guest who has answered is never reminded (checked in the query and again before sending).
+- The flow `Gx_Send_Feedback_Survey` and the Booking quick action of the same name are kept
+  deliberately **off** the page layout: sending is automatic. They are the recovery path when a
+  guest says the email never arrived (`scripts/apex/send-feedback-invitation.apex` does the same).
 
-`Reservation__c.Type__c` looks like the right discriminator but is **null on every row**.
-The populated field is **`AccountType__c`**:
+### Detractor alerts
 
-| `AccountType__c`                       | Survey section                                      |
-| -------------------------------------- | --------------------------------------------------- |
-| `Hotel`                                | Per-hotel rating card, sub-ratings when score `< 9` |
-| `Golfclub`                             | Per-course rating card                              |
-| `Airline`                              | Flight rating                                       |
-| `TransferCompany`                      | Transfer / chauffeur rating                         |
-| `CarRentalCompany`                     | Rental car rating                                   |
-| `Insurance`, `DMC`, `General Services` | Not rated                                           |
+A recommendation of 6 or below publishes `Gx_Detractor_Alert__e` after the answer is saved;
+the trigger emails the trip's travel designer with the alert copy address in copy. In a
+sandbox the designer is never emailed - the alert goes to the copy address only, marked
+`[Sandbox]`.
 
-Names come from `Travel_Location__r.Name`; `Service__r.Name` holds the service description.
-Only delivered travel is rated — filter `Status__c` to `Booked` / `Invoiced` / `Paid` /
-`Completed`, excluding `Calculation` / `Offered` / `Accepted` / `Rejected` / `Canceled`.
+### Feedback Dashboard
 
-Repeat rows for the same venue collapse into one rating card (a real booking carries the same
-hotel on four rows, one per room); distinct venues never collapse, so a guest who booked three
-hotels and two courses gets three hotel cards and two course cards.
+Lightning tab `Gx_Feedback_Dashboard`, for users with the permission set
+**Golf Extra Feedback - Admin**:
 
-The golf card deliberately omits a hole count and highlight badge: no such field exists on
-`Account`, `Service__c` or `Reservation__c`, and adding one would be a data-maintenance
-commitment rather than a code change. Courses show name, service description and `TeeTime__c`.
+- Headline numbers: responses, response rate, NPS, overall and consultation averages, open follow-ups.
+- NPS is % promoters (9-10) minus % detractors (0-6) over everyone who answered, to one
+  decimal, and can be negative. 7-8 are **Neutrals**.
+- Responses: search by guest, email, booking, FB number, region or country; groups; newest or
+  lowest first; paging; **Export to Excel** (CSV with BOM, `application/octet-stream` because
+  Lightning Web Security refuses a `text/csv` blob).
+- NPS by trip month, travel designers, venue and partner scores with search and every rating
+  per venue, hotel detail, unhappy guests to follow up, next destinations.
+- **Full response** shows one answer as the guest gave it, with the survey's icons.
+- Volume guards: the dashboard refuses a selection above 20,000 responses (venue scores above
+  45,000 ratings) and asks for narrower filters instead of failing; lists are capped and paged.
 
-## New data model
+## Data model
 
-| Object                 | Purpose                                                           |
-| ---------------------- | ----------------------------------------------------------------- |
-| `Feedback_Response__c` | One submission per booking: overall, consultation, NPS, free text |
-| `Feedback_Rating__c`   | One row per rated item — category, item name, score, comment      |
+| Object / field                                                              | Purpose                                                                                                                         |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `Feedback_Response__c`                                                      | One answer per booking: overall, consultation, recommendation (`NPS_Category__c`), free text, follow-up status / note / by / on |
+| `Feedback_Rating__c`                                                        | One row per rated item or hotel detail: category, item name, score, comment, lookup to the `Reservation__c`                     |
+| `Booking__c.Survey_Link__c`, `Survey_Sent_On__c`, `Survey_Reminder_Sent__c` | The personal link and the sending bookkeeping                                                                                   |
+| `Booking__c.Survey_Trip_Summary__c`, `Survey_Logo_URL__c`                   | Merge fields for the emails                                                                                                     |
+| `Gx_Feedback_Setting__mdt`                                                  | All settings (see Sending)                                                                                                      |
+| `Gx_Detractor_Alert__e`                                                     | Platform event behind the alert                                                                                                 |
 
-Ratings are normalised into child rows rather than columns, so a trip with four golf courses
-instead of three needs no schema change. Each rating keeps a lookup to the `Reservation__c` it
-came from, so "average score for Real Club Valderrama" is a report, not code.
+## Security
 
-## Why not Salesforce Surveys
+The survey is public, so:
 
-Feedback Management is already in this org and was tried: seven `Survey` records dating to
-Sept 2025, including an active `golf.extra Feedback`. It never launched —
-`SurveyInvitation` and `SurveyResponse` both hold zero rows. The existing survey is a flat
-25-question single page with no conditional logic and no per-hotel or per-course
-personalisation, which is precisely what the prototype was built to replace.
-
-## Survey behaviour to preserve
-
-Ported from `reference-app/src/components/SurveyView.tsx`:
-
-- Screens skip themselves based on which services were booked
-- Any rating `<= 8` reveals a follow-up comment box
-- A hotel rating `< 9` expands four sub-ratings: room, service, catering, cleanliness
-- A recommendation score `>= 9` reveals the Trustpilot and Google Maps review cards;
-  `<= 8` shows a quiet thank-you with no public review prompt
-- All ratings are on a 1–10 scale
-- German-first copy, with English as a translated variant
+- The only handle is `BookingNumber__c` + `Form_Secret__c`; record IDs never reach the browser.
+- The guest permission set **Golf Extra Feedback - Guest** grants the form controller only.
+  Guest sharing rules expose invited bookings (`Status__c = Feedback`) and supplier accounts,
+  never customer accounts.
+- Scores are re-checked on the server (1-10), free text is stripped of markup and capped, and a
+  booking accepts one response only.
+- The site sends `noindex, nofollow`.
 
 ## Development
 
@@ -128,42 +118,29 @@ Ported from `reference-app/src/components/SurveyView.tsx`:
 ```bash
 npm install
 sf org login web --alias gx-sandbox --instance-url https://test.salesforce.com --set-default
-sf org display --target-org gx-sandbox
 ```
 
-`sfdx-project.json` sets `sfdcLoginUrl` to `https://test.salesforce.com`; this project targets
-sandboxes by default. Production deployment is a deliberate, separate step.
-
-### Everyday commands
-
 ```bash
-npm run test:unit          # LWC Jest tests
-npm run lint               # ESLint over lwc/aura
-npm run prettier:verify    # formatting check
-sf project deploy start --dry-run --target-org gx-sandbox    # validate only
-sf project deploy start --target-org gx-sandbox              # deploy
-sf apex run test --target-org gx-sandbox --code-coverage --result-format human
-sf project retrieve start --target-org gx-sandbox            # pull org changes into source
+npm run test:unit                                     # LWC Jest tests
+npm run lint                                          # ESLint
+sf project deploy start --dry-run -o gx-sandbox       # validate
+sf project deploy start -o gx-sandbox                 # deploy
+sf apex run test -o gx-sandbox --code-coverage --result-format human
+sf community publish -o gx-sandbox --name "Golf Extra Feedback"   # after LWC or label changes
 ```
 
 ## Working agreement
 
-1. Develop and test in the **staging sandbox**, then promote to production.
-2. Metadata lives in this repo. Anything changed in the org UI is retrieved back into source.
-3. Tests are written alongside components — Apex tests with real assertions (target ~90%,
-   not the 75% floor) and Jest tests for the conditional-reveal logic.
-4. Validate with `--dry-run` before any deploy.
-5. Deploy from source with the CLI. No change sets.
-6. Never modify the existing Reiseanmeldung or booking metadata; this project only adds.
+1. Develop and test in the staging sandbox; production only after sign-off.
+2. Metadata lives in this repo. Anything changed in Setup is retrieved back before the next deploy.
+3. Apex tests with real assertions, Jest tests for the survey and dashboard logic.
+4. Deploy from source with the CLI, no change sets.
 
-## Security notes
+## Go-live
 
-The survey is served to unauthenticated guests on the public internet:
-
-- Record IDs are never exposed to the client; `BookingNumber__c` + `Form_Secret__c` is the
-  only handle, exactly as the Reiseanmeldung form does it.
-- The guest profile gets access to `GxFeedbackFormController` only — no object permissions of
-  its own. All logic runs in `GxFeedbackService` (`without sharing`).
-- Every score is re-validated server-side (1–10); free text is length-capped and sanitised.
-- Submissions are rate-limited per booking, following the existing form's 10/hour precedent.
-- One response per booking; re-submission is rejected.
+1. Deploy to production with the specified tests; publish the site.
+2. Set `Gx_Feedback_Setting.Default`: `Survey_Base_URL__c` (production site), `Survey_Start_Date__c`
+   (go-live date), `Alert_Copy_Email__c`.
+3. Verify the org-wide address `anfrage@golf-extra.com` and email deliverability.
+4. Assign **Golf Extra Feedback - Admin** to the team.
+5. Last step: `scripts/apex/schedule-feedback-dispatch.apex`.

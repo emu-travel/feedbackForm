@@ -36,10 +36,6 @@ export default class GxResponseModal extends LightningModal {
     return this.view ? this.view.title : "Feedback response";
   }
 
-  get hasBooking() {
-    return Boolean(this.view && this.view.bookingId);
-  }
-
   get noRecord() {
     return !this.view;
   }

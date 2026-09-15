@@ -691,26 +691,10 @@ public without sharing class GxFeedbackService {
   }
 
   /**
-   * What the survey would ask this booking about. Dispatch uses it to avoid
-   * inviting a guest to a survey with no questions in it.
-   */
-  public static List<Reservation__c> rateableItemsFor(Id bookingId) {
-    List<Booking__c> found = [
-      SELECT Id, Status__c
-      FROM Booking__c
-      WHERE Id = :bookingId
-      LIMIT 1
-    ];
-    return found.isEmpty()
-      ? new List<Reservation__c>()
-      : loadRateableReservations(found[0]);
-  }
-
-  /**
    * Which of these bookings the survey would have something to ask about, in
-   * two queries however many bookings are passed in. Dispatch uses it to keep a
-   * nightly batch inside the SOQL limit; rateableItemsFor above is the
-   * single-booking form for the survey itself.
+   * two queries however many bookings are passed in. Dispatch uses it so a
+   * guest is never invited to a survey with no questions in it, and so a
+   * nightly batch stays inside the SOQL limit.
    */
   public static Set<Id> bookingsWithRateableItems(Set<Id> bookingIds) {
     Set<Id> withItems = new Set<Id>();
