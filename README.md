@@ -92,14 +92,15 @@ Lightning tab `Gx_Feedback_Dashboard`, for users with the permission set
 
 ## Data model
 
-| Object / field                                                              | Purpose                                                                                                                         |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `Feedback_Response__c`                                                      | One answer per booking: overall, consultation, recommendation (`NPS_Category__c`), free text, follow-up status / note / by / on |
-| `Feedback_Rating__c`                                                        | One row per rated item or hotel detail: category, item name, score, comment, lookup to the `Reservation__c`                     |
-| `Booking__c.Survey_Link__c`, `Survey_Sent_On__c`, `Survey_Reminder_Sent__c` | The personal link and the sending bookkeeping                                                                                   |
-| `Booking__c.Survey_Trip_Summary__c`, `Survey_Logo_URL__c`                   | Merge fields for the emails                                                                                                     |
-| `Gx_Feedback_Setting__mdt`                                                  | All settings (see Sending)                                                                                                      |
-| `Gx_Detractor_Alert__e`                                                     | Platform event behind the alert                                                                                                 |
+| Object / field                                                              | Purpose                                                                                                                                  |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `Feedback_Response__c`                                                      | One answer per booking: overall, consultation, recommendation (`NPS_Category__c`), free text, follow-up status / note / by / on          |
+| `Feedback_Rating__c`                                                        | One row per rated item or hotel detail: category, item name, score, comment, lookup to the `Reservation__c`                              |
+| `Booking__c.Survey_Link__c`, `Survey_Sent_On__c`, `Survey_Reminder_Sent__c` | The personal link and the sending bookkeeping                                                                                            |
+| `Booking__c.Survey_Trip_Summary__c`, `Survey_Logo_URL__c`                   | Merge fields for the emails                                                                                                              |
+| `Booking__c.Feedback_Received_On__c` ("Feedback erhalten am")               | Roll-up of the latest `Submitted_On__c`: empty while the guest has not answered, set the moment they submit. The status stays "Feedback" |
+| `Gx_Feedback_Setting__mdt`                                                  | All settings (see Sending)                                                                                                               |
+| `Gx_Detractor_Alert__e`                                                     | Platform event behind the alert                                                                                                          |
 
 ## Security
 
@@ -145,4 +146,7 @@ sf community publish -o gx-sandbox --name "Golf Extra Feedback"   # after LWC or
    (go-live date), `Alert_Copy_Email__c`.
 3. Verify the org-wide address `anfrage@golf-extra.com` and email deliverability.
 4. Assign **Golf Extra Feedback - Admin** to the team.
-5. Last step: `scripts/apex/schedule-feedback-dispatch.apex`.
+5. Booking record pages: add the read-only **Feedback** section to the Details tab (Survey Sent, Survey
+   Sent On, Survey Reminder Sent, Feedback erhalten am, and the Feedback Responses list). These Lightning
+   pages belong to the org, not to this repo: retrieve them from production, add the section, deploy.
+6. Last step: `scripts/apex/schedule-feedback-dispatch.apex`.

@@ -332,14 +332,16 @@ private class GxFeedbackSenderTest {
   }
 
   /**
-   * A reminder that reads exactly like the invitation looks like a fault to the
-   * guest, so the two are different templates. Both must exist in the org.
+   * The invitation and the reminder are separate templates with their own text.
+   * Since 2026-09-15 the team deliberately gives both the same subject line and
+   * heading, so only the wording of the body has to differ: a reminder must never
+   * repeat the invitation word for word. Both must exist in the org.
    */
   @IsTest
   static void theInvitationAndTheReminderAreDifferentEmails() {
     Map<String, EmailTemplate> found = new Map<String, EmailTemplate>();
     for (EmailTemplate t : [
-      SELECT DeveloperName, Subject
+      SELECT DeveloperName, Subject, HtmlValue
       FROM EmailTemplate
       WHERE
         DeveloperName IN (
@@ -358,10 +360,18 @@ private class GxFeedbackSenderTest {
       found.containsKey(GxFeedbackSender.REMINDER_TEMPLATE),
       'The reminder template is deployed'
     );
-    Assert.areNotEqual(
+    Assert.isNotNull(
       found.get(GxFeedbackSender.TEMPLATE).Subject,
+      'The invitation has a subject'
+    );
+    Assert.isNotNull(
       found.get(GxFeedbackSender.REMINDER_TEMPLATE).Subject,
-      'A guest must not receive the same subject line twice'
+      'The reminder has a subject'
+    );
+    Assert.areNotEqual(
+      found.get(GxFeedbackSender.TEMPLATE).HtmlValue,
+      found.get(GxFeedbackSender.REMINDER_TEMPLATE).HtmlValue,
+      'The reminder does not repeat the invitation word for word'
     );
   }
 
