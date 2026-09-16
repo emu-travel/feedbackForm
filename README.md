@@ -149,8 +149,11 @@ sf community publish -o gx-sandbox --name "Golf Extra Feedback"   # after LWC or
 5. Booking record pages: add the read-only **Feedback** section to the Details tab (Survey Sent, Survey
    Sent On, Survey Reminder Sent, Feedback erhalten am, and the Feedback Responses list). These Lightning
    pages belong to the org, not to this repo: retrieve them from production, add the section, deploy.
-   Remove the old **Send Survey** button (`Booking__c.SendSurvey`, from the earlier Salesforce Surveys
-   attempt) from Booking Record Page: it sends the old survey and ticks Survey Sent, so the nightly
-   job would skip that booking. Also remove edit on `SurveySent__c` from Booking CRED and turn on field
+   Mind the duplicate label: the sandbox has two record pages both labelled "Booking Record Page"
+   (`Booking_Record_Page`, from 2025, assigned to nothing, and `Booking_Record_Page1`, the one bookings
+   actually render). Check Activation in the Lightning App Builder to see which page is assigned before
+   editing, and remove the old **Send Survey** button (`Booking__c.SendSurvey`, from the earlier
+   Salesforce Surveys attempt) wherever it sits on an assigned page: it sends the old survey and ticks
+   Survey Sent, so the nightly job would skip that booking. Also remove edit on `SurveySent__c` from Booking CRED and turn on field
    history for SurveySent__c, as done in the sandbox.
 6. Last step: `scripts/apex/schedule-feedback-dispatch.apex`.
