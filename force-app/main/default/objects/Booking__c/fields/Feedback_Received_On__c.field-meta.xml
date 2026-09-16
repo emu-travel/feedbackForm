@@ -2,7 +2,7 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Feedback_Received_On__c</fullName>
     <description
-  >When the guest's post-trip feedback arrived: the latest Feedback_Response__c.Submitted_On__c. Calculated by Salesforce (roll-up), so it fills in the moment the survey is submitted and clears if the response is deleted. With Status__c = Feedback, empty means invited but not answered yet.</description>
+  >When the guest's post-trip feedback arrived: the latest Feedback_Response__c.Submitted_On__c. Calculated by Salesforce (roll-up), so it fills in the moment the survey is submitted and clears if the response is deleted. Once the invitation has gone out (SurveySent__c), empty means not answered yet. The answer that fills it also moves the booking status to Feedback, and the validation rule Gx_Feedback_Only_After_Answer keeps Feedback for answered bookings.</description>
     <externalId>false</externalId>
     <inlineHelpText
   >Wann das Feedback des Gastes eingegangen ist. Wird automatisch gesetzt, sobald der Gast die Umfrage absendet. Leer bedeutet: noch keine Antwort.</inlineHelpText>

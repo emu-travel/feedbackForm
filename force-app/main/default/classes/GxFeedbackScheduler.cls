@@ -54,7 +54,7 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
         AND End_Date__c != NULL
         AND End_Date__c >= :earliest
         AND End_Date__c < TODAY
-        AND Status__c IN ('Completed', 'Paid', 'Invoiced', 'Feedback')
+        AND Status__c IN ('Traveled', 'Completed')
       ORDER BY End_Date__c
       LIMIT :batchLimit
     ];

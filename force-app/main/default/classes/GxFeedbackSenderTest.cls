@@ -161,9 +161,9 @@ private class GxFeedbackSenderTest {
 
     Booking__c after = booking(READY);
     Assert.areEqual(
-      'Feedback',
+      'Completed',
       after.Status__c,
-      'The booking was opened to the guest before the mail left'
+      'Sent but not answered: the booking stays at Completed'
     );
     Assert.isTrue(after.SurveySent__c, 'The booking is marked as invited');
     Assert.isNotNull(after.Form_Secret__c, 'A token was minted');

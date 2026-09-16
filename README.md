@@ -18,7 +18,7 @@ config/                     Scratch org definition
 
 ```
 GxFeedbackScheduler (nightly, 07:00)
-   │  invites trips that ended 36 h ago; one reminder 10 days later, never after an answer
+   │  invites trips marked Traveled that ended 36 h ago; one reminder 10 days later, never after an answer
    ▼
 Gx_Feedback_Invitation / Gx_Feedback_Reminder   (Lightning email templates, German)
    │  personal link: https://…/feedback/?b={BookingNumber__c}&k={Form_Secret__c}
@@ -62,6 +62,11 @@ Gx_Detractor_Alert__e → GxDetractorAlert (email to the travel designer)
 - Only trips that ended on or after `Survey_Start_Date__c` and within `Max_Trip_Age_Days__c`
   are invited, so switching the job on never mails old guests.
 - A guest who has answered is never reminded (checked in the query and again before sending).
+- **Booking status:** the team marks a trip **Traveled**; sending the invitation moves it to
+  **Completed** (a trip someone already marked Completed stays there); the guest's answer moves it
+  to **Feedback**. Only Traveled and Completed trips are invited, so a trip still at Paid or
+  Invoiced waits. The validation rule `Gx_Feedback_Only_After_Answer` refuses Feedback by hand
+  while no answer exists.
 - The flow `Gx_Send_Feedback_Survey` and the Booking quick action of the same name are kept
   deliberately **off** the page layout: sending is automatic. They are the recovery path when a
   guest says the email never arrived (`scripts/apex/send-feedback-invitation.apex` does the same).
@@ -92,15 +97,15 @@ Lightning tab `Gx_Feedback_Dashboard`, for users with the permission set
 
 ## Data model
 
-| Object / field                                                              | Purpose                                                                                                                                  |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `Feedback_Response__c`                                                      | One answer per booking: overall, consultation, recommendation (`NPS_Category__c`), free text, follow-up status / note / by / on          |
-| `Feedback_Rating__c`                                                        | One row per rated item or hotel detail: category, item name, score, comment, lookup to the `Reservation__c`                              |
-| `Booking__c.Survey_Link__c`, `Survey_Sent_On__c`, `Survey_Reminder_Sent__c` | The personal link and the sending bookkeeping                                                                                            |
-| `Booking__c.Survey_Trip_Summary__c`, `Survey_Logo_URL__c`                   | Merge fields for the emails                                                                                                              |
-| `Booking__c.Feedback_Received_On__c` ("Feedback erhalten am")               | Roll-up of the latest `Submitted_On__c`: empty while the guest has not answered, set the moment they submit. The status stays "Feedback" |
-| `Gx_Feedback_Setting__mdt`                                                  | All settings (see Sending)                                                                                                               |
-| `Gx_Detractor_Alert__e`                                                     | Platform event behind the alert                                                                                                          |
+| Object / field                                                              | Purpose                                                                                                                                                     |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Feedback_Response__c`                                                      | One answer per booking: overall, consultation, recommendation (`NPS_Category__c`), free text, follow-up status / note / by / on                             |
+| `Feedback_Rating__c`                                                        | One row per rated item or hotel detail: category, item name, score, comment, lookup to the `Reservation__c`                                                 |
+| `Booking__c.Survey_Link__c`, `Survey_Sent_On__c`, `Survey_Reminder_Sent__c` | The personal link and the sending bookkeeping                                                                                                               |
+| `Booking__c.Survey_Trip_Summary__c`, `Survey_Logo_URL__c`                   | Merge fields for the emails                                                                                                                                 |
+| `Booking__c.Feedback_Received_On__c` ("Feedback erhalten am")               | Roll-up of the latest `Submitted_On__c`: empty while the guest has not answered, set the moment they submit. The same answer moves the status to "Feedback" |
+| `Gx_Feedback_Setting__mdt`                                                  | All settings (see Sending)                                                                                                                                  |
+| `Gx_Detractor_Alert__e`                                                     | Platform event behind the alert                                                                                                                             |
 
 ## Security
 
@@ -108,7 +113,7 @@ The survey is public, so:
 
 - The only handle is `BookingNumber__c` + `Form_Secret__c`; record IDs never reach the browser.
 - The guest permission set **Golf Extra Feedback - Guest** grants the form controller only.
-  Guest sharing rules expose invited bookings (`Status__c = Feedback`) and supplier accounts,
+  Guest sharing rules expose invited bookings (`SurveySent__c = true`) and supplier accounts,
   never customer accounts.
 - Scores are re-checked on the server (1-10), free text is stripped of markup and capped, and a
   booking accepts one response only.

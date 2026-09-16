@@ -29,9 +29,13 @@ public without sharing class GxFeedbackService {
   private static final Set<String> DELIVERED_BOOKING_STATUS = new Set<String>{
     'Feedback',
     'Completed',
+    'Traveled',
     'Paid',
     'Invoiced'
   };
+
+  /** The booking status that means the guest has answered. */
+  private static final String STATUS_ANSWERED = 'Feedback';
 
   /** Never rated, whatever the booking says: the guest did not receive these. */
   private static final Set<String> EXCLUDED_RESERVATION_STATUS = new Set<String>{
@@ -425,6 +429,8 @@ public without sharing class GxFeedbackService {
         Database.insert(ratings, true, AccessLevel.SYSTEM_MODE);
       }
 
+      moveToAnswered(b);
+
       res.ok = true;
       res.reference = [
         SELECT Name
@@ -442,6 +448,34 @@ public without sharing class GxFeedbackService {
       res.ok = false;
       res.message = System.Label.Gx_Survey_Server_Not_Saved;
       return res;
+    }
+  }
+
+  /**
+   * Feedback on the path means the guest has answered, so a saved answer moves
+   * the booking there. The booking's validation rule allows Feedback only once
+   * Feedback_Received_On__c is filled, which saving the response has just done.
+   *
+   * The guest's answer matters more than the path. A status change fires the
+   * org's own booking automation ("Booking - Update Reservations and Opp
+   * Status"), which fails on a booking without an Opportunity. If anything
+   * refuses the move, only the move is undone: the answer is kept and the
+   * booking stays where it was. System mode for the same reason as the
+   * response insert.
+   */
+  private static void moveToAnswered(Booking__c b) {
+    if (b.Status__c == STATUS_ANSWERED) {
+      return;
+    }
+    Savepoint beforeMove = Database.setSavepoint();
+    try {
+      Database.update(
+        new Booking__c(Id = b.Id, Status__c = STATUS_ANSWERED),
+        true,
+        AccessLevel.SYSTEM_MODE
+      );
+    } catch (Exception e) {
+      Database.rollback(beforeMove);
     }
   }
 

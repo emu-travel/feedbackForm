@@ -26,12 +26,90 @@ private class GxFeedbackServiceTest {
     );
   }
 
+  @IsTest
+  static void aBookingCannotBeMovedToFeedbackByHandBeforeTheGuestAnswers() {
+    Booking__c b = theBooking();
+    StatusCode refusedWith;
+    try {
+      update new Booking__c(Id = b.Id, Status__c = 'Feedback');
+    } catch (DmlException e) {
+      refusedWith = e.getDmlType(0);
+    }
+    Assert.areEqual(
+      StatusCode.FIELD_CUSTOM_VALIDATION_EXCEPTION,
+      refusedWith,
+      'Feedback is kept for bookings the guest has answered'
+    );
+  }
+
+  @IsTest
+  static void anAnswerIsKeptEvenWhenTheBookingStatusCannotMove() {
+    // Without an Opportunity the org's booking flow refuses any status change:
+    // the real-world failure the guarded move in submit exists for.
+    update new Booking__c(Id = theBooking().Id, Opportunity__c = null);
+
+    Test.startTest();
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(basePayload())
+    );
+    Test.stopTest();
+
+    Assert.isTrue(r.ok, 'The guest answer is saved: ' + r.message);
+    Assert.areEqual(
+      1,
+      [
+        SELECT COUNT()
+        FROM Feedback_Response__c
+        WHERE Booking__c = :theBooking().Id
+      ],
+      'The answer exists'
+    );
+    Assert.areEqual(
+      'Completed',
+      [SELECT Status__c FROM Booking__c WHERE Id = :theBooking().Id].Status__c,
+      'The booking stays where it was when the move is refused'
+    );
+  }
+
+  private static Id testOpportunityId;
+
+  /**
+   * Changing a booking's status fires the org's "Booking - Update Reservations
+   * and Opp Status" flow, which fails on a booking without an Opportunity.
+   * Submitting an answer now moves the status, so test bookings get one, as in
+   * GxFeedbackDispatchTest.
+   */
+  private static Id opportunityFor(Account customer) {
+    if (testOpportunityId == null) {
+      List<Opportunity> existing = [
+        SELECT Id
+        FROM Opportunity
+        WHERE Name = 'Service Test Opportunity'
+        LIMIT 1
+      ];
+      if (existing.isEmpty()) {
+        Opportunity opp = new Opportunity(
+          Name = 'Service Test Opportunity',
+          StageName = 'Prospecting',
+          CloseDate = Date.today().addDays(30),
+          AccountId = customer.Id
+        );
+        insert opp;
+        testOpportunityId = opp.Id;
+      } else {
+        testOpportunityId = existing[0].Id;
+      }
+    }
+    return testOpportunityId;
+  }
+
   private static Booking__c newBooking(
     Account customer,
     String bookingNumber,
     String secret
   ) {
     return new Booking__c(
+      Opportunity__c = opportunityFor(customer),
       Quote_for__c = customer.Id,
       BookingNumber__c = bookingNumber,
       Form_Secret__c = secret,
@@ -568,6 +646,11 @@ private class GxFeedbackServiceTest {
       stored.Submitted_On__c,
       afterSubmit.Feedback_Received_On__c,
       'The booking shows when the feedback arrived'
+    );
+    Assert.areEqual(
+      'Feedback',
+      afterSubmit.Status__c,
+      'Answering moves the booking on to Feedback'
     );
 
     Feedback_Response__c saved = [

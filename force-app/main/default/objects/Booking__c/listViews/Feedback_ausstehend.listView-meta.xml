@@ -8,9 +8,9 @@
     <columns>Survey_Reminder_Sent__c</columns>
     <filterScope>Everything</filterScope>
     <filters>
-        <field>Status__c</field>
+        <field>SurveySent__c</field>
         <operation>equals</operation>
-        <value>Feedback</value>
+        <value>1</value>
     </filters>
     <filters>
         <field>Feedback_Received_On__c</field>

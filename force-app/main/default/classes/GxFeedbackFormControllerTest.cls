@@ -25,7 +25,20 @@ private class GxFeedbackFormControllerTest {
     );
     insert hotel;
 
+    // Submitting an answer moves the booking's status, which fires the org's
+    // "Booking - Update Reservations and Opp Status" flow. It fails on a
+    // booking without an Opportunity, so one is linked, as in
+    // GxFeedbackDispatchTest.
+    Opportunity opp = new Opportunity(
+      Name = 'Controller Test Opportunity',
+      StageName = 'Prospecting',
+      CloseDate = Date.today().addDays(30),
+      AccountId = customer.Id
+    );
+    insert opp;
+
     Booking__c b = new Booking__c(
+      Opportunity__c = opp.Id,
       Quote_for__c = customer.Id,
       BookingNumber__c = BOOKING_NUM,
       Form_Secret__c = SECRET,

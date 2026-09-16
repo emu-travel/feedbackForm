@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Gx_Feedback_Only_After_Answer</fullName>
+    <active>true</active>
+    <description
+  >Feedback means the guest answered the survey, which sets it automatically. Refuses a manual move to Feedback (e.g. Mark Status as Complete) while Feedback_Received_On__c is empty. Only on status changes of existing bookings.</description>
+    <errorConditionFormula>AND(
+  NOT(ISNEW()),
+  ISCHANGED(Status__c),
+  ISPICKVAL(Status__c, &quot;Feedback&quot;),
+  ISBLANK(Feedback_Received_On__c)
+)</errorConditionFormula>
+    <errorDisplayField>Status__c</errorDisplayField>
+    <errorMessage
+  >Der Status &quot;Feedback&quot; wird automatisch gesetzt, sobald der Gast das Feedback-Formular abgeschickt hat. Bis dahin bleibt die Buchung auf &quot;Completed&quot;.</errorMessage>
+</ValidationRule>

@@ -71,7 +71,8 @@ private class GxFeedbackDispatchTest {
       BookingNumber__c = BOOKING_NUM,
       Travel_Type__c = 'FIT',
       DestinationCountry__c = 'EG',
-      Status__c = 'Completed',
+      // Marked Traveled by the team: the state a trip is in when it is due.
+      Status__c = 'Traveled',
       Start_Date__c = Date.today().addDays(-14),
       End_Date__c = Date.today().addDays(-7)
     );
@@ -160,15 +161,57 @@ private class GxFeedbackDispatchTest {
     run(theBooking().Id);
 
     Booking__c after = theBooking();
-    // The guest sharing rule keys on this status. If it were set after the
+    // The guest sharing rule keys on this flag. If it were set after the
     // email went out, the guest would follow a good link to a booking they
     // cannot read.
-    Assert.areEqual(
-      'Feedback',
-      after.Status__c,
+    Assert.isTrue(
+      after.SurveySent__c,
       'The booking is shared to the guest as part of preparing the link'
     );
-    Assert.isTrue(after.SurveySent__c, 'The booking is marked as invited');
+    Assert.areEqual(
+      'Completed',
+      after.Status__c,
+      'Sending moves a traveled trip on to Completed, not yet to Feedback'
+    );
+  }
+
+  @IsTest
+  static void aTripSomeoneAlreadyMarkedCompletedIsInvitedAndStaysCompleted() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    update new Booking__c(Id = theBooking().Id, Status__c = 'Completed');
+
+    GxFeedbackDispatch.Result r = run(theBooking().Id)[0];
+
+    Assert.isTrue(
+      r.ok,
+      'A trip moved on by hand is still invited: ' + r.skippedReason
+    );
+    Assert.areEqual(
+      'Completed',
+      theBooking().Status__c,
+      'It stays at Completed until the guest answers'
+    );
+  }
+
+  @IsTest
+  static void aPaidTripIsNotInvitedUntilSomeoneMarksItTraveled() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    update new Booking__c(Id = theBooking().Id, Status__c = 'Paid');
+
+    GxFeedbackDispatch.Result r = run(theBooking().Id)[0];
+
+    Assert.isFalse(r.ok, 'Paid alone does not say the trip happened');
+    Assert.isTrue(
+      r.skippedReason.contains('Traveled'),
+      'The reason names what is missing: ' + r.skippedReason
+    );
+    Booking__c after = theBooking();
+    Assert.isFalse(after.SurveySent__c, 'Nothing is marked as sent');
+    Assert.areEqual('Paid', after.Status__c, 'The status is left alone');
   }
 
   @IsTest

@@ -4,15 +4,15 @@
         <fullName>Gx_Feedback_Guest_Bookings</fullName>
         <accessLevel>Read</accessLevel>
         <description
-    >Lets the feedback site guest user read only bookings that were actually invited to give feedback. Without this the survey cannot resolve a booking at all - guest users see no records even in without-sharing Apex.</description>
+    >Lets the feedback site guest user read only bookings that were actually invited to give feedback: Survey Sent is ticked by GxFeedbackDispatch before the link leaves. Keyed on that flag rather than the status, because an invited booking sits at Completed until the guest answers. Without this the survey cannot resolve a booking at all - guest users see no records even in without-sharing Apex.</description>
         <label>Golf Extra Feedback - Guest Bookings</label>
         <sharedTo>
             <guestUser>Golf_Extra_Feedback</guestUser>
         </sharedTo>
         <criteriaItems>
-            <field>Status__c</field>
+            <field>SurveySent__c</field>
             <operation>equals</operation>
-            <value>Feedback</value>
+            <value>True</value>
         </criteriaItems>
     </sharingGuestRules>
 </SharingRules>

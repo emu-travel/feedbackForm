@@ -11,22 +11,31 @@
  * enforced here rather than in a sequence of Flow elements someone can reorder.
  * And it is testable.
  *
- * ORDERING MATTERS. The guest sharing rule shares bookings whose Status__c is
- * 'Feedback'. If the email went out before that status were set, the guest would
- * follow a valid link to a booking they cannot read and be told the link is
- * invalid. The status and the secret are therefore committed before any link is
- * handed back to the caller.
+ * ORDERING MATTERS. The guest sharing rule shares bookings whose SurveySent__c is
+ * true. If the email went out before that flag were set, the guest would follow a
+ * valid link to a booking they cannot read and be told the link is invalid. The
+ * flag and the secret are therefore committed before any link is handed back to
+ * the caller.
+ *
+ * STATUS. The path reads Traveled -> Completed -> Feedback. The team marks a trip
+ * Traveled by hand; sending the invitation moves it on to Completed; the guest's
+ * answer moves it to Feedback (GxFeedbackService.submit). A booking someone
+ * already marked Completed is still invited and stays at Completed.
  */
 public with sharing class GxFeedbackDispatch {
-  /** Statuses meaning the trip happened and feedback is fair to ask for. */
+  /**
+   * Statuses meaning the trip happened and feedback is fair to ask for: Traveled,
+   * as agreed with the team on 2026-09-16, plus Completed for a trip someone moved
+   * on by hand. Paid and Invoiced come before Traveled on the path and are not
+   * enough on their own; Feedback means the guest has already answered.
+   */
   private static final Set<String> ELIGIBLE_BOOKING_STATUS = new Set<String>{
-    'Completed',
-    'Paid',
-    'Invoiced',
-    'Feedback'
+    'Traveled',
+    'Completed'
   };
 
-  private static final String STATUS_FEEDBACK = 'Feedback';
+  private static final String STATUS_TRAVELED = 'Traveled';
+  private static final String STATUS_COMPLETED = 'Completed';
 
   /** 24 random bytes, base64url encoded - 32 characters, ~192 bits. */
   private static final Integer SECRET_KEY_BITS = 192;
@@ -150,7 +159,11 @@ public with sharing class GxFeedbackDispatch {
       if (String.isBlank(b.Form_Secret__c)) {
         b.Form_Secret__c = newSecret();
       }
-      b.Status__c = STATUS_FEEDBACK;
+      // Sending is what moves a traveled trip on to Completed. A booking already
+      // at Completed stays there; it reaches Feedback only when the guest answers.
+      if (b.Status__c == STATUS_TRAVELED) {
+        b.Status__c = STATUS_COMPLETED;
+      }
       b.SurveySent__c = true;
       // Moves forward on every send, reminder included, because the survey's
       // expiry counts from the last time the guest was actually asked.
@@ -201,7 +214,7 @@ public with sharing class GxFeedbackDispatch {
       return 'Invitation already sent';
     }
     if (!ELIGIBLE_BOOKING_STATUS.contains(b.Status__c)) {
-      return 'Trip is not complete (status ' + b.Status__c + ')';
+      return 'Trip is not marked Traveled yet (status ' + b.Status__c + ')';
     }
     // The window decides who enters the programme. A guest we have already
     // invited is inside it, so reminders and resends are not re-judged here.
