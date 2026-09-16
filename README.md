@@ -154,6 +154,8 @@ sf community publish -o gx-sandbox --name "Golf Extra Feedback"   # after LWC or
    actually render). Check Activation in the Lightning App Builder to see which page is assigned before
    editing, and remove the old **Send Survey** button (`Booking__c.SendSurvey`, from the earlier
    Salesforce Surveys attempt) wherever it sits on an assigned page: it sends the old survey and ticks
-   Survey Sent, so the nightly job would skip that booking. Also remove edit on `SurveySent__c` from Booking CRED and turn on field
-   history for SurveySent__c, as done in the sandbox.
+   Survey Sent, so the nightly job would skip that booking. Remove the standard **Send Survey
+   Invitation** button as well, so no booking page offers a way to send the old Salesforce survey; in the
+   sandbox both buttons are gone from both pages. Also remove edit on `SurveySent__c` from Booking CRED
+   and turn on field history for SurveySent__c, as done in the sandbox.
 6. Last step: `scripts/apex/schedule-feedback-dispatch.apex`.
