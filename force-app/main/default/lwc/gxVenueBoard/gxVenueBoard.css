@@ -57,7 +57,7 @@
 }
 
 .venue:focus-visible {
-  outline: 2px solid #e29d0b;
+  outline: 2px solid #f59c00;
   outline-offset: 1px;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .venue-fill_mid {
-  background: #e29d0b;
+  background: #f59c00;
 }
 
 .venue-fill_bad {

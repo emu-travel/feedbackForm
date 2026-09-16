@@ -1,7 +1,7 @@
 :host {
-  --gx-gold: #e59e0f;
+  --gx-gold: #f59c00;
   --gx-gold-dark: #b87a08;
-  --gx-gold-hover: #d99313;
+  --gx-gold-hover: #dc8c00;
   --gx-gold-soft: #fffbeb;
   --gx-gold-border: #fde68a;
   /* Gold dark enough for small text on white (5:1). */

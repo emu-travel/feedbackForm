@@ -93,7 +93,7 @@
 
 .comment-box:focus {
   outline: none;
-  border-color: var(--gx-gold, #e59e0f);
+  border-color: var(--gx-gold, #f59c00);
 }
 
 /* 16px is the size below which iOS zooms the page when a field is tapped, on
