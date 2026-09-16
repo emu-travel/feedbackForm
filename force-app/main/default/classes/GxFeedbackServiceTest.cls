@@ -541,6 +541,52 @@ private class GxFeedbackServiceTest {
   }
 
   @IsTest
+  static void aServiceAddedAfterTheTripIsNotRated() {
+    // Someone adds a later flight to the booking. It starts after the trip
+    // ended, has not happened for this guest yet, and the answer does not
+    // reach it.
+    // The trip as saved when the guest was invited.
+    update new Booking__c(
+      Id = theBooking().Id,
+      Survey_Trip_Start__c = Date.today().addDays(-20),
+      Survey_Trip_End__c = Date.today().addDays(-10)
+    );
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Account later = newAccount('Later Airline', 'Airline');
+    insert later;
+    Reservation__c future = newReservation(
+      theBooking().Id,
+      later,
+      'Airline',
+      'Calculation'
+    );
+    future.Date_Begin__c = Date.today().addDays(50);
+    future.Date_End__c = Date.today().addDays(50);
+    insert future;
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    Map<String, Object> payload = basePayload();
+    payload.put('flight', new Map<String, Object>{ 'score' => 7 });
+    GxFeedbackService.submit(JSON.serialize(payload));
+
+    List<Feedback_Rating__c> flights = [
+      SELECT Item_Name__c
+      FROM Feedback_Rating__c
+      WHERE Category__c = 'Airline'
+    ];
+    Assert.areEqual(
+      1,
+      flights.size(),
+      'Only the flight that belonged to the trip is rated'
+    );
+    Assert.areEqual(
+      'Test Airline',
+      flights[0].Item_Name__c,
+      'The later flight is left out'
+    );
+  }
+
+  @IsTest
   static void theSameAirlineTwiceIsRatedOnce() {
     // Out and back with the same carrier is still one airline.
     TriggerHandler.bypass('ReservationTriggerHandler');

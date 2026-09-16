@@ -98,9 +98,12 @@ private class GxFeedbackDispatchTest {
         Status__c,
         SurveySent__c,
         Form_Secret__c,
+        Start_Date__c,
         End_Date__c,
         Survey_Sent_On__c,
-        Survey_Reminder_Sent__c
+        Survey_Reminder_Sent__c,
+        Survey_Trip_Start__c,
+        Survey_Trip_End__c
       FROM Booking__c
       WHERE BookingNumber__c = :BOOKING_NUM
     ];
@@ -212,6 +215,54 @@ private class GxFeedbackDispatchTest {
     Booking__c after = theBooking();
     Assert.isFalse(after.SurveySent__c, 'Nothing is marked as sent');
     Assert.areEqual('Paid', after.Status__c, 'The status is left alone');
+  }
+
+  @IsTest
+  static void theTripIsRememberedAsItWasWhenTheGuestWasFirstAsked() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    Booking__c before = theBooking();
+    run(before.Id);
+
+    Booking__c sent = theBooking();
+    Assert.areEqual(
+      before.Start_Date__c,
+      sent.Survey_Trip_Start__c,
+      'The trip start is saved with the invitation'
+    );
+    Assert.areEqual(
+      before.End_Date__c,
+      sent.Survey_Trip_End__c,
+      'The trip end is saved with the invitation'
+    );
+
+    // The booking changes afterwards and the invitation goes out again: the
+    // saved trip stays the one the guest was first asked about.
+    update new Booking__c(
+      Id = sent.Id,
+      Start_Date__c = Date.today().addDays(-30),
+      End_Date__c = Date.today().addDays(-25)
+    );
+    GxFeedbackDispatch.Request resend = new GxFeedbackDispatch.Request();
+    resend.bookingId = sent.Id;
+    resend.allowResend = true;
+    GxFeedbackDispatch.Result r = GxFeedbackDispatch.prepare(
+      new List<GxFeedbackDispatch.Request>{ resend }
+    )[0];
+
+    Assert.isTrue(r.ok, 'The resend goes out: ' + r.skippedReason);
+    Booking__c after = theBooking();
+    Assert.areEqual(
+      before.End_Date__c,
+      after.Survey_Trip_End__c,
+      'A resend does not move the saved trip end'
+    );
+    Assert.areEqual(
+      before.Start_Date__c,
+      after.Survey_Trip_Start__c,
+      'Nor its start'
+    );
   }
 
   @IsTest

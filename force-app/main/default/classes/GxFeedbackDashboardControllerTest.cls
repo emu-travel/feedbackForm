@@ -103,6 +103,11 @@ private class GxFeedbackDashboardControllerTest {
       Status__c = 'Feedback',
       Start_Date__c = Date.today().addDays(endOffset - 7),
       End_Date__c = Date.today().addDays(endOffset),
+      // Saved by GxFeedbackDispatch when the invitation goes out.
+      Survey_Trip_Start__c = invited
+        ? Date.today().addDays(endOffset - 7)
+        : null,
+      Survey_Trip_End__c = invited ? Date.today().addDays(endOffset) : null,
       SurveySent__c = invited,
       Survey_Sent_On__c = invited
         ? Datetime.now().addDays(endOffset + 2)
@@ -210,6 +215,35 @@ private class GxFeedbackDashboardControllerTest {
       8.0,
       k.avgConsultation,
       'Only two guests rated it: (10 + 6) / 2'
+    );
+  }
+
+  @IsTest
+  static void aLaterChangeToTheBookingDoesNotMoveItsAnswer() {
+    // A stay added to GXD-5 after the guest answered moves the booking's own
+    // dates two months ahead. The answer stays with the trip the guest was
+    // asked about, so it is still inside a window that ends today.
+    Booking__c gxd5 = [
+      SELECT Id
+      FROM Booking__c
+      WHERE BookingNumber__c = 'GXD-5'
+    ];
+    update new Booking__c(
+      Id = gxd5.Id,
+      Start_Date__c = Date.today().addDays(60),
+      End_Date__c = Date.today().addDays(67)
+    );
+
+    GxFeedbackDashboardController.Dashboard d = load(
+      new Map<String, Object>{
+        'fromDate' => Date.today().addDays(-25),
+        'toDate' => Date.today()
+      }
+    );
+    Assert.areEqual(
+      2,
+      d.kpis.responses,
+      'GXD-3 and GXD-5 are still in the window'
     );
   }
 

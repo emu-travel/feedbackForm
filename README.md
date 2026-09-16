@@ -50,6 +50,8 @@ Gx_Detractor_Alert__e → GxDetractorAlert (email to the travel designer)
 - The survey is German. The hotel's country is shown with the German name from
   `Booking__c.DestinationCountry__c`.
 - A link stops working 14 days after the last invitation or reminder.
+- The survey keeps to the trip dates saved with the first invitation: a line that starts after
+  that trip ended (a stay added to the booking later) is not offered.
 - Answers are kept on the guest's device as they go (browser storage, nothing is sent before
   submitting). Reopening the link on the same device resumes on the same step. The draft is
   deleted on submit, when the link is answered or expired, and is never restored after 14 days.
@@ -84,6 +86,8 @@ Lightning tab `Gx_Feedback_Dashboard`, for users with the permission set
 **Golf Extra Feedback - Admin**:
 
 - Headline numbers: responses, response rate, NPS, overall and consultation averages, open follow-ups.
+- Dates are the trip as it was when the guest was invited (`Survey_Trip_End__c`), so a later change
+  to the booking does not move its feedback out of its trip month.
 - NPS is % promoters (9-10) minus % detractors (0-6) over everyone who answered, to one
   decimal, and can be negative. 7-8 are **Neutrals**.
 - Responses: search by guest, email, booking, FB number, region or country; groups; newest or
@@ -104,6 +108,7 @@ Lightning tab `Gx_Feedback_Dashboard`, for users with the permission set
 | `Booking__c.Survey_Link__c`, `Survey_Sent_On__c`, `Survey_Reminder_Sent__c` | The personal link and the sending bookkeeping                                                                                                               |
 | `Booking__c.Survey_Trip_Summary__c`, `Survey_Logo_URL__c`                   | Merge fields for the emails                                                                                                                                 |
 | `Booking__c.Feedback_Received_On__c` ("Feedback erhalten am")               | Roll-up of the latest `Submitted_On__c`: empty while the guest has not answered, set the moment they submit. The same answer moves the status to "Feedback" |
+| `Booking__c.Survey_Trip_Start__c`, `Survey_Trip_End__c`                     | The trip dates as they were at the first invitation. Reminders and later edits to the booking leave them alone; the dashboard filters and groups by them    |
 | `Gx_Feedback_Setting__mdt`                                                  | All settings (see Sending)                                                                                                                                  |
 | `Gx_Detractor_Alert__e`                                                     | Platform event behind the alert                                                                                                                             |
 

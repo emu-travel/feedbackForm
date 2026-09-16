@@ -91,6 +91,7 @@ public without sharing class GxDetractorAlert {
         Booking__r.BookingNumber__c,
         Booking__r.Region__c,
         Booking__r.End_Date__c,
+        Booking__r.Survey_Trip_End__c,
         Booking__r.TravelDesigner__r.Name,
         Booking__r.TravelDesigner__r.Email,
         Booking__r.TravelDesigner__r.IsActive,
@@ -348,8 +349,12 @@ public without sharing class GxDetractorAlert {
     if (String.isNotBlank(r.Booking__r?.Region__c)) {
       parts.add(r.Booking__r.Region__c);
     }
-    if (r.Booking__r?.End_Date__c != null) {
-      parts.add('ended ' + r.Booking__r.End_Date__c.format());
+    // The trip as it was when the guest was asked, if the booking moved on.
+    Date ended = r.Booking__r?.Survey_Trip_End__c != null
+      ? r.Booking__r.Survey_Trip_End__c
+      : r.Booking__r?.End_Date__c;
+    if (ended != null) {
+      parts.add('ended ' + ended.format());
     }
     return String.join(parts, ', ');
   }

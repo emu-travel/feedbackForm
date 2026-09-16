@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Trip_End__c</fullName>
+    <description
+  >The trip's end date as it was when the guest was first invited to give feedback. Set once by GxFeedbackDispatch and left alone by reminders, resends and later changes to the booking. The Feedback Dashboard filters and groups by it, and the survey offers only lines that start on or before it, so a stay added to the booking later neither moves the response nor gets rated.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >Reiseende zum Zeitpunkt der ersten Feedback-Einladung. Wird automatisch gesetzt; das Feedback-Dashboard ordnet die Antwort nach diesem Datum ein.</inlineHelpText>
+    <label>Survey Trip End</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Date</type>
+</CustomField>

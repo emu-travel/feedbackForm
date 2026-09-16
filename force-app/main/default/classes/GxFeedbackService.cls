@@ -240,8 +240,11 @@ public without sharing class GxFeedbackService {
     c.guestName = buildGuestName(b);
     c.destination = b.DestinationCountry__c;
     c.region = b.Region__c;
-    c.startDate = formatDate(b.Start_Date__c);
-    c.endDate = formatDate(b.End_Date__c);
+    // The trip as it was when the guest was invited, if the booking moved on.
+    c.startDate = formatDate(
+      b.Survey_Trip_Start__c != null ? b.Survey_Trip_Start__c : b.Start_Date__c
+    );
+    c.endDate = formatDate(surveyedTripEnd(b));
     // Deliberately no TravelDesigner__r.Name traversal: guest users have heavily
     // restricted access to User, and Form_Designer_Name__c exists on Booking__c
     // precisely so a public form never has to reach across to it.
@@ -716,7 +719,9 @@ public without sharing class GxFeedbackService {
         toLabel(DestinationCountry__c),
         toLabel(Region__c),
         Form_Designer_Name__c,
-        Survey_Sent_On__c
+        Survey_Sent_On__c,
+        Survey_Trip_Start__c,
+        Survey_Trip_End__c
       FROM Booking__c
       WHERE BookingNumber__c = :bookingNumber AND Form_Secret__c = :secret
       LIMIT 2
@@ -736,7 +741,11 @@ public without sharing class GxFeedbackService {
       return withItems;
     }
     Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
-      [SELECT Id, Status__c FROM Booking__c WHERE Id IN :bookingIds]
+      [
+        SELECT Id, Status__c, Survey_Trip_End__c
+        FROM Booking__c
+        WHERE Id IN :bookingIds
+      ]
     );
     Map<Id, List<Reservation__c>> rateable = loadRateableReservations(bookings);
     for (Id bookingId : rateable.keySet()) {
@@ -810,6 +819,19 @@ public without sharing class GxFeedbackService {
       if (b == null) {
         continue;
       }
+      // Only what belonged to the trip the guest was asked about. A line that
+      // starts after that trip ended - a stay added to the booking later - has
+      // not happened for this guest yet and is not theirs to rate. Judged only
+      // against the trip saved with the invitation: before that the booking's
+      // own dates are all there is, and imperfect booking dates must never
+      // silently drop a line the guest really had.
+      if (
+        b.Survey_Trip_End__c != null &&
+        r.Date_Begin__c != null &&
+        r.Date_Begin__c > b.Survey_Trip_End__c
+      ) {
+        continue;
+      }
       // On a delivered booking every line is rated except the ones the guest
       // never received. On a booking that is not yet delivered we fall back to
       // the strict line-level check, so a trip still being quoted cannot be
@@ -822,6 +844,14 @@ public without sharing class GxFeedbackService {
       }
     }
     return byBooking;
+  }
+
+  /**
+   * The end of the trip the survey is about: as it was when the guest was
+   * invited, or the booking's own end date before any invitation went out.
+   */
+  private static Date surveyedTripEnd(Booking__c b) {
+    return b.Survey_Trip_End__c != null ? b.Survey_Trip_End__c : b.End_Date__c;
   }
 
   private static Boolean hasExistingResponse(Id bookingId) {

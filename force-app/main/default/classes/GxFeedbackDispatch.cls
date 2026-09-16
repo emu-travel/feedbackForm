@@ -117,7 +117,9 @@ public with sharing class GxFeedbackDispatch {
           Form_Secret__c,
           SurveySent__c,
           Survey_Sent_On__c,
-          Survey_Reminder_Sent__c
+          Survey_Reminder_Sent__c,
+          Survey_Trip_Start__c,
+          Survey_Trip_End__c
         FROM Booking__c
         WHERE Id IN :bookingIds
       ]
@@ -158,6 +160,15 @@ public with sharing class GxFeedbackDispatch {
 
       if (String.isBlank(b.Form_Secret__c)) {
         b.Form_Secret__c = newSecret();
+      }
+      // The trip as it was when the guest was first asked. Reminders, resends
+      // and later edits to the booking leave it alone, so the dashboard and
+      // the survey keep to the trip this invitation was about.
+      if (b.Survey_Trip_End__c == null) {
+        b.Survey_Trip_Start__c = b.Start_Date__c;
+        b.Survey_Trip_End__c = b.End_Date__c != null
+          ? b.End_Date__c
+          : b.Start_Date__c;
       }
       // Sending is what moves a traveled trip on to Completed. A booking already
       // at Completed stays there; it reaches Feedback only when the guest answers.

@@ -553,8 +553,8 @@ public with sharing class GxFeedbackDashboardController {
         Booking__r.BookingNumber__c,
         toLabel(Booking__r.Region__c),
         toLabel(Booking__r.DestinationCountry__c),
-        Booking__r.Start_Date__c,
-        Booking__r.End_Date__c,
+        Booking__r.Survey_Trip_Start__c,
+        Booking__r.Survey_Trip_End__c,
         Booking__r.TravelDesigner__r.Name,
         Overall_Experience__c,
         Overall_Experience_Comment__c,
@@ -603,8 +603,8 @@ public with sharing class GxFeedbackDashboardController {
     d.bookingNumber = r.Booking__r?.BookingNumber__c;
     d.region = r.Booking__r?.Region__c;
     d.country = r.Booking__r?.DestinationCountry__c;
-    d.tripStart = r.Booking__r?.Start_Date__c;
-    d.tripEnd = r.Booking__r?.End_Date__c;
+    d.tripStart = r.Booking__r?.Survey_Trip_Start__c;
+    d.tripEnd = r.Booking__r?.Survey_Trip_End__c;
     d.designer = r.Booking__r?.TravelDesigner__r?.Name;
     d.overall = r.Overall_Experience__c;
     d.overallComment = r.Overall_Experience_Comment__c;
@@ -822,7 +822,7 @@ public with sharing class GxFeedbackDashboardController {
       'SELECT ' +
         RESPONSE_FIELDS +
         ', Booking__r.TravelDesigner__r.Name, Booking__r.Region__c,' +
-        ' Booking__r.End_Date__c, Public_Review_Prompted__c' +
+        ' Booking__r.Survey_Trip_End__c, Public_Review_Prompted__c' +
         ' FROM Feedback_Response__c' +
         whereOf(clauses) +
         ' ORDER BY ' +
@@ -1069,19 +1069,19 @@ public with sharing class GxFeedbackDashboardController {
   ) {
     Map<String, Object> binds = new Map<String, Object>();
     List<String> clauses = bookingClauses('Booking__r.', f, binds);
-    clauses.add('Booking__r.End_Date__c != null');
+    clauses.add('Booking__r.Survey_Trip_End__c != null');
     if (extra != null) {
       clauses.add(extra);
       binds.putAll(extraBinds);
     }
     for (
       AggregateResult ar : (List<AggregateResult>) Database.queryWithBinds(
-        'SELECT CALENDAR_YEAR(Booking__r.End_Date__c) y, ' +
-          'CALENDAR_MONTH(Booking__r.End_Date__c) m, COUNT(Id) n ' +
+        'SELECT CALENDAR_YEAR(Booking__r.Survey_Trip_End__c) y, ' +
+          'CALENDAR_MONTH(Booking__r.Survey_Trip_End__c) m, COUNT(Id) n ' +
           'FROM Feedback_Response__c' +
           whereOf(clauses) +
-          ' GROUP BY CALENDAR_YEAR(Booking__r.End_Date__c), ' +
-          'CALENDAR_MONTH(Booking__r.End_Date__c)',
+          ' GROUP BY CALENDAR_YEAR(Booking__r.Survey_Trip_End__c), ' +
+          'CALENDAR_MONTH(Booking__r.Survey_Trip_End__c)',
         binds,
         AccessLevel.SYSTEM_MODE
       )
@@ -1271,8 +1271,8 @@ public with sharing class GxFeedbackDashboardController {
       'SELECT ' +
         RESPONSE_FIELDS +
         ', Contact__r.Email, Booking__r.TravelDesigner__r.Name, Booking__r.Region__c,' +
-        ' toLabel(Booking__r.DestinationCountry__c), Booking__r.Start_Date__c,' +
-        ' Booking__r.End_Date__c, Public_Review_Prompted__c' +
+        ' toLabel(Booking__r.DestinationCountry__c), Booking__r.Survey_Trip_Start__c,' +
+        ' Booking__r.Survey_Trip_End__c, Public_Review_Prompted__c' +
         ' FROM Feedback_Response__c' +
         whereOf(clauses) +
         ' ORDER BY ' +
@@ -1321,8 +1321,8 @@ public with sharing class GxFeedbackDashboardController {
             r.Booking__r?.BookingNumber__c,
             r.Booking__r?.Region__c,
             r.Booking__r?.DestinationCountry__c,
-            isoDate(r.Booking__r?.Start_Date__c),
-            isoDate(r.Booking__r?.End_Date__c),
+            isoDate(r.Booking__r?.Survey_Trip_Start__c),
+            isoDate(r.Booking__r?.Survey_Trip_End__c),
             r.Booking__r?.TravelDesigner__r?.Name,
             nps == null ? null : String.valueOf(nps),
             npsGroupOf(nps),
@@ -1686,7 +1686,7 @@ public with sharing class GxFeedbackDashboardController {
       row.guest = r.Contact__r?.Name;
       row.designer = r.Booking__r?.TravelDesigner__r?.Name;
       row.region = r.Booking__r?.Region__c;
-      row.tripEnd = r.Booking__r?.End_Date__c;
+      row.tripEnd = r.Booking__r?.Survey_Trip_End__c;
       row.submittedOn = r.Submitted_On__c;
       row.nps = r.Recommendation_NPS__c;
       row.overall = r.Overall_Experience__c;
@@ -1945,11 +1945,11 @@ public with sharing class GxFeedbackDashboardController {
   ) {
     List<String> clauses = new List<String>();
     if (f.fromDate != null) {
-      clauses.add(prefix + 'End_Date__c >= :fromDate');
+      clauses.add(prefix + 'Survey_Trip_End__c >= :fromDate');
       binds.put('fromDate', f.fromDate);
     }
     if (f.toDate != null) {
-      clauses.add(prefix + 'End_Date__c <= :toDate');
+      clauses.add(prefix + 'Survey_Trip_End__c <= :toDate');
       binds.put('toDate', f.toDate);
     }
     if (String.isNotBlank(f.region)) {
