@@ -10,6 +10,9 @@
   --gx-slate-600: #475569;
   --gx-slate-900: #0f172a;
   display: block;
+  /* No grey flash from the phone over a tapped button: the button's own
+     states show the tap instead. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .scale {
@@ -135,15 +138,30 @@
   font-size: 0.6875rem;
   font-weight: 700;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     background-color 0.15s ease,
+    border-color 0.15s ease,
     color 0.15s ease,
-    transform 0.15s ease;
+    transform 0.1s ease;
 }
 
-.choice:hover {
-  background: var(--gx-slate-50);
-  color: var(--gx-slate-900);
+/* Hover only where there is a mouse. A phone keeps "hover" on the last button
+   tapped, and that used to paint over the gold of a chosen score, leaving only
+   its outline. */
+@media (hover: hover) {
+  .choice:not(.choice_selected):hover {
+    background: var(--gx-slate-50);
+    color: var(--gx-slate-900);
+  }
+}
+
+.choice:active {
+  transform: scale(0.96);
+}
+
+.choice:focus {
+  outline: none;
 }
 
 .choice:focus-visible {
@@ -151,7 +169,7 @@
   outline-offset: 1px;
 }
 
-.choice_selected {
+.choice.choice_selected {
   background: var(--gx-gold);
   border-color: var(--gx-gold);
   color: var(--gx-forest);

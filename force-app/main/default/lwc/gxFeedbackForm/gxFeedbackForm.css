@@ -19,6 +19,9 @@
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   color: var(--gx-slate-900);
+  /* Phones draw a grey box over whatever is tapped, square over our rounded
+     buttons and cards. Each control shows its own press state instead. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .shell {
@@ -216,9 +219,19 @@
   font-weight: 700;
   cursor: pointer;
   border: 1px solid transparent;
+  touch-action: manipulation;
   transition:
     background-color 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:focus {
+  outline: none;
 }
 
 .btn:disabled {
@@ -237,7 +250,19 @@
   color: var(--gx-slate-600);
 }
 
-.btn_ghost:hover:not(:disabled) {
+/* Hover only where there is a mouse: a phone keeps it on the last button
+   tapped. A press shows the same shade for a moment instead. */
+@media (hover: hover) {
+  .btn_ghost:hover:not(:disabled) {
+    background: var(--gx-slate-50);
+    color: var(--gx-slate-900);
+  }
+  .btn_primary:hover:not(:disabled) {
+    background: var(--gx-gold-hover);
+  }
+}
+
+.btn_ghost:active:not(:disabled) {
   background: var(--gx-slate-50);
   color: var(--gx-slate-900);
 }
@@ -251,7 +276,7 @@
   box-shadow: 0 4px 10px rgba(229, 158, 15, 0.25);
 }
 
-.btn_primary:hover:not(:disabled) {
+.btn_primary:active:not(:disabled) {
   background: var(--gx-gold-hover);
 }
 
@@ -351,12 +376,48 @@
   border-radius: 0.875rem;
   padding: 0.875rem;
   text-decoration: none;
-  transition: border-color 0.15s ease;
+  touch-action: manipulation;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.1s ease;
 }
 
-.review-card:hover,
+/* The review sites open in a new tab. Coming back, a phone would still show
+   the card as hovered and focused, a gold frame left behind by the tap, so
+   hover is for a mouse only and the ring only for the keyboard. */
+@media (hover: hover) {
+  .review-card:hover {
+    border-color: var(--gx-gold);
+  }
+}
+
+.review-card:focus {
+  outline: none;
+}
+
 .review-card:focus-visible {
   border-color: var(--gx-gold);
+  outline: 2px solid var(--gx-forest);
+  outline-offset: 2px;
+}
+
+/* The site loads Salesforce's standard stylesheet, which underlines every link
+   on hover and focus and clears its background. A card is not a text link:
+   after a tap the phone keeps it hovered and focused, and that left a blue
+   underline across the stars and the text. */
+.review-card,
+.review-card:hover,
+.review-card:focus,
+.review-card:visited {
+  background-color: #fff !important;
+  text-decoration: none !important;
+}
+
+.review-card:active {
+  border-color: var(--gx-gold);
+  background-color: var(--gx-gold-soft) !important;
+  transform: scale(0.98);
 }
 
 .review-stars {
