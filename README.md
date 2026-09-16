@@ -146,9 +146,10 @@ sf community publish -o gx-sandbox --name "Golf Extra Feedback"   # after LWC or
    (go-live date), `Alert_Copy_Email__c`.
 3. Verify the org-wide address `anfrage@golf-extra.com` and email deliverability.
 4. Assign **Golf Extra Feedback - Admin** to the team.
-5. Booking record pages: add the read-only **Feedback** section to the Details tab (Survey Sent, Survey
-   Sent On, Survey Reminder Sent, Feedback erhalten am, and the Feedback Responses list). These Lightning
-   pages belong to the org, not to this repo: retrieve them from production, add the section, deploy.
+5. Booking record pages: add the read-only **Feedback** section to the Details tab as one full-width
+   column (Survey Sent On, Survey Reminder Sent, Feedback erhalten am), so no label wraps. There is no
+   Feedback Responses list on the booking: the answers are read on the dashboard. These Lightning pages
+   belong to the org, not to this repo: retrieve them from production, add the section, deploy.
    Mind the duplicate label: the sandbox has two record pages both labelled "Booking Record Page"
    (`Booking_Record_Page`, from 2025, assigned to nothing, and `Booking_Record_Page1`, the one bookings
    actually render). Check Activation in the Lightning App Builder to see which page is assigned before
