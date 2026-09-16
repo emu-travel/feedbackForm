@@ -55,3 +55,6 @@ $RECYCLE.BIN/
 
 # Retrieved org metadata kept locally for study, not part of this project's source
 .org-study/
+
+# Local backups
+*.bak
