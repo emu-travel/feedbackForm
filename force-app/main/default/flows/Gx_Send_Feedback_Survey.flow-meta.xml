@@ -16,7 +16,7 @@
   Get_Booking -> Confirm -> Send_Invitation -> Did_It_Send -> Sent | Not_Sent.
 -->
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>68.0</apiVersion>
+    <apiVersion>67.0</apiVersion>
 
     <actionCalls>
         <description
