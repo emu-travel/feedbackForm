@@ -37,6 +37,9 @@ public with sharing class GxFeedbackDispatch {
   private static final String STATUS_TRAVELED = 'Traveled';
   private static final String STATUS_COMPLETED = 'Completed';
 
+  /** The size of Booking__c.Survey_Snapshot__c. */
+  private static final Integer SNAPSHOT_MAX_LENGTH = 131072;
+
   /** 24 random bytes, base64url encoded - 32 characters, ~192 bits. */
   private static final Integer SECRET_KEY_BITS = 192;
 
@@ -119,7 +122,8 @@ public with sharing class GxFeedbackDispatch {
           Survey_Sent_On__c,
           Survey_Reminder_Sent__c,
           Survey_Trip_Start__c,
-          Survey_Trip_End__c
+          Survey_Trip_End__c,
+          Survey_Snapshot__c
         FROM Booking__c
         WHERE Id IN :bookingIds
       ]
@@ -139,7 +143,16 @@ public with sharing class GxFeedbackDispatch {
     // invitation, so every booking is checked against the same rules the survey
     // itself applies. Asked once for the whole batch: checking each booking on
     // its own costs two queries apiece, which a nightly run cannot afford.
-    Set<Id> rateable = GxFeedbackService.bookingsWithRateableItems(bookingIds);
+    // The same pass builds the list saved with a first invitation.
+    Map<Id, String> snapshots = GxFeedbackService.surveySnapshots(bookingIds);
+    Set<Id> rateable = new Set<Id>(snapshots.keySet());
+    for (Booking__c saved : bookings.values()) {
+      // A guest already asked keeps the list they were sent, whatever the
+      // booking's lines look like now, so a reminder or resend still goes out.
+      if (String.isNotBlank(saved.Survey_Snapshot__c)) {
+        rateable.add(saved.Id);
+      }
+    }
 
     Map<Id, Booking__c> toUpdate = new Map<Id, Booking__c>();
 
@@ -164,6 +177,19 @@ public with sharing class GxFeedbackDispatch {
       // The trip as it was when the guest was first asked. Reminders, resends
       // and later edits to the booking leave it alone, so the dashboard and
       // the survey keep to the trip this invitation was about.
+      // What the guest will rate, saved with the first invitation and never
+      // rebuilt: later changes to the booking do not reach a survey already
+      // sent. Built from the lines as they were before this invitation moves
+      // the status on, so automation reacting to that change cannot alter it.
+      // A list too long for the field is not saved; that survey is then read
+      // from the booking instead.
+      if (
+        String.isBlank(b.Survey_Snapshot__c) &&
+        snapshots.containsKey(b.Id) &&
+        snapshots.get(b.Id).length() <= SNAPSHOT_MAX_LENGTH
+      ) {
+        b.Survey_Snapshot__c = snapshots.get(b.Id);
+      }
       if (b.Survey_Trip_End__c == null) {
         b.Survey_Trip_Start__c = b.Start_Date__c;
         b.Survey_Trip_End__c = b.End_Date__c != null

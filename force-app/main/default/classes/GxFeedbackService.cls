@@ -10,7 +10,9 @@
  * this org stay recognisably the same shape.
  *
  * The survey is generated per booking: only the hotels, golf courses, flights,
- * transfers and rental cars actually on that booking are asked about.
+ * transfers and rental cars actually on that booking are asked about. That list
+ * is saved with the first invitation (Booking__c.Survey_Snapshot__c) and read
+ * from there, so later changes to the booking never reach a survey already sent.
  */
 public without sharing class GxFeedbackService {
   public class FormException extends Exception {
@@ -254,7 +256,7 @@ public without sharing class GxFeedbackService {
     c.trustpilotUrl = GxFeedbackSettings.trustpilotUrl();
     c.googleMapsUrl = GxFeedbackSettings.googleMapsUrl();
 
-    applyItinerary(c, loadRateableReservations(b));
+    applyItinerary(c, surveyLines(b));
 
     // A booking with nothing rateable gets no survey rather than an empty one.
     if (
@@ -403,10 +405,10 @@ public without sharing class GxFeedbackService {
       return res;
     }
 
-    // Only reservations actually on this booking may be referenced, so a
+    // Only the lines the guest was asked about may be referenced, so a
     // tampered payload cannot attach feedback to someone else's trip.
     Map<Id, Reservation__c> allowed = new Map<Id, Reservation__c>(
-      loadRateableReservations(b)
+      surveyLines(b)
     );
 
     Savepoint sp = Database.setSavepoint();
@@ -428,6 +430,7 @@ public without sharing class GxFeedbackService {
       Database.insert(resp, true, AccessLevel.SYSTEM_MODE);
 
       List<Feedback_Rating__c> ratings = buildRatings(p, resp.Id, allowed);
+      unlinkRemovedReservations(ratings, allowed.keySet());
       if (!ratings.isEmpty()) {
         Database.insert(ratings, true, AccessLevel.SYSTEM_MODE);
       }
@@ -721,7 +724,8 @@ public without sharing class GxFeedbackService {
         Form_Designer_Name__c,
         Survey_Sent_On__c,
         Survey_Trip_Start__c,
-        Survey_Trip_End__c
+        Survey_Trip_End__c,
+        Survey_Snapshot__c
       FROM Booking__c
       WHERE BookingNumber__c = :bookingNumber AND Form_Secret__c = :secret
       LIMIT 2
@@ -730,15 +734,17 @@ public without sharing class GxFeedbackService {
   }
 
   /**
-   * Which of these bookings the survey would have something to ask about, in
-   * two queries however many bookings are passed in. Dispatch uses it so a
-   * guest is never invited to a survey with no questions in it, and so a
-   * nightly batch stays inside the SOQL limit.
+   * The survey list for each booking as it stands now, ready to be saved with
+   * the first invitation in Booking__c.Survey_Snapshot__c: the rateable lines,
+   * serialized with every field the survey reads. Only bookings with something
+   * to rate are in the map, so dispatch never invites a guest to an empty
+   * survey. Two queries however many bookings are passed in, so a nightly batch
+   * stays inside the SOQL limit.
    */
-  public static Set<Id> bookingsWithRateableItems(Set<Id> bookingIds) {
-    Set<Id> withItems = new Set<Id>();
+  public static Map<Id, String> surveySnapshots(Set<Id> bookingIds) {
+    Map<Id, String> snapshots = new Map<Id, String>();
     if (bookingIds == null || bookingIds.isEmpty()) {
-      return withItems;
+      return snapshots;
     }
     Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
       [
@@ -749,11 +755,60 @@ public without sharing class GxFeedbackService {
     );
     Map<Id, List<Reservation__c>> rateable = loadRateableReservations(bookings);
     for (Id bookingId : rateable.keySet()) {
-      if (!rateable.get(bookingId).isEmpty()) {
-        withItems.add(bookingId);
+      List<Reservation__c> lines = rateable.get(bookingId);
+      if (!lines.isEmpty()) {
+        snapshots.put(bookingId, JSON.serialize(lines));
       }
     }
-    return withItems;
+    return snapshots;
+  }
+
+  /**
+   * What the survey asks about: the list saved with the first invitation, as it
+   * was then. Later changes to the booking - a line canceled, a hotel swapped, a
+   * stay added, automation touching line statuses - do not reach it; that is
+   * the point. Only a booking with nothing saved (invited before the list was
+   * kept, or with a list too long for the field) is read from the booking.
+   */
+  private static List<Reservation__c> surveyLines(Booking__c b) {
+    if (String.isNotBlank(b.Survey_Snapshot__c)) {
+      try {
+        return (List<Reservation__c>) JSON.deserialize(
+          b.Survey_Snapshot__c,
+          List<Reservation__c>.class
+        );
+      } catch (Exception e) {
+        // An unreadable list falls back to the booking as it is now, rather
+        // than leaving the guest without a survey.
+      }
+    }
+    return loadRateableReservations(b);
+  }
+
+  /**
+   * A saved line can have been deleted from the booking since the invitation.
+   * Its rating is kept under the name the guest saw, only without the link:
+   * a lookup to a deleted record would refuse the whole answer.
+   */
+  private static void unlinkRemovedReservations(
+    List<Feedback_Rating__c> ratings,
+    Set<Id> savedIds
+  ) {
+    if (ratings.isEmpty() || savedIds.isEmpty()) {
+      return;
+    }
+    Set<Id> stillThere = new Map<Id, Reservation__c>(
+        [SELECT Id FROM Reservation__c WHERE Id IN :savedIds]
+      )
+      .keySet();
+    for (Feedback_Rating__c rating : ratings) {
+      if (
+        rating.Reservation__c != null &&
+        !stillThere.contains(rating.Reservation__c)
+      ) {
+        rating.Reservation__c = null;
+      }
+    }
   }
 
   /**

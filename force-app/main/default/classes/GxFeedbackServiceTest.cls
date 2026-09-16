@@ -213,6 +213,95 @@ private class GxFeedbackServiceTest {
   // ------------------------------------------------------------------
   // getContext
 
+  /** Saves the survey list on the booking exactly as a first invitation does. */
+  private static void saveSurveyList() {
+    Id bookingId = theBooking().Id;
+    update new Booking__c(
+      Id = bookingId,
+      Survey_Snapshot__c = GxFeedbackService.surveySnapshots(
+          new Set<Id>{ bookingId }
+        )
+        .get(bookingId)
+    );
+  }
+
+  @IsTest
+  static void theSurveyShowsWhatWasSavedWithTheInvitation() {
+    saveSurveyList();
+
+    // After sending, a hotel is added to the trip, inside its dates: read
+    // live, it would be offered.
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Account later = newAccount('Later Hotel', 'Hotel');
+    insert later;
+    insert newReservation(theBooking().Id, later, 'Hotel', 'Completed');
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+
+    Assert.isTrue(c.ok, 'The survey opens');
+    Assert.areEqual(
+      2,
+      c.hotels.size(),
+      'Still the two hotels the guest was asked about'
+    );
+    for (GxFeedbackService.RateableItem hotel : c.hotels) {
+      Assert.areNotEqual(
+        'Later Hotel',
+        hotel.name,
+        'A hotel added after sending is not in the survey'
+      );
+    }
+  }
+
+  @IsTest
+  static void anAnswerIsSavedEvenIfARatedLineWasDeletedAfterSending() {
+    saveSurveyList();
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      BOOKING_NUM,
+      SECRET
+    );
+    String golfId = c.golfCourses[0].reservationId;
+    String golfName = c.golfCourses[0].name;
+
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    delete new Reservation__c(Id = golfId);
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    Map<String, Object> payload = basePayload();
+    payload.put(
+      'golfCourses',
+      new List<Object>{
+        new Map<String, Object>{
+          'reservationId' => golfId,
+          'itemName' => golfName,
+          'score' => 7
+        }
+      }
+    );
+    GxFeedbackService.SubmitResult r = GxFeedbackService.submit(
+      JSON.serialize(payload)
+    );
+
+    Assert.isTrue(r.ok, 'The answer is saved: ' + r.message);
+    Feedback_Rating__c saved = [
+      SELECT Item_Name__c, Score__c, Reservation__c
+      FROM Feedback_Rating__c
+      WHERE Category__c = 'Golfclub'
+      LIMIT 1
+    ];
+    Assert.areEqual(
+      golfName,
+      saved.Item_Name__c,
+      'Under the name the guest saw'
+    );
+    Assert.areEqual(7, saved.Score__c, 'With the score');
+    Assert.isNull(saved.Reservation__c, 'Without a link to the deleted line');
+  }
+
   @IsTest
   static void getContextBuildsSurveyFromTheItinerary() {
     Test.startTest();

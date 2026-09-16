@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Snapshot__c</fullName>
+    <description
+  >What the guest is asked to rate: the survey's lines as they were when the first feedback invitation went out, saved by GxFeedbackDispatch and read by the survey instead of the booking's current lines. Never rebuilt, so later changes to the booking (lines canceled, hotels swapped, stays added, automation touching line statuses) do not reach a survey already sent. Technical content (JSON), not for editing.</description>
+    <externalId>false</externalId>
+    <label>Survey Snapshot</label>
+    <length>131072</length>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+</CustomField>

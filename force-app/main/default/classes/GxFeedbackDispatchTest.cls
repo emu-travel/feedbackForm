@@ -103,7 +103,8 @@ private class GxFeedbackDispatchTest {
         Survey_Sent_On__c,
         Survey_Reminder_Sent__c,
         Survey_Trip_Start__c,
-        Survey_Trip_End__c
+        Survey_Trip_End__c,
+        Survey_Snapshot__c
       FROM Booking__c
       WHERE BookingNumber__c = :BOOKING_NUM
     ];
@@ -262,6 +263,74 @@ private class GxFeedbackDispatchTest {
       before.Start_Date__c,
       after.Survey_Trip_Start__c,
       'Nor its start'
+    );
+  }
+
+  @IsTest
+  static void whatTheGuestRatesIsSavedWithTheFirstInvitation() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    run(theBooking().Id);
+
+    Booking__c sent = theBooking();
+    Assert.isNotNull(
+      sent.Survey_Snapshot__c,
+      'The survey list is saved with the invitation'
+    );
+    List<Reservation__c> saved = (List<Reservation__c>) JSON.deserialize(
+      sent.Survey_Snapshot__c,
+      List<Reservation__c>.class
+    );
+    Assert.areEqual(1, saved.size(), 'The one hotel line on the trip');
+    Assert.areEqual(
+      'Dispatch Hotel',
+      saved[0].Travel_Location__r.Name,
+      'Saved with the name the guest will see'
+    );
+  }
+
+  @IsTest
+  static void aResendKeepsTheListFromTheFirstInvitation() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    run(theBooking().Id);
+    String first = theBooking().Survey_Snapshot__c;
+
+    // A hotel is added to the trip after the invitation went out.
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Account later = new Account(
+      Name = 'Later Hotel',
+      Account_Type__c = 'Hotel',
+      BillingCity = 'Faro',
+      BillingCountry = 'Portugal'
+    );
+    insert later;
+    insert new Reservation__c(
+      Booking__c = theBooking().Id,
+      Travel_Location__c = later.Id,
+      AccountType__c = 'Hotel',
+      Pricing__c = 'Leistung',
+      Status__c = 'Completed',
+      Date_Begin__c = Date.today().addDays(-10),
+      Date_End__c = Date.today().addDays(-8)
+    );
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    GxFeedbackDispatch.Request reminder = new GxFeedbackDispatch.Request();
+    reminder.bookingId = theBooking().Id;
+    reminder.allowResend = true;
+    reminder.markReminder = true;
+    GxFeedbackDispatch.Result r = GxFeedbackDispatch.prepare(
+      new List<GxFeedbackDispatch.Request>{ reminder }
+    )[0];
+
+    Assert.isTrue(r.ok, 'The reminder goes out: ' + r.skippedReason);
+    Assert.areEqual(
+      first,
+      theBooking().Survey_Snapshot__c,
+      'The saved list is not rebuilt, so the later hotel is not in it'
     );
   }
 
