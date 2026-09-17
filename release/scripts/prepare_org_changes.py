@@ -18,6 +18,8 @@ only as agreed:
                          in staging (dashboard, feedback records, new booking
                          fields), merged without lowering anything it has.
   Booking__c.SurveySent__c  Field history on.
+  Reservation__c record type Master  Allows the line status "Completed", as
+                         in staging, so a booking can move to Completed.
 
 Writes a metadata-format folder with its own package.xml:
 
@@ -283,6 +285,39 @@ print(
 if "SurveySent__c" in read(os.path.join(OUT, "permissionsets", "EMU_Admin_view_all.permissionset")):
     raise SystemExit("EMU_Admin_view_all: Survey Sent must stay as it is in production")
 
+# Reservation__c record type "Master": allow the line status "Completed", as
+# staging does. Production's record type leaves it out, so when a booking moves
+# to Completed the org's booking flow cannot set its lines to Completed and the
+# whole save is refused - by hand, and when the invitation moves a trip on.
+# Proven check-only in both orgs on 17.09.2026. Every other picklist on the
+# record type is written back exactly as production has it.
+res = read(os.path.join(SRC, "objects", "Reservation__c.object"))
+rt = re.search(r"    <recordTypes>\n.*?</recordTypes>\n", res, re.S).group(0)
+status = re.search(r"<picklistValues>\s*<picklist>Status__c</picklist>.*?</picklistValues>", rt, re.S)
+if status is None:
+    raise SystemExit("Reservation__c.Master: no Status__c values in the backup - retrieve it with its picklist fields")
+block = status.group(0)
+existing_values = re.findall(r"<fullName>([^<]*)</fullName>", block)
+if "Completed" in existing_values:
+    raise SystemExit("Reservation__c.Master: Completed is already allowed in the backup - nothing to change")
+completed = (
+    "            <values>\n"
+    "                <fullName>Completed</fullName>\n"
+    "                <default>false</default>\n"
+    "            </values>\n"
+)
+entries = list(re.finditer(r"            <values>\s*<fullName>([^<]*)</fullName>.*?</values>\n", block, re.S))
+after = [m for m in entries if m.group(1).lower() > "completed"]
+at = after[0].start() if after else entries[-1].end()
+new_block = block[:at] + completed + block[at:]
+new_rt = rt.replace(block, new_block, 1)
+write(
+    os.path.join(OUT, "objects", "Reservation__c.object"),
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">\n' + new_rt + "</CustomObject>\n",
+)
+print(f"Reservation__c.Master: line status Completed allowed ({len(existing_values)} -> {len(existing_values) + 1} values)")
+
 write(
     os.path.join(OUT, "package.xml"),
     '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -299,6 +334,10 @@ write(
     "        <members>Booking_CRED</members>\n"
     "        <members>EMU_Admin_view_all</members>\n"
     "        <name>PermissionSet</name>\n"
+    "    </types>\n"
+    "    <types>\n"
+    "        <members>Reservation__c.Master</members>\n"
+    "        <name>RecordType</name>\n"
     "    </types>\n"
     f"    <version>{API_VERSION}</version>\n"
     "</Package>\n",

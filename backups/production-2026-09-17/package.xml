@@ -13,6 +13,12 @@
     </types>
     <types>
         <members>Booking__c.SurveySent__c</members>
+        <members>Reservation__c.Category__c</members>
+        <members>Reservation__c.Type__c</members>
+        <members>Reservation__c.AccountType__c</members>
+        <members>Reservation__c.Status__c</members>
+        <members>Reservation__c.Pricing__c</members>
+        <members>Reservation__c.QuantityCalculation__c</members>
         <name>CustomField</name>
     </types>
     <types>
@@ -35,6 +41,10 @@
     <types>
         <members>Golf_Extra_Feedback1</members>
         <name>CustomSite</name>
+    </types>
+    <types>
+        <members>Reservation__c.Master</members>
+        <name>RecordType</name>
     </types>
     <version>67.0</version>
 </Package>

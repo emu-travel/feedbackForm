@@ -14,5 +14,9 @@
         <members>EMU_Admin_view_all</members>
         <name>PermissionSet</name>
     </types>
+    <types>
+        <members>Reservation__c.Master</members>
+        <name>RecordType</name>
+    </types>
     <version>67.0</version>
 </Package>
