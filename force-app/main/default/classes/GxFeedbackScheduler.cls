@@ -21,7 +21,11 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
     run();
   }
 
-  /** Both passes, in one transaction, invitations first. */
+  /**
+   * Both passes, in one transaction, invitations first. A booking the org
+   * refuses to save does not stop the others (see GxFeedbackDispatch); anyone
+   * due who could not be asked is reported by GxFeedbackRunNotice.
+   */
   public static List<GxFeedbackSender.Result> run() {
     List<GxFeedbackSender.Request> requests = new List<GxFeedbackSender.Request>();
     requests.addAll(invitations());
@@ -30,7 +34,9 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
     if (requests.isEmpty()) {
       return new List<GxFeedbackSender.Result>();
     }
-    return GxFeedbackSender.send(requests);
+    List<GxFeedbackSender.Result> results = GxFeedbackSender.send(requests);
+    GxFeedbackRunNotice.sendIfNeeded(requests, results);
+    return results;
   }
 
   /**

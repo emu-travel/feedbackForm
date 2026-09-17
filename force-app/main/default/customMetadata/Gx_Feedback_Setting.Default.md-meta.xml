@@ -52,4 +52,8 @@
         <field>Sender_Email__c</field>
         <value xsi:type="xsd:string">anfrage@golf-extra.com</value>
     </values>
+    <values>
+        <field>Alert_Copy_Email__c</field>
+        <value xsi:type="xsd:string">ali.haider@emu-travel.com</value>
+    </values>
 </CustomMetadata>

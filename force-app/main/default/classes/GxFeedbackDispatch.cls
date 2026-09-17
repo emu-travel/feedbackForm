@@ -43,6 +43,26 @@ public with sharing class GxFeedbackDispatch {
   /** 24 random bytes, base64url encoded - 32 characters, ~192 bits. */
   private static final Integer SECRET_KEY_BITS = 192;
 
+  /** Bookings a test wants refused by the save, as a rule or flow in the org would. */
+  @TestVisible
+  private static Set<Id> refuseSaveForTest = new Set<Id>();
+
+  /**
+   * For tests: a refused booking also sinks every booking saved alongside it,
+   * which is what a fault in a record-triggered flow does.
+   */
+  @TestVisible
+  private static Boolean refusalSinksTheBatchForTest = false;
+
+  /**
+   * What one more save must leave free in the run. Measured in staging on
+   * 2026-09-17: one booking moving to Completed costs about 6 queries, 6 DML
+   * statements and under a second of CPU, most of it in the org's booking flow.
+   */
+  private static final Integer SPARE_QUERIES = 20;
+  private static final Integer SPARE_DML_STATEMENTS = 15;
+  private static final Integer SPARE_CPU_MS = 5000;
+
   public class Request {
     @InvocableVariable(
       label='Booking Id'
@@ -88,6 +108,12 @@ public with sharing class GxFeedbackDispatch {
       description='Why this booking was not prepared. Empty when it was.'
     )
     public String skippedReason;
+
+    @InvocableVariable(
+      label='Could Not Be Saved'
+      description='The booking was due but the org refused to save it. Nothing was changed on it, so it is tried again next time.'
+    )
+    public Boolean saveFailed = false;
   }
 
   @InvocableMethod(
@@ -117,6 +143,7 @@ public with sharing class GxFeedbackDispatch {
           End_Date__c,
           Start_Date__c,
           MainContact__c,
+          Opportunity__c,
           Form_Secret__c,
           SurveySent__c,
           Survey_Sent_On__c,
@@ -155,6 +182,7 @@ public with sharing class GxFeedbackDispatch {
     }
 
     Map<Id, Booking__c> toUpdate = new Map<Id, Booking__c>();
+    Map<Id, List<Result>> readyByBooking = new Map<Id, List<Result>>();
 
     for (Request r : requests) {
       Result out = new Result();
@@ -211,6 +239,10 @@ public with sharing class GxFeedbackDispatch {
         b.Survey_Reminder_Sent__c = true;
       }
       toUpdate.put(b.Id, b);
+      if (!readyByBooking.containsKey(b.Id)) {
+        readyByBooking.put(b.Id, new List<Result>());
+      }
+      readyByBooking.get(b.Id).add(out);
 
       out.ok = true;
       out.bookingNumber = b.BookingNumber__c;
@@ -222,10 +254,123 @@ public with sharing class GxFeedbackDispatch {
     if (!toUpdate.isEmpty()) {
       // Committed before the caller sends anything, so the guest can read
       // the booking by the time the link reaches them.
-      update toUpdate.values();
+      //
+      // One booking the org refuses must not hold back every other guest due
+      // that night. A refused booking is left exactly as it was - not marked
+      // sent, no list saved - so it comes up again on the next run, and it gets
+      // no email, because its link would lead nowhere.
+      Map<Id, String> refused = new Map<Id, String>();
+      saveSeparatingRefusals(toUpdate.values(), refused);
+      for (Id bookingId : refused.keySet()) {
+        String reason =
+          'The booking could not be saved: ' + refused.get(bookingId);
+        for (Result out : readyByBooking.get(bookingId)) {
+          out.ok = false;
+          out.saveFailed = true;
+          out.surveyUrl = null;
+          out.recipientContactId = null;
+          out.skippedReason = reason;
+        }
+      }
     }
 
     return results;
+  }
+
+  /**
+   * Saves the bookings together, and narrows down any refusal to the bookings
+   * that caused it. A fault in a record-triggered flow - the org's booking flow
+   * runs when a booking moves to Completed - fails every booking saved in the
+   * same batch, not only the one it choked on. So when several are refused
+   * together they are split in half and each half saved again, until each
+   * refusal belongs to a booking on its own: one bad booking among thirty costs
+   * about ten extra saves. Stops splitting before the run could hit a governor
+   * limit; bookings it could not separate stay untouched until the next run.
+   */
+  private static void saveSeparatingRefusals(
+    List<Booking__c> rows,
+    Map<Id, String> refused
+  ) {
+    List<Database.SaveResult> saved = save(rows);
+    List<Booking__c> failed = new List<Booking__c>();
+    for (Integer i = 0; i < saved.size(); i++) {
+      if (saved[i].isSuccess()) {
+        refused.remove(rows[i].Id);
+      } else {
+        failed.add(rows[i]);
+        refused.put(rows[i].Id, firstError(saved[i]));
+      }
+    }
+    if (failed.size() < 2) {
+      return;
+    }
+    if (!roomForAnotherSave()) {
+      for (Booking__c b : failed) {
+        refused.put(
+          b.Id,
+          refused.get(b.Id) +
+          ' (refused together with other bookings and not tried on its own this run)'
+        );
+      }
+      return;
+    }
+    Integer half = failed.size() / 2;
+    List<Booking__c> first = new List<Booking__c>();
+    List<Booking__c> second = new List<Booking__c>();
+    for (Integer i = 0; i < failed.size(); i++) {
+      (i < half ? first : second).add(failed[i]);
+    }
+    saveSeparatingRefusals(first, refused);
+    if (roomForAnotherSave()) {
+      saveSeparatingRefusals(second, refused);
+    } else {
+      for (Booking__c b : second) {
+        refused.put(
+          b.Id,
+          refused.get(b.Id) +
+          ' (refused together with other bookings and not tried on its own this run)'
+        );
+      }
+    }
+  }
+
+  private static List<Database.SaveResult> save(List<Booking__c> rows) {
+    // Test support only: a lookup pointing at the wrong kind of record makes
+    // the save refuse a booking, the way a rule or flow in the org would.
+    Boolean sinkAll = false;
+    if (refusalSinksTheBatchForTest && rows.size() > 1) {
+      for (Booking__c b : rows) {
+        sinkAll = sinkAll || refuseSaveForTest.contains(b.Id);
+      }
+    }
+    Map<Id, Id> opportunities = new Map<Id, Id>();
+    for (Booking__c b : rows) {
+      if (sinkAll || refuseSaveForTest.contains(b.Id)) {
+        opportunities.put(b.Id, b.Opportunity__c);
+        b.Opportunity__c = b.Id;
+      }
+    }
+    List<Database.SaveResult> saved = Database.update(rows, false);
+    for (Booking__c b : rows) {
+      if (opportunities.containsKey(b.Id)) {
+        b.Opportunity__c = opportunities.get(b.Id);
+      }
+    }
+    return saved;
+  }
+
+  private static Boolean roomForAnotherSave() {
+    return Limits.getQueries() + SPARE_QUERIES <= Limits.getLimitQueries() &&
+      Limits.getDmlStatements() + SPARE_DML_STATEMENTS <=
+      Limits.getLimitDmlStatements() &&
+      Limits.getCpuTime() + SPARE_CPU_MS <= Limits.getLimitCpuTime();
+  }
+
+  private static String firstError(Database.SaveResult result) {
+    List<Database.Error> errors = result.getErrors();
+    return errors.isEmpty()
+      ? 'no reason given'
+      : errors[0].getMessage().stripHtmlTags();
   }
 
   /** Null when the booking is ready; otherwise why it was skipped. */

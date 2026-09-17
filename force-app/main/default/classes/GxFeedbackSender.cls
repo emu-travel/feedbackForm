@@ -46,6 +46,27 @@ public with sharing class GxFeedbackSender {
 
     @InvocableVariable(label='Survey URL')
     public String surveyUrl;
+
+    @InvocableVariable(label='Booking Number')
+    public String bookingNumber;
+
+    @InvocableVariable(label='Reminder')
+    public Boolean reminder = false;
+
+    /**
+     * Due, but not sent for a reason someone has to act on: the booking could
+     * not be saved, or the email itself failed. Not set for the ordinary
+     * reasons a booking waits, such as a trip still inside its waiting period.
+     */
+    @InvocableVariable(label='Needs Attention')
+    public Boolean needsAttention = false;
+
+    /**
+     * The booking was left untouched, so the next nightly run picks it up again
+     * by itself. False when it needs attention after being saved as invited.
+     */
+    @InvocableVariable(label='Tried Again Next Run')
+    public Boolean triedAgainNextRun = false;
   }
 
   @InvocableMethod(
@@ -82,26 +103,34 @@ public with sharing class GxFeedbackSender {
       GxFeedbackDispatch.Result p = prepared[i];
       Result out = new Result();
       out.surveyUrl = p.surveyUrl;
-
-      if (!p.ok) {
-        out.message = p.skippedReason;
-        results.add(out);
-        continue;
-      }
-
+      out.bookingNumber = p.bookingNumber;
       // A reminder is a different email, not the same one sent twice.
       Boolean reminding =
         requests[i] != null &&
         requests[i].markReminder == true;
+      out.reminder = reminding;
+
+      if (!p.ok) {
+        out.message = p.skippedReason;
+        out.needsAttention = p.saveFailed == true;
+        out.triedAgainNextRun = p.saveFailed == true;
+        results.add(out);
+        continue;
+      }
+
       String wanted = reminding ? REMINDER_TEMPLATE : TEMPLATE;
       Id templateId = templates.get(wanted);
+      // Both of these are found only after the booking was saved as invited,
+      // so the guest will not be asked again on their own.
       if (templateId == null) {
         out.message = 'Email template ' + wanted + ' not found';
+        out.needsAttention = true;
         results.add(out);
         continue;
       }
       if (String.isBlank(p.surveyUrl)) {
         out.message = 'No survey base URL configured, so there is no link to send';
+        out.needsAttention = true;
         results.add(out);
         continue;
       }
@@ -133,6 +162,7 @@ public with sharing class GxFeedbackSender {
           out.sent = true;
         } else {
           out.message = firstError(sendResults[i]);
+          out.needsAttention = true;
         }
       }
     }

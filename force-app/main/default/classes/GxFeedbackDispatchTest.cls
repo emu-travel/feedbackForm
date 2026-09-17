@@ -750,4 +750,185 @@ private class GxFeedbackDispatchTest {
       'An unconfigured environment yields no link rather than a broken one'
     );
   }
+
+  // ------------------------------------------------------------------
+  // One refused booking among several
+
+  /** A second trip, due exactly like the first. */
+  private static Booking__c anotherDueBooking(String bookingNumber) {
+    Booking__c first = [
+      SELECT Opportunity__c, Quote_for__c, MainContact__c
+      FROM Booking__c
+      WHERE BookingNumber__c = :BOOKING_NUM
+    ];
+    Booking__c b = new Booking__c(
+      Opportunity__c = first.Opportunity__c,
+      Quote_for__c = first.Quote_for__c,
+      MainContact__c = first.MainContact__c,
+      BookingNumber__c = bookingNumber,
+      Travel_Type__c = 'FIT',
+      DestinationCountry__c = 'EG',
+      Status__c = 'Traveled',
+      Start_Date__c = Date.today().addDays(-14),
+      End_Date__c = Date.today().addDays(-7)
+    );
+    insert b;
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    insert new Reservation__c(
+      Booking__c = b.Id,
+      Travel_Location__c = [
+        SELECT Id
+        FROM Account
+        WHERE Name = 'Dispatch Hotel'
+      ]
+      .Id,
+      AccountType__c = 'Hotel',
+      Pricing__c = 'Leistung',
+      Status__c = 'Completed',
+      Date_Begin__c = Date.today().addDays(-14),
+      Date_End__c = Date.today().addDays(-7)
+    );
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+    return b;
+  }
+
+  private static List<GxFeedbackDispatch.Result> runBoth(Id first, Id second) {
+    List<GxFeedbackDispatch.Request> requests = new List<GxFeedbackDispatch.Request>();
+    for (Id bookingId : new List<Id>{ first, second }) {
+      GxFeedbackDispatch.Request req = new GxFeedbackDispatch.Request();
+      req.bookingId = bookingId;
+      requests.add(req);
+    }
+    return GxFeedbackDispatch.prepare(requests);
+  }
+
+  @IsTest
+  static void aBookingTheOrgRefusesDoesNotHoldBackTheOthers() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    Booking__c other = anotherDueBooking('TEST-GX-DISPATCH-2');
+    Id refused = theBooking().Id;
+    GxFeedbackDispatch.refuseSaveForTest.add(refused);
+
+    Test.startTest();
+    List<GxFeedbackDispatch.Result> out = runBoth(refused, other.Id);
+    Test.stopTest();
+
+    Assert.isFalse(out[0].ok, 'The refused booking is not ready to send');
+    Assert.isTrue(out[0].saveFailed, 'And says it could not be saved');
+    Assert.isTrue(
+      out[0].skippedReason.startsWith('The booking could not be saved'),
+      'With the reason: ' + out[0].skippedReason
+    );
+    Assert.isNull(out[0].surveyUrl, 'No link for a booking that was not saved');
+    Assert.isTrue(
+      out[1].ok,
+      'The other booking still goes: ' + out[1].skippedReason
+    );
+    Assert.isFalse(out[1].saveFailed, 'And was saved');
+
+    Booking__c untouched = theBooking();
+    Assert.isFalse(
+      untouched.SurveySent__c,
+      'The refused booking is not marked as invited'
+    );
+    Assert.isNull(untouched.Form_Secret__c, 'Has no link');
+    Assert.isTrue(
+      String.isBlank(untouched.Survey_Snapshot__c),
+      'Has no saved list'
+    );
+    Assert.isNull(untouched.Survey_Trip_End__c, 'Has no saved trip dates');
+    Assert.areEqual('Traveled', untouched.Status__c, 'And keeps its status');
+
+    Booking__c invited = [
+      SELECT SurveySent__c, Status__c, Survey_Snapshot__c
+      FROM Booking__c
+      WHERE Id = :other.Id
+    ];
+    Assert.isTrue(invited.SurveySent__c, 'The other booking is invited');
+    Assert.areEqual(
+      'Completed',
+      invited.Status__c,
+      'And moved on to Completed'
+    );
+    Assert.isTrue(
+      String.isNotBlank(invited.Survey_Snapshot__c),
+      'With its list saved'
+    );
+  }
+
+  @IsTest
+  static void aFlowFaultThatSinksTheWholeBatchStillOnlyRefusesTheBookingThatCausedIt() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    Booking__c second = anotherDueBooking('TEST-GX-DISPATCH-2');
+    Booking__c third = anotherDueBooking('TEST-GX-DISPATCH-3');
+    Id bad = theBooking().Id;
+    GxFeedbackDispatch.refuseSaveForTest.add(bad);
+    GxFeedbackDispatch.refusalSinksTheBatchForTest = true;
+
+    List<GxFeedbackDispatch.Request> requests = new List<GxFeedbackDispatch.Request>();
+    for (Id bookingId : new List<Id>{ second.Id, bad, third.Id }) {
+      GxFeedbackDispatch.Request req = new GxFeedbackDispatch.Request();
+      req.bookingId = bookingId;
+      requests.add(req);
+    }
+
+    Test.startTest();
+    List<GxFeedbackDispatch.Result> out = GxFeedbackDispatch.prepare(requests);
+    Test.stopTest();
+
+    Assert.isTrue(
+      out[0].ok,
+      'Saved on its own after the batch failed: ' + out[0].skippedReason
+    );
+    Assert.isFalse(out[1].ok, 'The booking that caused it stays refused');
+    Assert.isTrue(out[1].saveFailed, 'And is reported as not saved');
+    Assert.isTrue(
+      out[2].ok,
+      'Saved on its own after the batch failed: ' + out[2].skippedReason
+    );
+
+    Map<Id, Booking__c> after = new Map<Id, Booking__c>(
+      [
+        SELECT Id, SurveySent__c, Opportunity__c
+        FROM Booking__c
+        WHERE Id IN :new List<Id>{ second.Id, bad, third.Id }
+      ]
+    );
+    Assert.isTrue(
+      after.get(second.Id).SurveySent__c,
+      'The second booking is invited'
+    );
+    Assert.isTrue(
+      after.get(third.Id).SurveySent__c,
+      'The third booking is invited'
+    );
+    Assert.isFalse(after.get(bad).SurveySent__c, 'The bad booking is not');
+    Assert.isNotNull(
+      after.get(second.Id).Opportunity__c,
+      'Retrying keeps everything else on the booking as it was'
+    );
+  }
+
+  @IsTest
+  static void aRefusedBookingIsReadyAgainOnceItCanBeSaved() {
+    GxFeedbackSettings.useForTest(
+      settings(36, 'https://example.test/feedback/')
+    );
+    Id bookingId = theBooking().Id;
+    GxFeedbackDispatch.refuseSaveForTest.add(bookingId);
+    Assert.isFalse(run(bookingId)[0].ok, 'Refused the first time');
+
+    GxFeedbackDispatch.refuseSaveForTest.clear();
+    List<GxFeedbackDispatch.Result> again = run(bookingId);
+
+    Assert.isTrue(
+      again[0].ok,
+      'Ready once it saves: ' + again[0].skippedReason
+    );
+    Assert.isTrue(theBooking().SurveySent__c, 'And marked as invited');
+  }
 }

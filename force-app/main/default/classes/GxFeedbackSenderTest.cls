@@ -626,4 +626,254 @@ private class GxFeedbackSenderTest {
       'And is registered'
     );
   }
+
+  // ------------------------------------------------------------------
+  // A booking the org refuses to save
+
+  private static final String READY_TOO = 'TEST-GX-SEND-READY-2';
+  private static final String TEAM = 'team@example.test';
+
+  /** As pinSettings, with a copy address so problems are emailed. */
+  private static void pinSettingsWithNotice(Decimal reminderDays) {
+    GxFeedbackSettings.useForTest(
+      new Gx_Feedback_Setting__mdt(
+        Dispatch_Delay_Hours__c = 36,
+        Reminder_Delay_Days__c = reminderDays,
+        Link_Validity_Days__c = 14,
+        Survey_Base_URL__c = 'https://example.test/feedback/',
+        Sender_Email__c = null,
+        Survey_Start_Date__c = Date.today().addYears(-5),
+        Alert_Copy_Email__c = TEAM
+      )
+    );
+  }
+
+  /** A second finished trip, due for its invitation like READY. */
+  private static Booking__c secondReadyBooking() {
+    Booking__c first = [
+      SELECT Opportunity__c, Quote_for__c, MainContact__c
+      FROM Booking__c
+      WHERE BookingNumber__c = :READY
+    ];
+    Booking__c b = newBooking(
+      new Account(Id = first.Quote_for__c),
+      new Opportunity(Id = first.Opportunity__c),
+      new Contact(Id = first.MainContact__c),
+      READY_TOO,
+      Date.today().addDays(-5)
+    );
+    insert b;
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    insert new Reservation__c(
+      Booking__c = b.Id,
+      Travel_Location__c = [SELECT Id FROM Account WHERE Name = 'Sender Hotel']
+      .Id,
+      AccountType__c = 'Hotel',
+      Pricing__c = 'Leistung',
+      Status__c = 'Completed',
+      Date_Begin__c = Date.today().addDays(-12),
+      Date_End__c = Date.today().addDays(-5)
+    );
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+    return b;
+  }
+
+  private static GxFeedbackSender.Result resultFor(
+    List<GxFeedbackSender.Result> results,
+    String bookingNumber
+  ) {
+    for (GxFeedbackSender.Result r : results) {
+      if (r.bookingNumber == bookingNumber) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  @IsTest
+  static void theNightlyRunStillAsksEveryoneElseWhenOneBookingIsRefused() {
+    pinSettingsWithNotice(0);
+    secondReadyBooking();
+    GxFeedbackDispatch.refuseSaveForTest.add(booking(READY).Id);
+
+    Test.startTest();
+    List<GxFeedbackSender.Result> out = GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.areEqual(2, out.size(), 'Both due trips are considered');
+    GxFeedbackSender.Result refused = resultFor(out, READY);
+    GxFeedbackSender.Result asked = resultFor(out, READY_TOO);
+    Assert.isFalse(refused.sent, 'The refused booking gets no email');
+    Assert.isTrue(refused.needsAttention, 'And is flagged for the team');
+    Assert.isTrue(refused.triedAgainNextRun, 'And will be tried again');
+    Assert.isTrue(
+      asked.sent,
+      'The other guest is still invited: ' + asked.message
+    );
+
+    Assert.isFalse(
+      booking(READY).SurveySent__c,
+      'Nothing was changed on the refused booking'
+    );
+    Assert.isTrue(
+      booking(READY_TOO).SurveySent__c,
+      'The other booking is marked as invited'
+    );
+
+    Assert.areEqual(
+      1,
+      GxFeedbackRunNotice.sent.size(),
+      'One notice for the run'
+    );
+    Messaging.SingleEmailMessage notice = GxFeedbackRunNotice.sent[0];
+    Assert.areEqual(
+      new List<String>{ TEAM },
+      notice.getToAddresses(),
+      'To the alert copy address'
+    );
+    Assert.isTrue(
+      notice.getSubject().contains('1 guest was not asked'),
+      notice.getSubject()
+    );
+    Assert.isTrue(
+      notice.getPlainTextBody().contains(READY),
+      'Names the refused booking'
+    );
+    Assert.isFalse(
+      notice.getPlainTextBody().contains(READY_TOO),
+      'And only the refused booking'
+    );
+    Assert.isTrue(
+      notice.getPlainTextBody().contains('tried again at the next 07:00 run'),
+      'And says it will be tried again'
+    );
+  }
+
+  @IsTest
+  static void aRefusedBookingIsInvitedByTheNextRunOnceItCanBeSaved() {
+    pinSettingsWithNotice(0);
+    Id refused = booking(READY).Id;
+    GxFeedbackDispatch.refuseSaveForTest.add(refused);
+    Assert.isFalse(GxFeedbackScheduler.run()[0].sent, 'Refused tonight');
+
+    GxFeedbackDispatch.refuseSaveForTest.clear();
+    Test.startTest();
+    List<GxFeedbackSender.Result> tomorrow = GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.areEqual(1, tomorrow.size(), 'Picked up again the next night');
+    Assert.isTrue(tomorrow[0].sent, 'And invited: ' + tomorrow[0].message);
+    Assert.isTrue(booking(READY).SurveySent__c, 'Now marked as invited');
+  }
+
+  @IsTest
+  static void remindersStillGoOutWhenAnInvitationIsRefused() {
+    pinSettingsWithNotice(10);
+    invitedDaysAgo(READY, 11);
+    Booking__c refused = secondReadyBooking();
+    GxFeedbackDispatch.refuseSaveForTest.add(refused.Id);
+
+    Test.startTest();
+    List<GxFeedbackSender.Result> out = GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    GxFeedbackSender.Result reminder = resultFor(out, READY);
+    Assert.isTrue(reminder.reminder, 'The silent guest is due a reminder');
+    Assert.isTrue(reminder.sent, 'And is reminded: ' + reminder.message);
+    Assert.isFalse(
+      resultFor(out, READY_TOO).sent,
+      'The refused invitation is not sent'
+    );
+    Assert.isTrue(
+      GxFeedbackRunNotice.sent[0]
+        .getPlainTextBody()
+        .contains(READY_TOO + ' - Invitation'),
+      'The notice names the invitation that could not go'
+    );
+  }
+
+  @IsTest
+  static void aNightWithoutProblemsSendsNoNotice() {
+    pinSettingsWithNotice(0);
+
+    Test.startTest();
+    List<GxFeedbackSender.Result> out = GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.isTrue(out[0].sent, 'The guest is invited: ' + out[0].message);
+    Assert.isFalse(out[0].needsAttention, 'Nothing needs attention');
+    Assert.areEqual(
+      0,
+      GxFeedbackRunNotice.sent.size(),
+      'So nobody is emailed about it'
+    );
+  }
+
+  @IsTest
+  static void withoutACopyAddressTheOthersStillGoAndNothingIsEmailed() {
+    pinSettings(36);
+    secondReadyBooking();
+    GxFeedbackDispatch.refuseSaveForTest.add(booking(READY).Id);
+
+    Test.startTest();
+    List<GxFeedbackSender.Result> out = GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.isTrue(
+      resultFor(out, READY_TOO).sent,
+      'The other guest is still invited'
+    );
+    Assert.areEqual(
+      0,
+      GxFeedbackRunNotice.sent.size(),
+      'No address, no notice'
+    );
+  }
+
+  @IsTest
+  static void aFailedEmailAfterSavingSaysHowToResend() {
+    pinSettingsWithNotice(0);
+    GxFeedbackRunNotice.sandboxOverride = true;
+    GxFeedbackSender.Request request = new GxFeedbackSender.Request();
+    request.bookingId = booking(READY).Id;
+    request.markReminder = true;
+    GxFeedbackSender.Result failed = new GxFeedbackSender.Result();
+    failed.bookingNumber = READY;
+    failed.reminder = true;
+    failed.message = 'Mailbox unavailable';
+    failed.needsAttention = true;
+    GxFeedbackSender.Result waiting = new GxFeedbackSender.Result();
+    waiting.bookingNumber = TOO_SOON;
+    waiting.message = 'Still inside the waiting period';
+
+    GxFeedbackRunNotice.sendIfNeeded(
+      new List<GxFeedbackSender.Request>{
+        request,
+        new GxFeedbackSender.Request()
+      },
+      new List<GxFeedbackSender.Result>{ failed, waiting }
+    );
+
+    Assert.areEqual(1, GxFeedbackRunNotice.sent.size(), 'One notice');
+    Messaging.SingleEmailMessage notice = GxFeedbackRunNotice.sent[0];
+    Assert.isTrue(
+      notice.getSubject().startsWith('[Sandbox] '),
+      'Marked in a sandbox'
+    );
+    String text = notice.getPlainTextBody();
+    Assert.isTrue(text.contains(READY + ' - Reminder'), text);
+    Assert.isTrue(text.contains('Mailbox unavailable'), 'With the reason');
+    Assert.isTrue(
+      text.contains('already marked as reminded'),
+      'Says it is not retried'
+    );
+    Assert.isTrue(
+      text.contains('scripts/apex/send-feedback-invitation.apex'),
+      'And how to resend'
+    );
+    Assert.isFalse(
+      text.contains(TOO_SOON),
+      'An ordinary wait is not a problem'
+    );
+  }
 }

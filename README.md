@@ -64,10 +64,21 @@ Gx_Detractor_Alert__e → GxDetractorAlert (email to the travel designer)
 
 - `GxFeedbackScheduler` → `GxFeedbackDispatch` → `GxFeedbackSender`. Rules and addresses live
   in the custom metadata record `Gx_Feedback_Setting.Default` (start date, delays, link
-  validity, sender `anfrage@golf-extra.com`, review links, alert switch and copy address).
+  validity, sender `anfrage@golf-extra.com`, review links, alert switch and copy address
+  `ali.haider@emu-travel.com`, which also receives the nightly run's problem notice).
 - Only trips that ended on or after `Survey_Start_Date__c` and within `Max_Trip_Age_Days__c`
   are invited, so switching the job on never mails old guests.
 - A guest who has answered is never reminded (checked in the query and again before sending).
+- **One refused booking does not stop the night.** The due bookings are saved together; when the
+  org refuses some of them (a rule, or a fault in a record-triggered flow, which fails every booking
+  saved alongside it), the refused ones are split and saved again until only the booking at fault is
+  left, within the run's governor limits. That booking is left untouched and tried again at the next
+  run; everyone else is emailed as normal.
+- **Someone is told.** When a guest due that morning could not be asked, `GxFeedbackRunNotice` emails
+  the alert copy address with each booking and the reason, marked `[Sandbox]` in a sandbox. A
+  refused booking repeats in the notice every morning until it is fixed. An email that failed after
+  the booking was saved is not retried by itself; the notice says to resend it with
+  `scripts/apex/send-feedback-invitation.apex`.
 - **Booking status:** the team marks a trip **Traveled**; sending the invitation moves it to
   **Completed** (a trip someone already marked Completed stays there); the guest's answer moves it
   to **Feedback**. Only Traveled and Completed trips are invited, so a trip still at Paid or
