@@ -5,7 +5,6 @@
         <name>CustomField</name>
     </types>
     <types>
-        <members>Booking_Record_Page</members>
         <members>Booking_Record_Page1</members>
         <members>Booking_Group_Record_Page</members>
         <name>FlexiPage</name>

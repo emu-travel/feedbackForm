@@ -8,7 +8,11 @@ only as agreed:
                          Survey Reminder Sent, Feedback erhalten am) as one
                          full-width column just above System Information, and
                          remove the old survey buttons (Booking__c.SendSurvey,
-                         SendSurveyInvitation) wherever they sit.
+                         SendSurveyInvitation) wherever they sit. Only the two
+                         pages bookings actually use: the unassigned 2025 page
+                         Booking_Record_Page is left alone, because production
+                         refuses to save it at all (it still lists the removed
+                         related list Signatur_Anfragen__r; validation 17.09.2026).
   Booking_CRED           No edit on Booking__c.SurveySent__c (read stays).
   EMU_Admin_view_all     Gets the feedback access Golf_Extra_Feedback_Admin gives
                          in staging (dashboard, feedback records, new booking
@@ -27,7 +31,7 @@ import sys
 import uuid
 
 SRC, OUT = sys.argv[1], sys.argv[2]
-PAGES = ["Booking_Record_Page", "Booking_Record_Page1", "Booking_Group_Record_Page"]
+PAGES = ["Booking_Record_Page1", "Booking_Group_Record_Page"]
 FIELDS = ["Survey_Sent_On__c", "Survey_Reminder_Sent__c", "Feedback_Received_On__c"]
 OLD_BUTTONS = ["Booking__c.SendSurvey", "SendSurveyInvitation"]
 MARK = "gxFeedback"
