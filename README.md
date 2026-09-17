@@ -98,7 +98,8 @@ sandbox the designer is never emailed - the alert goes to the copy address only,
 ### Feedback Dashboard
 
 Lightning tab `Gx_Feedback_Dashboard`, for users with the permission set
-**Golf Extra Feedback - Admin**:
+**Golf Extra Feedback - Admin** (in production the same access comes with the existing permission set
+**EMU Admin view all**, which holds the org's admins; the Golf Extra set is not deployed there):
 
 - Headline numbers: responses, response rate, NPS, overall and consultation averages, open follow-ups.
 - Dates are the trip as it was when the guest was invited (`Survey_Trip_End__c`), so a later change
@@ -172,7 +173,7 @@ sf community publish -o gx-sandbox --name "Golf Extra Feedback"   # after LWC or
 2. Set `Gx_Feedback_Setting.Default`: `Survey_Base_URL__c` (production site), `Survey_Start_Date__c`
    (go-live date), `Alert_Copy_Email__c`.
 3. Verify the org-wide address `anfrage@golf-extra.com` and email deliverability.
-4. Assign **Golf Extra Feedback - Admin** to the team.
+4. Dashboard access: the release adds it to **EMU Admin view all**, so its holders have it without an assignment.
 5. Booking record pages: add the read-only **Feedback** section to the Details tab as one full-width
    column (Survey Sent On, Survey Reminder Sent, Feedback erhalten am), so no label wraps. There is no
    Feedback Responses list on the booking: the answers are read on the dashboard. These Lightning pages

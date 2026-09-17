@@ -275,7 +275,6 @@
         <name>ListView</name>
     </types>
     <types>
-        <members>Golf_Extra_Feedback_Admin</members>
         <members>Golf_Extra_Feedback_Guest</members>
         <name>PermissionSet</name>
     </types>

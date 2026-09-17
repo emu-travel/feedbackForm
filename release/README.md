@@ -4,15 +4,16 @@ Go-live: **21.09.2026**. Production org alias `gx-prod`, API 67.0.
 
 ## What is in here
 
-| Path                                                 | What it is                                                                                                                                                                                                                                              |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package.xml`                                        | Every project component that goes to production (225), generated from `force-app` and trimmed                                                                                                                                                           |
-| `production/Gx_Feedback_Setting.Default.md-meta.xml` | The settings record with production values: survey address `https://emu-travel.my.site.com/feedback/`, Survey Start Date `2026-09-21`                                                                                                                   |
-| `org-changes/`                                       | Changes to production's own metadata, made from the production backup: Feedback section on the three booking pages (and the old survey buttons off the unassigned 2025 page), Survey Sent read-only in `Booking_CRED`, field history on `SurveySent__c` |
-| `scripts/prepare_org_changes.py`                     | Builds `org-changes/` from `backups/production-2026-09-17/metadata`                                                                                                                                                                                     |
-| `scripts/build_release.py`                           | Builds `build/` (not committed): the metadata-format folder that is validated and deployed                                                                                                                                                              |
+| Path                                                 | What it is                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.xml`                                        | Every project component that goes to production (225), generated from `force-app` and trimmed                                                                                                                                                                                                                                                                                                       |
+| `production/Gx_Feedback_Setting.Default.md-meta.xml` | The settings record with production values: survey address `https://emu-travel.my.site.com/feedback/`, Survey Start Date `2026-09-21`                                                                                                                                                                                                                                                               |
+| `org-changes/`                                       | Changes to production's own metadata, made from the production backup: Feedback section on the three booking pages (and the old survey buttons off the unassigned 2025 page), Survey Sent read-only in `Booking_CRED`, field history on `SurveySent__c`, and the feedback access of `Golf_Extra_Feedback_Admin` merged into `EMU_Admin_view_all` (added only, nothing it already allows is lowered) |
+| `scripts/prepare_org_changes.py`                     | Builds `org-changes/` from `backups/production-2026-09-17/metadata`                                                                                                                                                                                                                                                                                                                                 |
+| `scripts/build_release.py`                           | Builds `build/` (not committed): the metadata-format folder that is validated and deployed                                                                                                                                                                                                                                                                                                          |
 
-Left out on purpose: `Booking__c-Booking Layout` (org-owned, unchanged), `golfextra_logo` (already in production,
+Left out on purpose: `Golf_Extra_Feedback_Admin` (production uses `EMU_Admin_view_all` for the dashboard instead),
+`Booking__c-Booking Layout` (org-owned, unchanged), `golfextra_logo` (already in production,
 byte-identical), the sharing rule and label containers (only our own rules and labels are named, so production's
 `Website_Guest_Access` guest rule and other labels stay untouched).
 
@@ -49,4 +50,5 @@ sf project retrieve start -o gx-prod --manifest backups/production-2026-09-17/pa
 ```
 
 Then follow Phase 5 of the go-live plan: quick deploy, guest permission set on the site guest user, publish the site,
-admin permission set for Ergül Altinova, Kaan Vincent Altinova and Ali Haider, smoke test, nightly job last.
+smoke test, nightly job last. Dashboard access comes with EMU_Admin_view_all (part of the release), so there is no
+admin permission set to assign.

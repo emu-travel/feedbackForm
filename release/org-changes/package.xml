@@ -12,6 +12,7 @@
     </types>
     <types>
         <members>Booking_CRED</members>
+        <members>EMU_Admin_view_all</members>
         <name>PermissionSet</name>
     </types>
     <version>67.0</version>

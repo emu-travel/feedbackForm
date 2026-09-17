@@ -19,14 +19,14 @@ From **21.09.2026** guests are asked for feedback automatically after their trip
   cannot be set by hand.
 - A guest who has not answered gets **one reminder after 10 days**. The link works for 14 days after the last email.
 - A guest who would recommend us **6 or less**: the trip's travel designer gets an email at once, with a copy to
-  ali.haider@emu-travel.com. Please call the guest, then note what you did under "Unhappy guests to follow up" on the
-  Feedback Dashboard.
+  ali.haider@emu-travel.com. Please call the guest and let Ali know what was agreed, so it is recorded under "Unhappy
+  guests to follow up" on the Feedback Dashboard.
 - "Survey Sent" on the booking is read-only now; the system sets it.
 - Only trips ending on or after 21.09.2026 are invited, so no past guest receives an email.
 
 **Who to ask**
 
-- The **Feedback Dashboard** (tab "Feedback Dashboard") is open to Ergül Altinova, Kaan Vincent Altinova and Ali Haider.
+- The **Feedback Dashboard** (tab "Feedback Dashboard") is open to everyone with the "EMU Admin view all" permission set.
 - A guest says the email never arrived, or a booking was not invited: tell Ali. It can be resent.
 
 ## Deutsch
@@ -47,13 +47,13 @@ From **21.09.2026** guests are asked for feedback automatically after their trip
 - Wer nicht antwortet, bekommt **nach 10 Tagen eine Erinnerung**, nur einmal. Der Link gilt 14 Tage ab der letzten
   E-Mail.
 - Empfiehlt uns ein Gast mit **6 oder weniger** weiter, bekommt der Reisedesigner der Reise sofort eine E-Mail, in
-  Kopie an ali.haider@emu-travel.com. Bitte den Gast anrufen und im Feedback Dashboard unter "Unhappy guests to follow
-  up" festhalten, was passiert ist.
+  Kopie an ali.haider@emu-travel.com. Bitte den Gast anrufen und Ali mitteilen, was vereinbart wurde, damit es im
+  Feedback Dashboard unter "Unhappy guests to follow up" festgehalten wird.
 - "Survey Sent" auf der Buchung ist jetzt schreibgeschützt; das System setzt es.
 - Eingeladen werden nur Reisen, die am 21.09.2026 oder später enden. Frühere Gäste bekommen keine E-Mail.
 
 **Ansprechpartner**
 
-- Das **Feedback Dashboard** (Tab "Feedback Dashboard") sehen Ergül Altinova, Kaan Vincent Altinova und Ali Haider.
+- Das **Feedback Dashboard** (Tab "Feedback Dashboard") sehen alle mit dem Berechtigungssatz "EMU Admin view all".
 - Ein Gast hat die E-Mail nicht bekommen oder eine Buchung wurde nicht eingeladen: bitte Ali Bescheid geben. Die
   Einladung kann erneut gesendet werden.

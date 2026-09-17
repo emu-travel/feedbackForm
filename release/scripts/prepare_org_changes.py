@@ -10,6 +10,9 @@ only as agreed:
                          remove the old survey buttons (Booking__c.SendSurvey,
                          SendSurveyInvitation) wherever they sit.
   Booking_CRED           No edit on Booking__c.SurveySent__c (read stays).
+  EMU_Admin_view_all     Gets the feedback access Golf_Extra_Feedback_Admin gives
+                         in staging (dashboard, feedback records, new booking
+                         fields), merged without lowering anything it has.
   Booking__c.SurveySent__c  Field history on.
 
 Writes a metadata-format folder with its own package.xml:
@@ -185,6 +188,97 @@ write(
 )
 print("Booking__c.SurveySent__c: field history on")
 
+# EMU_Admin_view_all: the people who administer the feedback in production
+# (decided 17.09.2026), so it gets what Golf_Extra_Feedback_Admin grants in
+# staging - dashboard, feedback records, the new booking fields - instead of
+# that permission set being deployed. Merged, never lowered: anything the
+# permission set already allows stays as it is, and only what it lacks is
+# written, so nothing else about it can change.
+PERM_KEYS = {
+    "classAccesses": ("apexClass", ["enabled"]),
+    "fieldPermissions": ("field", ["editable", "readable"]),
+    "flowAccesses": ("flow", ["enabled"]),
+    "objectPermissions": (
+        "object",
+        ["allowCreate", "allowDelete", "allowEdit", "allowRead", "modifyAllFields", "modifyAllRecords", "viewAllFields", "viewAllRecords"],
+    ),
+    "tabSettings": ("tab", ["visibility"]),
+}
+# Metadata API order of the elements that can appear here.
+PERM_ORDER = ["classAccesses", "fieldPermissions", "flowAccesses", "hasActivationRequired", "label", "objectPermissions", "tabSettings"]
+TAB_RANK = {"None": 0, "Hidden": 0, "Available": 1, "DefaultOff": 1, "Visible": 2, "DefaultOn": 2}
+
+
+def perm_entries(text):
+    entries = {}
+    for kind, (key, flags) in PERM_KEYS.items():
+        for block in re.findall(rf"<{kind}>(.*?)</{kind}>", text, re.S):
+            name = re.search(rf"<{key}>([^<]*)</{key}>", block).group(1)
+            values = {}
+            for flag in flags:
+                m = re.search(rf"<{flag}>([^<]*)</{flag}>", block)
+                if m:
+                    values[flag] = m.group(1)
+            entries[(kind, name)] = values
+    return entries
+
+
+def stronger(flag, ours, theirs):
+    if flag == "visibility":
+        return ours if TAB_RANK.get(ours, 0) > TAB_RANK.get(theirs, 0) else theirs
+    return "true" if "true" in (ours, theirs) else "false"
+
+
+view_all = read(os.path.join(SRC, "permissionsets", "EMU_Admin_view_all.permissionset"))
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ours = read(
+    os.path.join(repo_root, "force-app", "main", "default", "permissionsets", "Golf_Extra_Feedback_Admin.permissionset-meta.xml")
+)
+existing = perm_entries(view_all)
+to_write = {kind: [] for kind in PERM_KEYS}
+added = kept = raised = 0
+for (kind, name), values in perm_entries(ours).items():
+    key, flags = PERM_KEYS[kind]
+    current = existing.get((kind, name))
+    if current is None:
+        merged = values
+        added += 1
+    else:
+        merged = {f: stronger(f, values.get(f, "false"), current.get(f, "false")) for f in flags if f in values or f in current}
+        if merged == {f: current.get(f) for f in merged}:
+            kept += 1
+            if kind != "objectPermissions":
+                continue
+            # A granted object must travel with the objects it depends on
+            # (Feedback_Response__c needs Booking__c), so production's own
+            # object access is written back exactly as it is.
+        else:
+            raised += 1
+    lines = [f"        <{key}>{name}</{key}>"] + [f"        <{f}>{merged[f]}</{f}>" for f in sorted(merged)]
+    to_write[kind].append((name, f"    <{kind}>\n" + "\n".join(sorted(lines)) + f"\n    </{kind}>"))
+
+label = re.search(r"<label>([^<]*)</label>", view_all).group(1)
+activation = re.search(r"<hasActivationRequired>([^<]*)</hasActivationRequired>", view_all)
+parts = []
+for element in PERM_ORDER:
+    if element == "hasActivationRequired" and activation:
+        parts.append(f"    <hasActivationRequired>{activation.group(1)}</hasActivationRequired>")
+    elif element == "label":
+        parts.append(f"    <label>{label}</label>")
+    elif element in to_write:
+        parts.extend(block for _, block in sorted(to_write[element]))
+write(
+    os.path.join(OUT, "permissionsets", "EMU_Admin_view_all.permissionset"),
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">\n' + "\n".join(parts) + "\n</PermissionSet>\n",
+)
+print(
+    f"EMU_Admin_view_all: feedback access merged in | {added} added, {raised} raised,"
+    f" {kept} already allowed (left alone) | Survey Sent untouched"
+)
+if "SurveySent__c" in read(os.path.join(OUT, "permissionsets", "EMU_Admin_view_all.permissionset")):
+    raise SystemExit("EMU_Admin_view_all: Survey Sent must stay as it is in production")
+
 write(
     os.path.join(OUT, "package.xml"),
     '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -199,6 +293,7 @@ write(
     "    </types>\n"
     "    <types>\n"
     "        <members>Booking_CRED</members>\n"
+    "        <members>EMU_Admin_view_all</members>\n"
     "        <name>PermissionSet</name>\n"
     "    </types>\n"
     f"    <version>{API_VERSION}</version>\n"
