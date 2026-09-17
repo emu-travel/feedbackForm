@@ -50,6 +50,18 @@ Record the validation ID. It stays valid for 10 days.
 Checked against staging on 17.09.2026: 229 of 229 components and 159 of 159 tests. `Booking_Record_Page` was left out of
 that check only because production's version uses `Pay__c`, which exists in production but not in staging.
 
+## Deployed to production on 17.09.2026
+
+- Quick deploy `0AfMz000002N2SzKAK` at 17:40 Berlin: 230 of 230 components.
+- **Incident, fixed:** the release carried `Booking_CRED` and `EMU_Admin_view_all` as partial files (only the changed
+  entries). Deploying a permission set replaces its contents with the file, so both lost most of their other
+  permissions (Booking_CRED lost its Booking object access, which the EMU Travel Designer and EMU Buchhaltung groups
+  use). Both were restored at 17:49 Berlin from `backups/production-2026-09-17`, with only the agreed changes on top
+  (deploy `0AfMz000002N2ftKAC`), and compared entry by entry with the backup afterwards: nothing missing.
+- `release/scripts/prepare_org_changes.py` now always writes complete permission sets and refuses to write one that
+  would lose a backed-up entry.
+- Guest permission set assigned to the site guest user; site published.
+
 ## Go-live day, before the quick deploy
 
 Other work goes on in production in parallel. The release writes production's own components (the two booking pages,

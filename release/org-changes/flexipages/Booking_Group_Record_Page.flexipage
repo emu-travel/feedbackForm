@@ -847,7 +847,7 @@
                 <identifier>RecordFeedback_Received_On_cField_gxFeedback</identifier>
             </fieldInstance>
         </itemInstances>
-        <name>Facet-7dd62f4d-2dd1-463b-8682-144bc6bba95d</name>
+        <name>Facet-7afbb500-a9cd-43e7-af73-94d8b230a476</name>
         <type>Facet</type>
     </flexiPageRegions>
     <flexiPageRegions>
@@ -855,13 +855,13 @@
             <componentInstance>
                 <componentInstanceProperties>
                     <name>body</name>
-                    <value>Facet-7dd62f4d-2dd1-463b-8682-144bc6bba95d</value>
+                    <value>Facet-7afbb500-a9cd-43e7-af73-94d8b230a476</value>
                 </componentInstanceProperties>
                 <componentName>flexipage:column</componentName>
                 <identifier>flexipage_column_gxFeedback1</identifier>
             </componentInstance>
         </itemInstances>
-        <name>Facet-99f88091-35de-480e-bbb8-759e416d7ff1</name>
+        <name>Facet-bc50f533-e778-4693-9325-c56ba7e635a9</name>
         <type>Facet</type>
     </flexiPageRegions>
     <flexiPageRegions>
@@ -941,7 +941,7 @@
             <componentInstance>
                 <componentInstanceProperties>
                     <name>columns</name>
-                    <value>Facet-99f88091-35de-480e-bbb8-759e416d7ff1</value>
+                    <value>Facet-bc50f533-e778-4693-9325-c56ba7e635a9</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>horizontalAlignment</name>

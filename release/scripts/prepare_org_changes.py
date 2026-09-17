@@ -162,27 +162,23 @@ for page in PAGES:
         f" | {len(original)} -> {len(patched)} bytes"
     )
 
-# Booking_CRED: only the one field permission is deployed, so nothing else on
-# the permission set can change.
+# PERMISSION SETS ARE ALWAYS WRITTEN WHOLE. Deploying a permission set replaces
+# its contents with the file: a file carrying only the changed entries removes
+# every other permission. That happened in production on 17.09.2026 (17:40 to
+# 17:49 Berlin) and was restored from the backup. Both files below are the
+# complete backed-up permission set with only the agreed change applied.
+
+# Booking_CRED: the backup, with Survey Sent read-only.
 cred = read(os.path.join(SRC, "permissionsets", "Booking_CRED.permissionset"))
-label = re.search(r"<label>([^<]*)</label>", cred).group(1)
-if not re.search(
-    r"<editable>true</editable>\s*<field>Booking__c\.SurveySent__c</field>\s*<readable>true</readable>", cred
-):
-    raise SystemExit("Booking_CRED: Survey Sent is not editable in the backup - nothing to change, check again")
-write(
-    os.path.join(OUT, "permissionsets", "Booking_CRED.permissionset"),
-    '<?xml version="1.0" encoding="UTF-8"?>\n'
-    '<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">\n'
-    "    <fieldPermissions>\n"
-    "        <editable>false</editable>\n"
-    "        <field>Booking__c.SurveySent__c</field>\n"
-    "        <readable>true</readable>\n"
-    "    </fieldPermissions>\n"
-    f"    <label>{label}</label>\n"
-    "</PermissionSet>\n",
+new_cred, count = re.subn(
+    r"<editable>true</editable>(\s*<field>Booking__c\.SurveySent__c</field>\s*<readable>true</readable>)",
+    r"<editable>false</editable>\1",
+    cred,
 )
-print("Booking_CRED: Survey Sent read-only (was editable)")
+if count != 1:
+    raise SystemExit("Booking_CRED: Survey Sent is not editable in the backup - nothing to change, check again")
+write(os.path.join(OUT, "permissionsets", "Booking_CRED.permissionset"), new_cred)
+print("Booking_CRED: complete permission set, Survey Sent read-only (was editable)")
 
 # SurveySent__c: the production field definition, with history turned on.
 obj = read(os.path.join(SRC, "objects", "Booking__c.object"))
@@ -263,27 +259,60 @@ for (kind, name), values in perm_entries(ours).items():
     lines = [f"        <{key}>{name}</{key}>"] + [f"        <{f}>{merged[f]}</{f}>" for f in sorted(merged)]
     to_write[kind].append((name, f"    <{kind}>\n" + "\n".join(sorted(lines)) + f"\n    </{kind}>"))
 
-label = re.search(r"<label>([^<]*)</label>", view_all).group(1)
-activation = re.search(r"<hasActivationRequired>([^<]*)</hasActivationRequired>", view_all)
-parts = []
-for element in PERM_ORDER:
-    if element == "hasActivationRequired" and activation:
-        parts.append(f"    <hasActivationRequired>{activation.group(1)}</hasActivationRequired>")
-    elif element == "label":
-        parts.append(f"    <label>{label}</label>")
-    elif element in to_write:
-        parts.extend(block for _, block in sorted(to_write[element]))
-write(
-    os.path.join(OUT, "permissionsets", "EMU_Admin_view_all.permissionset"),
-    '<?xml version="1.0" encoding="UTF-8"?>\n'
-    '<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">\n' + "\n".join(parts) + "\n</PermissionSet>\n",
-)
+# The whole backed-up permission set, with the new and raised entries put in
+# (replacing an entry of the same name), grouped and sorted as Salesforce writes
+# them.
+import xml.etree.ElementTree as ET
+
+PS_NS = "http://soap.sforce.com/2006/04/metadata"
+ET.register_namespace("", PS_NS)
+ENTRY_KEYS = {
+    "applicationVisibilities": "application", "classAccesses": "apexClass", "customMetadataTypeAccesses": "name",
+    "customPermissions": "name", "customSettingAccesses": "name", "fieldPermissions": "field", "flowAccesses": "flow",
+    "objectPermissions": "object", "pageAccesses": "apexPage", "recordTypeVisibilities": "recordType",
+    "tabSettings": "tab", "userPermissions": "name",
+}
+
+
+def tag_of(el):
+    return el.tag.split("}", 1)[1]
+
+
+def entry_key(el):
+    key = ENTRY_KEYS.get(tag_of(el))
+    child = el.find("{%s}%s" % (PS_NS, key)) if key else None
+    return (tag_of(el), child.text if child is not None else "")
+
+
+full = ET.ElementTree(ET.fromstring(view_all.encode("utf-8")))
+root = full.getroot()
+replacements = {}
+for kind, blocks in to_write.items():
+    for _, block in blocks:
+        el = ET.fromstring(f'<PermissionSet xmlns="{PS_NS}">{block}</PermissionSet>')[0]
+        replacements[entry_key(el)] = el
+children = [replacements.pop(entry_key(el), el) for el in list(root)]
+children.extend(replacements.values())
+for el in list(root):
+    root.remove(el)
+for el in sorted(children, key=lambda el: (tag_of(el), entry_key(el)[1])):
+    root.append(el)
+ET.indent(full, space="    ")
+out_path = os.path.join(OUT, "permissionsets", "EMU_Admin_view_all.permissionset")
+os.makedirs(os.path.dirname(out_path), exist_ok=True)
+full.write(out_path, encoding="UTF-8", xml_declaration=True)
 print(
-    f"EMU_Admin_view_all: feedback access merged in | {added} added, {raised} raised,"
-    f" {kept} already allowed (left alone) | Survey Sent untouched"
+    f"EMU_Admin_view_all: complete permission set with the feedback access | {added} added, {raised} raised,"
+    f" {kept} already allowed | Survey Sent untouched"
 )
-if "SurveySent__c" in read(os.path.join(OUT, "permissionsets", "EMU_Admin_view_all.permissionset")):
-    raise SystemExit("EMU_Admin_view_all: Survey Sent must stay as it is in production")
+before_entries = {entry_key(el) for el in ET.fromstring(view_all.encode("utf-8"))}
+after_root = ET.parse(out_path).getroot()
+missing = before_entries - {entry_key(el) for el in after_root}
+if missing:
+    raise SystemExit(f"EMU_Admin_view_all: {len(missing)} backed-up entries would be lost - not writing a partial set")
+survey_sent = [el for el in after_root if entry_key(el) == ("fieldPermissions", "Booking__c.SurveySent__c")]
+if not survey_sent or survey_sent[0].find("{%s}editable" % PS_NS).text != "true":
+    raise SystemExit("EMU_Admin_view_all: Survey Sent must stay editable as it is in production")
 
 # Reservation__c record type "Master": allow the line status "Completed", as
 # staging does. Production's record type leaves it out, so when a booking moves
