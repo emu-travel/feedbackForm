@@ -9,3 +9,7 @@
 .vscode
 
 coverage/
+
+# Exact copies of production metadata: never reformat
+backups/
+release/org-changes/

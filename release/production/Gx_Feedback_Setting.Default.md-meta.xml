@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomMetadata
+  xmlns="http://soap.sforce.com/2006/04/metadata"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+>
+    <label>Default</label>
+    <protected>false</protected>
+    <values>
+        <field>Detractor_Alerts_On__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>Trustpilot_URL__c</field>
+        <value
+      xsi:type="xsd:string"
+    >https://www.trustpilot.com/evaluate/golf-extra.com</value>
+    </values>
+    <values>
+        <field>Google_Maps_URL__c</field>
+        <value
+      xsi:type="xsd:string"
+    >https://g.page/r/CXPNAtLxy7_jEAE/review</value>
+    </values>
+    <values>
+        <field>Link_Validity_Days__c</field>
+        <value xsi:type="xsd:double">14</value>
+    </values>
+    <values>
+        <field>Dispatch_Delay_Hours__c</field>
+        <value xsi:type="xsd:double">36</value>
+    </values>
+    <values>
+        <field>Reminder_Delay_Days__c</field>
+        <value xsi:type="xsd:double">10</value>
+    </values>
+    <values>
+        <field>Survey_Start_Date__c</field>
+        <value xsi:type="xsd:date">2026-09-21</value>
+    </values>
+    <values>
+        <field>Max_Trip_Age_Days__c</field>
+        <value xsi:type="xsd:double">30</value>
+    </values>
+    <values>
+        <field>Survey_Base_URL__c</field>
+        <value
+      xsi:type="xsd:string"
+    >https://emu-travel.my.site.com/feedback/</value>
+    </values>
+    <values>
+        <field>Sender_Email__c</field>
+        <value xsi:type="xsd:string">anfrage@golf-extra.com</value>
+    </values>
+    <values>
+        <field>Alert_Copy_Email__c</field>
+        <value xsi:type="xsd:string">ali.haider@emu-travel.com</value>
+    </values>
+</CustomMetadata>

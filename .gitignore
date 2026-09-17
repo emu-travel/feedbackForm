@@ -58,3 +58,7 @@ $RECYCLE.BIN/
 
 # Local backups
 *.bak
+
+# Release build output: rebuilt with release/scripts/build_release.py
+release/build/
+.go-live-check/

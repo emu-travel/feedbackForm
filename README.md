@@ -167,7 +167,8 @@ sf community publish -o gx-sandbox --name "Golf Extra Feedback"   # after LWC or
 
 ## Go-live
 
-1. Deploy to production with the specified tests; publish the site.
+1. Build and deploy the release in `release/` (see `release/README.md`: production settings, production's own
+   booking pages and permission changes, check-only validation first); publish the site.
 2. Set `Gx_Feedback_Setting.Default`: `Survey_Base_URL__c` (production site), `Survey_Start_Date__c`
    (go-live date), `Alert_Copy_Email__c`.
 3. Verify the org-wide address `anfrage@golf-extra.com` and email deliverability.

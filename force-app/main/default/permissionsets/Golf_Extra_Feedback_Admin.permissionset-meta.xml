@@ -206,11 +206,6 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>Booking__c.Survey_Destination_Phrase__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>false</editable>
         <field>Booking__c.Survey_Trip_Summary__c</field>
         <readable>true</readable>
     </fieldPermissions>
