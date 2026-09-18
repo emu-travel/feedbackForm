@@ -1,6 +1,6 @@
 # Golf Extra Feedback: team briefing
 
-From **21.09.2026** guests are asked for feedback automatically after their trip. For the team, one habit changes.
+From **15.10.2026** guests are asked for feedback automatically after their trip. For the team, one habit changes.
 
 ## English
 
@@ -22,7 +22,7 @@ From **21.09.2026** guests are asked for feedback automatically after their trip
   ali.haider@emu-travel.com. Please call the guest and let Ali know what was agreed, so it is recorded under "Unhappy
   guests to follow up" on the Feedback tab.
 - "Survey Sent" on the booking is read-only now; the system sets it.
-- Only trips ending on or after 21.09.2026 are invited, so no past guest receives an email.
+- Only trips ending on or after 15.10.2026 are invited, so no past guest receives an email.
 
 **Who to ask**
 
@@ -50,7 +50,7 @@ From **21.09.2026** guests are asked for feedback automatically after their trip
   Kopie an ali.haider@emu-travel.com. Bitte den Gast anrufen und Ali mitteilen, was vereinbart wurde, damit es im
   Tab "Feedback" unter "Unhappy guests to follow up" festgehalten wird.
 - "Survey Sent" auf der Buchung ist jetzt schreibgeschützt; das System setzt es.
-- Eingeladen werden nur Reisen, die am 21.09.2026 oder später enden. Frühere Gäste bekommen keine E-Mail.
+- Eingeladen werden nur Reisen, die am 15.10.2026 oder später enden. Frühere Gäste bekommen keine E-Mail.
 
 **Ansprechpartner**
 
