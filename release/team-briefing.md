@@ -20,13 +20,13 @@ From **21.09.2026** guests are asked for feedback automatically after their trip
 - A guest who has not answered gets **one reminder after 10 days**. The link works for 14 days after the last email.
 - A guest who would recommend us **6 or less**: the trip's travel designer gets an email at once, with a copy to
   ali.haider@emu-travel.com. Please call the guest and let Ali know what was agreed, so it is recorded under "Unhappy
-  guests to follow up" on the Feedback Dashboard.
+  guests to follow up" on the Feedback tab.
 - "Survey Sent" on the booking is read-only now; the system sets it.
 - Only trips ending on or after 21.09.2026 are invited, so no past guest receives an email.
 
 **Who to ask**
 
-- The **Feedback Dashboard** (tab "Feedback Dashboard") is open to everyone with the "EMU Admin view all" permission set.
+- The feedback dashboard (tab **Feedback**) is open to everyone with the "EMU Admin view all" permission set.
 - A guest says the email never arrived, or a booking was not invited: tell Ali. It can be resent.
 
 ## Deutsch
@@ -48,12 +48,12 @@ From **21.09.2026** guests are asked for feedback automatically after their trip
   E-Mail.
 - Empfiehlt uns ein Gast mit **6 oder weniger** weiter, bekommt der Reisedesigner der Reise sofort eine E-Mail, in
   Kopie an ali.haider@emu-travel.com. Bitte den Gast anrufen und Ali mitteilen, was vereinbart wurde, damit es im
-  Feedback Dashboard unter "Unhappy guests to follow up" festgehalten wird.
+  Tab "Feedback" unter "Unhappy guests to follow up" festgehalten wird.
 - "Survey Sent" auf der Buchung ist jetzt schreibgeschützt; das System setzt es.
 - Eingeladen werden nur Reisen, die am 21.09.2026 oder später enden. Frühere Gäste bekommen keine E-Mail.
 
 **Ansprechpartner**
 
-- Das **Feedback Dashboard** (Tab "Feedback Dashboard") sehen alle mit dem Berechtigungssatz "EMU Admin view all".
+- Das Feedback-Dashboard (Tab **Feedback**) sehen alle mit dem Berechtigungssatz "EMU Admin view all".
 - Ein Gast hat die E-Mail nicht bekommen oder eine Buchung wurde nicht eingeladen: bitte Ali Bescheid geben. Die
   Einladung kann erneut gesendet werden.

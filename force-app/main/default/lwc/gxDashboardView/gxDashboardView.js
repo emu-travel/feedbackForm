@@ -791,7 +791,6 @@ export function designerRows(rows, activeId) {
     responses: d.responses,
     consultation: formatScore(d.consultation),
     consultCls: `pill pill_${toneFor(d.consultation)}`,
-    nps: formatNps(d.nps),
     active: d.id === activeId,
     rowCls: d.id === activeId ? "drow drow_active" : "drow"
   }));

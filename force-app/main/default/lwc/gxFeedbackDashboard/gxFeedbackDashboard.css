@@ -912,10 +912,6 @@ button.kpi:focus-visible,
   font-weight: 500;
 }
 
-.dnps {
-  font-weight: 600;
-}
-
 .drow_active {
   background: var(--gx-sunk);
 }

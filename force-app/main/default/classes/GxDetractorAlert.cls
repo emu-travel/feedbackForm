@@ -242,7 +242,7 @@ public without sharing class GxDetractorAlert {
     );
     html.add(
       '<p style="color:#5a6b62">Please get in touch with the guest, then record ' +
-      'what you did under “Unhappy guests to follow up” on the Feedback Dashboard.</p>'
+      'what you did under “Unhappy guests to follow up” on the Feedback tab.</p>'
     );
     html.add('</div>');
     return String.join(html, '');

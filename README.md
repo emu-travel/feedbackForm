@@ -30,7 +30,7 @@ LWR site "Golf Extra Feedback"  →  gxFeedbackForm (LWC)
 Feedback_Response__c  +  Feedback_Rating__c
    │                                   │
    │  recommendation 6 or below        ▼
-   ▼                            Feedback Dashboard (gxFeedbackDashboard, GxFeedbackDashboardController)
+   ▼                            Feedback tab (gxFeedbackDashboard, GxFeedbackDashboardController)
 Gx_Detractor_Alert__e → GxDetractorAlert (email to the travel designer)
 ```
 
@@ -95,9 +95,9 @@ the trigger emails the trip's travel designer with the alert copy address in cop
 sandbox the designer is never emailed - the alert goes to the copy address only, marked
 `[Sandbox]`.
 
-### Feedback Dashboard
+### Feedback tab (dashboard)
 
-Lightning tab `Gx_Feedback_Dashboard`, for users with the permission set
+Lightning tab `Gx_Feedback_Dashboard`, labelled **Feedback** (it was "Feedback Dashboard" until 18.09.2026), for users with the permission set
 **Golf Extra Feedback - Admin** (in production the same access comes with the existing permission set
 **EMU Admin view all**, which holds the org's admins; the Golf Extra set is not deployed there):
 

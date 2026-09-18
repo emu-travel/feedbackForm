@@ -636,6 +636,11 @@ describe("c-gx-feedback-dashboard for the people who use it", () => {
     });
     await settle();
 
+    const heads = [...el.shadowRoot.querySelectorAll(".dtable thead th")].map(
+      (th) => th.textContent.trim()
+    );
+    expect(heads).toEqual(["Travel designer", "Responses", "Consultation"]);
+
     const silke = [...el.shadowRoot.querySelectorAll(".dtable button")].find(
       (b) => b.dataset.id === "005A"
     );

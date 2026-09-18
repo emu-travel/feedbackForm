@@ -747,7 +747,7 @@ describe("the response list", () => {
 });
 
 describe("travel designers", () => {
-  it("marks the designer being filtered on", () => {
+  it("marks the designer being filtered on, without an NPS column", () => {
     const rows = designerRows(
       [
         { id: "u1", name: "Silke", responses: 12, consultation: 9.1, nps: 50 },
@@ -758,9 +758,8 @@ describe("travel designers", () => {
     expect(rows[0].active).toBe(true);
     expect(rows[0].rowCls).toBe("drow drow_active");
     expect(rows[0].consultation).toBe("9.1");
-    expect(rows[0].nps).toBe("50.0");
+    expect(rows[0].nps).toBeUndefined();
     expect(rows[1].active).toBe(false);
-    expect(rows[1].nps).toBe("-");
   });
 
   it("adds a designer to the default filters, set to everyone", () => {
