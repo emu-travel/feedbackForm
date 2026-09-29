@@ -298,23 +298,28 @@ private class GxFeedbackDashboardControllerTest {
       FROM Booking__c
       WHERE BookingNumber__c = 'GXD-4'
     ];
-    insert new List<Traveler__c>{
-      new Traveler__c(
-        TravelQuote__c = trip.Id,
-        Traveler__c = trip.MainContact__c,
-        Survey_Sent_On__c = Datetime.now().addDays(-2)
+    // Two guests on the one trip, each with an invitation of their own. This
+    // is what the dashboard counts: the invitations, not the bookings.
+    insert new List<Feedback_Invitation__c>{
+      new Feedback_Invitation__c(
+        Booking__c = trip.Id,
+        Contact__c = trip.MainContact__c,
+        Secret__c = 'dashboard-guest-one',
+        Sent_On__c = Datetime.now().addDays(-2)
       ),
-      new Traveler__c(
-        TravelQuote__c = trip.Id,
-        Traveler__c = trip.MainContact__c,
-        Survey_Sent_On__c = Datetime.now().addDays(-2)
+      new Feedback_Invitation__c(
+        Booking__c = trip.Id,
+        Contact__c = trip.MainContact__c,
+        Secret__c = 'dashboard-guest-two',
+        Sent_On__c = Datetime.now().addDays(-2)
       )
     };
 
     GxFeedbackDashboardController.Kpis k = load(null).kpis;
 
-    // GXD-4 now stands for its two invited travellers instead of one main
-    // contact; the other four invited trips are unchanged.
+    // GXD-4 now stands for its two invited guests instead of one main contact;
+    // the other four trips carry no invitations, so each counts once for the
+    // person the booking itself was invited for.
     Assert.areEqual(6, k.invited, 'Two guests on GXD-4, four elsewhere');
     Assert.areEqual(5, k.tripsInvited, 'Still five trips');
     Assert.areEqual(67, k.responseRate, 'Four answers over six guests asked');

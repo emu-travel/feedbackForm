@@ -1807,26 +1807,25 @@ public with sharing class GxFeedbackDashboardController {
       AccessLevel.SYSTEM_MODE
     );
 
-    // Travellers carry their own invitation date. A trip whose main contact was
-    // asked through the booking itself, with no traveller invited, counts once
-    // for that person.
-    Map<String, Object> travellerBinds = new Map<String, Object>();
-    List<String> travellers = bookingClauses(
-      'TravelQuote__r.',
-      f,
-      travellerBinds
-    );
-    travellers.add('Survey_Sent_On__c != null');
+    // One invitation row per guest asked. Counted from the invitations rather
+    // than from the bookings, because a trip can carry several guests and this
+    // tile is about people, not trips.
+    Map<String, Object> inviteBinds = new Map<String, Object>();
+    List<String> invitations = bookingClauses('Booking__r.', f, inviteBinds);
+    invitations.add('Sent_On__c != null');
     Integer guestsAsked = Database.countQueryWithBinds(
-      'SELECT COUNT() FROM Traveler__c WHERE ' +
-      String.join(travellers, ' AND '),
-      travellerBinds,
+      'SELECT COUNT() FROM Feedback_Invitation__c WHERE ' +
+      String.join(invitations, ' AND '),
+      inviteBinds,
       AccessLevel.SYSTEM_MODE
     );
 
+    // Trips invited before invitations were kept per person carry no rows at
+    // all. Their main contact was asked through the booking itself, so each
+    // counts once, for that one person.
     List<String> mainContactOnly = invitedTrips.clone();
     mainContactOnly.add(
-      'Id NOT IN (SELECT TravelQuote__c FROM Traveler__c WHERE Survey_Sent_On__c != null)'
+      'Id NOT IN (SELECT Booking__c FROM Feedback_Invitation__c WHERE Sent_On__c != null)'
     );
     guestsAsked += Database.countQueryWithBinds(
       'SELECT COUNT() FROM Booking__c WHERE ' +
