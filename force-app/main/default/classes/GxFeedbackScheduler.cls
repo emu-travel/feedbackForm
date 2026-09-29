@@ -51,16 +51,21 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
       // No survey start date: nobody is invited. See Survey_Start_Date__c.
       return new List<GxFeedbackSender.Request>();
     }
+    // A group trip is several bookings: the group booking and one participant
+    // booking per party, linked by TravelGroup__c. The team marks the group
+    // booking as travelled, so a participant booking qualifies through its
+    // group as well as through its own status. Its own end date and waiting
+    // period still decide when its guests are asked.
     List<Booking__c> due = [
-      SELECT Id
+      SELECT Id, MainContact__c
       FROM Booking__c
       WHERE
         SurveySent__c = FALSE
-        AND MainContact__c != NULL
         AND End_Date__c != NULL
         AND End_Date__c >= :earliest
         AND End_Date__c < TODAY
-        AND Status__c IN ('Traveled', 'Completed')
+        AND (Status__c IN ('Traveled', 'Completed')
+        OR TravelGroup__r.Status__c IN ('Traveled', 'Completed'))
       ORDER BY End_Date__c
       LIMIT :batchLimit
     ];
@@ -112,8 +117,31 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
     }
 
     Datetime askedBefore = Datetime.now().addDays(-delayDays.intValue());
-    List<Booking__c> due = [
-      SELECT Id
+    List<GxFeedbackSender.Request> requests = new List<GxFeedbackSender.Request>();
+
+    // Travellers are reminded one by one: their own invitation date, their own
+    // single reminder, and nothing for anyone who has already answered.
+    for (Traveler__c t : [
+      SELECT Id, TravelQuote__c
+      FROM Traveler__c
+      WHERE
+        Survey_Sent_On__c != NULL
+        AND Survey_Sent_On__c <= :askedBefore
+        AND Survey_Reminder_Sent__c = FALSE
+        AND Survey_Answered_On__c = NULL
+        AND Traveler__c != NULL
+        AND Traveler__r.Email != NULL
+      ORDER BY Survey_Sent_On__c
+      LIMIT :batchLimit
+    ]) {
+      requests.add(requestFor(t.TravelQuote__c, t.Id, true));
+    }
+
+    // The booking's own invitation, for a main contact who is not a traveller
+    // on their own trip. A trip whose main contact was never asked directly is
+    // left to the travellers' own reminders above.
+    for (Booking__c b : [
+      SELECT Id, MainContact__c
       FROM Booking__c
       WHERE
         SurveySent__c = TRUE
@@ -122,26 +150,86 @@ public with sharing class GxFeedbackScheduler implements Schedulable {
         AND Survey_Sent_On__c != NULL
         AND Survey_Sent_On__c <= :askedBefore
         AND Id NOT IN (SELECT Booking__c FROM Feedback_Response__c)
+        AND Id NOT IN (
+          SELECT TravelQuote__c
+          FROM Traveler__c
+          WHERE Survey_Sent_On__c != NULL
+        )
       ORDER BY Survey_Sent_On__c
       LIMIT :batchLimit
-    ];
-    return requestsFor(due, true);
+    ]) {
+      requests.add(requestFor(b.Id, null, true));
+    }
+    return requests;
   }
 
+  /**
+   * One request per person, not per booking: every traveller with an email
+   * address, plus the booking's main contact when they are not already one of
+   * them. Nobody is asked twice for the same trip, whether they appear as a
+   * traveller and as the main contact, or twice with the same address.
+   */
   private static List<GxFeedbackSender.Request> requestsFor(
     List<Booking__c> bookings,
     Boolean asReminder
   ) {
     List<GxFeedbackSender.Request> requests = new List<GxFeedbackSender.Request>();
+    if (bookings.isEmpty()) {
+      return requests;
+    }
+    Map<Id, Booking__c> byId = new Map<Id, Booking__c>(bookings);
+
+    Map<Id, Set<Id>> contactsAsked = new Map<Id, Set<Id>>();
+    Map<Id, Set<String>> addressesAsked = new Map<Id, Set<String>>();
+    for (Id bookingId : byId.keySet()) {
+      contactsAsked.put(bookingId, new Set<Id>());
+      addressesAsked.put(bookingId, new Set<String>());
+    }
+
+    for (Traveler__c t : [
+      SELECT Id, TravelQuote__c, Traveler__c, Traveler__r.Email
+      FROM Traveler__c
+      WHERE
+        TravelQuote__c IN :byId.keySet()
+        AND Traveler__c != NULL
+        AND Traveler__r.Email != NULL
+        AND Survey_Answered_On__c = NULL
+      ORDER BY CreatedDate
+    ]) {
+      String address = t.Traveler__r.Email.trim().toLowerCase();
+      if (
+        !contactsAsked.get(t.TravelQuote__c).add(t.Traveler__c) ||
+        !addressesAsked.get(t.TravelQuote__c).add(address)
+      ) {
+        continue;
+      }
+      requests.add(requestFor(t.TravelQuote__c, t.Id, asReminder));
+    }
+
     for (Booking__c b : bookings) {
-      GxFeedbackSender.Request r = new GxFeedbackSender.Request();
-      r.bookingId = b.Id;
-      // A reminder is a second send to a booking already marked as invited, so
-      // it needs the same guard bypass a person clicking Resend needs.
-      r.allowResend = asReminder;
-      r.markReminder = asReminder;
-      requests.add(r);
+      if (
+        b.MainContact__c == null ||
+        contactsAsked.get(b.Id).contains(b.MainContact__c)
+      ) {
+        continue;
+      }
+      requests.add(requestFor(b.Id, null, asReminder));
     }
     return requests;
+  }
+
+  private static GxFeedbackSender.Request requestFor(
+    Id bookingId,
+    Id travelerId,
+    Boolean asReminder
+  ) {
+    GxFeedbackSender.Request r = new GxFeedbackSender.Request();
+    r.bookingId = bookingId;
+    r.travelerId = travelerId;
+    // A reminder is a second send to someone already marked as invited, so it
+    // needs the same guard bypass a person clicking Resend needs.
+    r.allowResend = asReminder;
+    r.markReminder = asReminder;
+    return r;
   }
 }

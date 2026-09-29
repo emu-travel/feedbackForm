@@ -222,13 +222,14 @@ public without sharing class GxFeedbackService {
       return c;
     }
 
-    Booking__c b = resolveBooking(bookingNumber, secret);
-    if (b == null) {
+    Invitation inv = resolveInvitation(bookingNumber, secret);
+    if (inv == null) {
       c.message = 'invalid';
       return c;
     }
+    Booking__c b = inv.booking;
 
-    if (hasExistingResponse(b.Id)) {
+    if (hasExistingResponse(b.Id, inv)) {
       c.message = 'submitted';
       return c;
     }
@@ -380,11 +381,12 @@ public without sharing class GxFeedbackService {
       return res;
     }
 
-    Booking__c b = resolveBooking(p.bookingNumber, p.secret);
-    if (b == null) {
+    Invitation inv = resolveInvitation(p.bookingNumber, p.secret);
+    if (inv == null) {
       res.message = System.Label.Gx_Survey_Server_Invalid_Link;
       return res;
     }
+    Booking__c b = inv.booking;
 
     // One response per booking. This is a stronger constraint than the
     // per-hour rate limit the Reiseanmeldung form needs, because that form
@@ -394,7 +396,7 @@ public without sharing class GxFeedbackService {
       return res;
     }
 
-    if (hasExistingResponse(b.Id)) {
+    if (hasExistingResponse(b.Id, inv)) {
       res.message = System.Label.Gx_Survey_Server_Already_Answered;
       return res;
     }
@@ -413,7 +415,7 @@ public without sharing class GxFeedbackService {
 
     Savepoint sp = Database.setSavepoint();
     try {
-      Feedback_Response__c resp = buildResponse(p, b);
+      Feedback_Response__c resp = buildResponse(p, b, inv.personContactId);
       // System mode, deliberately. Feedback_Response__c is a detail of
       // Booking__c, and inserting a detail record requires EDIT access to its
       // master. A guest user can only ever hold Read Only on a booking - that
@@ -433,6 +435,19 @@ public without sharing class GxFeedbackService {
       unlinkRemovedReservations(ratings, allowed.keySet());
       if (!ratings.isEmpty()) {
         Database.insert(ratings, true, AccessLevel.SYSTEM_MODE);
+      }
+
+      // This traveller is done: it closes their link and keeps their reminder
+      // from going out. The booking still moves on the first answer only.
+      if (inv.traveler != null) {
+        Database.update(
+          new Traveler__c(
+            Id = inv.traveler.Id,
+            Survey_Answered_On__c = Datetime.now()
+          ),
+          true,
+          AccessLevel.SYSTEM_MODE
+        );
       }
 
       moveToAnswered(b);
@@ -485,10 +500,14 @@ public without sharing class GxFeedbackService {
     }
   }
 
-  private static Feedback_Response__c buildResponse(Payload p, Booking__c b) {
+  private static Feedback_Response__c buildResponse(
+    Payload p,
+    Booking__c b,
+    Id personContactId
+  ) {
     return new Feedback_Response__c(
       Booking__c = b.Id,
-      Contact__c = b.MainContact__c,
+      Contact__c = personContactId != null ? personContactId : b.MainContact__c,
       Language__c = LANGUAGES.contains(p.language) ? p.language : 'DE',
       Overall_Experience__c = p.overallExperience,
       Overall_Experience_Comment__c = clean(p.overallExperienceComment),
@@ -706,6 +725,59 @@ public without sharing class GxFeedbackService {
   // ------------------------------------------------------------------
   // Shared helpers
 
+  /**
+   * Who opened a link, and which trip it is about. One trip can have several
+   * links: one per traveller, plus the booking's own for its main contact.
+   */
+  public class Invitation {
+    public Booking__c booking;
+    /** Null when the link is the booking's own, for its main contact. */
+    public Traveler__c traveler;
+    /** The contact behind the link: the traveller, or the main contact. */
+    public Id personContactId;
+  }
+
+  /**
+   * Resolves a link by its secret alone. The booking number in the URL is for
+   * the reader, not for finding anything: a group booking and every participant
+   * booking under it share one number, so only the secret identifies the person.
+   */
+  private static Invitation resolveInvitation(
+    String bookingNumber,
+    String secret
+  ) {
+    List<Traveler__c> travelers = [
+      SELECT Id, TravelQuote__c, Traveler__c, Survey_Answered_On__c
+      FROM Traveler__c
+      WHERE Survey_Secret__c = :secret
+      LIMIT 2
+    ];
+    if (travelers.size() == 1 && travelers[0].TravelQuote__c != null) {
+      Booking__c b = bookingById(travelers[0].TravelQuote__c);
+      // The number still has to match the trip the secret belongs to, so a
+      // mistyped or stitched-together link is refused rather than answered for
+      // somebody else's booking. It is not what finds the trip: a group booking
+      // and its participant bookings all carry the same number.
+      if (b == null || b.BookingNumber__c != bookingNumber) {
+        return null;
+      }
+      Invitation inv = new Invitation();
+      inv.booking = b;
+      inv.traveler = travelers[0];
+      inv.personContactId = travelers[0].Traveler__c;
+      return inv;
+    }
+
+    Booking__c own = resolveBooking(bookingNumber, secret);
+    if (own == null) {
+      return null;
+    }
+    Invitation inv = new Invitation();
+    inv.booking = own;
+    inv.personContactId = own.MainContact__c;
+    return inv;
+  }
+
   private static Booking__c resolveBooking(
     String bookingNumber,
     String secret
@@ -731,6 +803,31 @@ public without sharing class GxFeedbackService {
       LIMIT 2
     ];
     return found.size() == 1 ? found[0] : null;
+  }
+
+  /** The trip a traveller's link belongs to, with everything the survey reads. */
+  private static Booking__c bookingById(Id bookingId) {
+    List<Booking__c> found = [
+      SELECT
+        Id,
+        BookingNumber__c,
+        MainContact__c,
+        MainContactName__c,
+        Status__c,
+        Start_Date__c,
+        End_Date__c,
+        toLabel(DestinationCountry__c),
+        toLabel(Region__c),
+        Form_Designer_Name__c,
+        Survey_Sent_On__c,
+        Survey_Trip_Start__c,
+        Survey_Trip_End__c,
+        Survey_Snapshot__c
+      FROM Booking__c
+      WHERE Id = :bookingId
+      LIMIT 1
+    ];
+    return found.isEmpty() ? null : found[0];
   }
 
   /**
@@ -909,11 +1006,31 @@ public without sharing class GxFeedbackService {
     return b.Survey_Trip_End__c != null ? b.Survey_Trip_End__c : b.End_Date__c;
   }
 
-  private static Boolean hasExistingResponse(Id bookingId) {
+  /**
+   * Whether this person has already answered for this trip. Per person, because
+   * several travellers can be asked about one booking; a response saved before
+   * answers carried a contact closes the booking's own link, as it always did.
+   */
+  private static Boolean hasExistingResponse(Id bookingId, Invitation inv) {
+    if (inv != null && inv.traveler != null) {
+      if (inv.traveler.Survey_Answered_On__c != null) {
+        return true;
+      }
+      Id person = inv.personContactId;
+      return [
+          SELECT COUNT()
+          FROM Feedback_Response__c
+          WHERE Booking__c = :bookingId AND Contact__c = :person
+        ] > 0;
+    }
+    Id mainContact = inv == null ? null : inv.personContactId;
     return [
         SELECT COUNT()
         FROM Feedback_Response__c
-        WHERE Booking__c = :bookingId
+        WHERE
+          Booking__c = :bookingId
+          AND (Contact__c = NULL
+          OR Contact__c = :mainContact)
       ] > 0;
   }
 

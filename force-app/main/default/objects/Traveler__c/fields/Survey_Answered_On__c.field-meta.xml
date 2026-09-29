@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Answered_On__c</fullName>
+    <description
+  >When this traveller submitted their feedback, stamped by GxFeedbackService as it saves their response. It is what stops a second answer from the same link and what keeps a reminder from reaching someone who has already answered. The booking's Feedback_Received_On__c still records the first answer for the trip.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >When this traveller answered the feedback survey. Set automatically.</inlineHelpText>
+    <label>Feedback Answered On</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>DateTime</type>
+</CustomField>

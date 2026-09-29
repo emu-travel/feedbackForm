@@ -32,6 +32,12 @@ public with sharing class GxFeedbackSender {
       description='Set by the nightly reminder pass, so a guest is only ever reminded once.'
     )
     public Boolean markReminder = false;
+
+    @InvocableVariable(
+      label='Traveler Id'
+      description='The traveller to ask. Empty means the booking\'s main contact.'
+    )
+    public Id travelerId;
   }
 
   public class Result {
@@ -52,6 +58,12 @@ public with sharing class GxFeedbackSender {
 
     @InvocableVariable(label='Reminder')
     public Boolean reminder = false;
+
+    @InvocableVariable(
+      label='Traveler Id'
+      description='The traveller this result is about. Empty when it was the booking\'s main contact.'
+    )
+    public Id travelerId;
 
     /**
      * Due, but not sent for a reason someone has to act on: the booking could
@@ -84,6 +96,7 @@ public with sharing class GxFeedbackSender {
     for (Request r : requests) {
       GxFeedbackDispatch.Request p = new GxFeedbackDispatch.Request();
       p.bookingId = r == null ? null : r.bookingId;
+      p.travelerId = r == null ? null : r.travelerId;
       p.allowResend = r != null && r.allowResend == true;
       p.markReminder = r != null && r.markReminder == true;
       toPrepare.add(p);
@@ -104,6 +117,7 @@ public with sharing class GxFeedbackSender {
       Result out = new Result();
       out.surveyUrl = p.surveyUrl;
       out.bookingNumber = p.bookingNumber;
+      out.travelerId = requests[i] == null ? null : requests[i].travelerId;
       // A reminder is a different email, not the same one sent twice.
       Boolean reminding =
         requests[i] != null &&
