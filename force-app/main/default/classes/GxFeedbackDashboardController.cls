@@ -264,6 +264,12 @@ public with sharing class GxFeedbackDashboardController {
     public Integer answeredInvitations = 0;
     @AuraEnabled
     public Decimal responseRate;
+    /** Trips that were invited, however many guests each one carried. */
+    @AuraEnabled
+    public Integer tripsInvited = 0;
+    /** Trips where at least one guest answered. */
+    @AuraEnabled
+    public Integer tripsAnswered = 0;
     @AuraEnabled
     public Integer promoters = 0;
     @AuraEnabled
@@ -1782,16 +1788,62 @@ public with sharing class GxFeedbackDashboardController {
    * latter predates this project and was set by the old survey flow too, so it
    * would count guests who were never sent this survey and drag the response
    * rate down for reasons that have nothing to do with it.
+   *
+   * Counted per guest, not per trip: a trip can carry several travellers, each
+   * with their own link, and the rate has to be answers over the people who
+   * were actually asked. The trip figures are kept beside it, because "how many
+   * trips did we hear from" is the other question the team asks.
    */
   private static void countInvitations(Kpis k, Filters f) {
     Map<String, Object> binds = new Map<String, Object>();
     List<String> clauses = bookingClauses('', f, binds);
 
-    List<String> invited = clauses.clone();
-    invited.add('Survey_Sent_On__c != null');
-    k.invited = Database.countQueryWithBinds(
-      'SELECT COUNT() FROM Booking__c WHERE ' + String.join(invited, ' AND '),
+    List<String> invitedTrips = clauses.clone();
+    invitedTrips.add('Survey_Sent_On__c != null');
+    k.tripsInvited = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Booking__c WHERE ' +
+      String.join(invitedTrips, ' AND '),
       binds,
+      AccessLevel.SYSTEM_MODE
+    );
+
+    // Travellers carry their own invitation date. A trip whose main contact was
+    // asked through the booking itself, with no traveller invited, counts once
+    // for that person.
+    Map<String, Object> travellerBinds = new Map<String, Object>();
+    List<String> travellers = bookingClauses(
+      'TravelQuote__r.',
+      f,
+      travellerBinds
+    );
+    travellers.add('Survey_Sent_On__c != null');
+    Integer guestsAsked = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Traveler__c WHERE ' +
+      String.join(travellers, ' AND '),
+      travellerBinds,
+      AccessLevel.SYSTEM_MODE
+    );
+
+    List<String> mainContactOnly = invitedTrips.clone();
+    mainContactOnly.add(
+      'Id NOT IN (SELECT TravelQuote__c FROM Traveler__c WHERE Survey_Sent_On__c != null)'
+    );
+    guestsAsked += Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Booking__c WHERE ' +
+      String.join(mainContactOnly, ' AND '),
+      binds,
+      AccessLevel.SYSTEM_MODE
+    );
+    k.invited = guestsAsked;
+
+    Map<String, Object> answeredBinds = new Map<String, Object>();
+    List<String> answeredTrips = bookingClauses('', f, answeredBinds);
+    answeredTrips.add('Survey_Sent_On__c != null');
+    answeredTrips.add('Id IN (SELECT Booking__c FROM Feedback_Response__c)');
+    k.tripsAnswered = Database.countQueryWithBinds(
+      'SELECT COUNT() FROM Booking__c WHERE ' +
+      String.join(answeredTrips, ' AND '),
+      answeredBinds,
       AccessLevel.SYSTEM_MODE
     );
 

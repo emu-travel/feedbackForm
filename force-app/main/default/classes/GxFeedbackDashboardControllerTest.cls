@@ -277,9 +277,47 @@ private class GxFeedbackDashboardControllerTest {
 
     // GXD-6 carries the old flow's SurveySent__c but was never sent this
     // survey. Counting it would drag the rate down for no real reason.
-    Assert.areEqual(5, k.invited, 'Five bookings carry Survey_Sent_On__c');
+    // No travellers in this fixture, so every invited trip stands for the one
+    // guest it was sent to: its main contact.
+    Assert.areEqual(5, k.invited, 'Five guests were asked');
     Assert.areEqual(4, k.answeredInvitations, 'Four of them answered');
     Assert.areEqual(80, k.responseRate, '4 of 5');
+    Assert.areEqual(5, k.tripsInvited, 'Five trips were invited');
+    Assert.areEqual(4, k.tripsAnswered, 'Four trips heard back');
+  }
+
+  /**
+   * A trip with several travellers is several guests, and the rate is answers
+   * over people asked. Counting trips would put three answers over one
+   * invitation and read as 300 per cent.
+   */
+  @IsTest
+  static void theRateCountsGuestsNotTrips() {
+    Booking__c trip = [
+      SELECT Id, MainContact__c
+      FROM Booking__c
+      WHERE BookingNumber__c = 'GXD-4'
+    ];
+    insert new List<Traveler__c>{
+      new Traveler__c(
+        TravelQuote__c = trip.Id,
+        Traveler__c = trip.MainContact__c,
+        Survey_Sent_On__c = Datetime.now().addDays(-2)
+      ),
+      new Traveler__c(
+        TravelQuote__c = trip.Id,
+        Traveler__c = trip.MainContact__c,
+        Survey_Sent_On__c = Datetime.now().addDays(-2)
+      )
+    };
+
+    GxFeedbackDashboardController.Kpis k = load(null).kpis;
+
+    // GXD-4 now stands for its two invited travellers instead of one main
+    // contact; the other four invited trips are unchanged.
+    Assert.areEqual(6, k.invited, 'Two guests on GXD-4, four elsewhere');
+    Assert.areEqual(5, k.tripsInvited, 'Still five trips');
+    Assert.areEqual(67, k.responseRate, 'Four answers over six guests asked');
   }
 
   // ------------------------------------------------------------------

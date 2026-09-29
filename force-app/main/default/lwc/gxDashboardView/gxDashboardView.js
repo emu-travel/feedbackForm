@@ -211,7 +211,7 @@ export function kpiTiles(kpis) {
       key: "responses",
       label: "Responses",
       value: String(k.responses || 0),
-      note: `${k.invited || 0} invited`,
+      note: `${plural(k.invited || 0, "guest", "guests")} asked`,
       target: "responses",
       hint: "See every response"
     },
@@ -219,7 +219,11 @@ export function kpiTiles(kpis) {
       key: "rate",
       label: "Response rate",
       value: formatPercent(k.responseRate),
-      note: `${Math.max((k.invited || 0) - (k.answeredInvitations || 0), 0)} still open`
+      // Per guest, because a trip can carry several travellers with a link
+      // each; the trips line answers "how many trips did we hear from".
+      note: `${Math.max((k.invited || 0) - (k.answeredInvitations || 0), 0)} still open · ${
+        k.tripsAnswered || 0
+      } of ${plural(k.tripsInvited || 0, "trip", "trips")}`
     },
     {
       key: "nps",

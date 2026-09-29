@@ -134,13 +134,17 @@ describe("KPI tiles", () => {
       detractors: 1,
       avgOverall: 8,
       avgConsultation: 8,
-      openFollowUps: 1
+      openFollowUps: 1,
+      tripsInvited: 3,
+      tripsAnswered: 2
     });
     const byKey = Object.fromEntries(tiles.map((t) => [t.key, t]));
     expect(byKey.reminder).toBeUndefined();
     expect(byKey.responses.value).toBe("4");
+    expect(byKey.responses.note).toBe("5 guests asked");
     expect(byKey.rate.value).toBe("80%");
-    expect(byKey.rate.note).toBe("1 still open");
+    // Guests first, trips beside them: several guests can answer one trip.
+    expect(byKey.rate.note).toBe("1 still open · 2 of 3 trips");
     expect(byKey.nps.value).toBe("25.0");
     expect(byKey.followups.alert).toBe(true);
   });
