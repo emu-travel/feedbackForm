@@ -187,6 +187,51 @@ nine mangled or stolen links.
    refused with "nothing on this itinerary can be rated". It now falls back to
    the group booking's lines, and only when the party holds nothing of its own.
 
+## Booking status on a group trip (29.09.2026)
+
+The status bar was checked on both Booking record types, through the whole
+lifecycle, on the real record pages.
+
+- **FIT** (record type `Booking`): Traveled -> Completed when the invitation is
+  sent -> Feedback when the guest answers. The bar follows every step.
+- **Group trip** (record type `PRO`): its path has no Traveled step at all, so it
+  stays at Completed until its organiser answers, then moves to Feedback.
+
+**A party booking was the gap.** It is invited through its group's status while
+still sitting at its own commercial status, so it went straight from Accepted to
+Feedback, never passing Traveled or Completed. The survey code was deliberately
+not changed for this: pushing a party from Calculation to Completed would hide
+that nothing was ever agreed for it, and a status write wakes the org's booking
+flows, which can fail and cost that guest their invitation.
+
+Instead there is a scheduled flow of its own, `Gx - Mark Group Parties Travelled`,
+running nightly at 00:30 local - after the org's own
+`ScheduleFlow - Mark Booking Status Travelled` at 00:15, and well before the
+feedback job. For each party whose group is Traveled, Completed or Feedback, and
+whose own end date has passed, it sets the party to Traveled. The survey then
+takes it on as it does any other trip.
+
+It leaves alone any party at Calculation, Offered or Discussion, where nothing was
+agreed, and anything Rejected or Canceled. It also checks the record type, because
+Traveled does not exist on the PRO path.
+
+Verified in the sandbox: parties at Accepted, Booked, Invoiced and Paid all moved
+to Traveled; Calculation, Offered, Discussion, Rejected and Canceled did not; a
+party under a group that had not travelled did not; and one party was followed the
+whole way, Accepted -> Traveled -> Completed -> Feedback.
+
+**Worth knowing about this org**
+
+- `Status__c` is a restricted picklist **and** record-type filtered through the
+  API: a PRO booking cannot hold Traveled at all, and a Booking cannot hold
+  Confirmed or LT booked. A write of the wrong value fails rather than corrupting
+  the record.
+- The org's own nightly flow promotes only from **Paid**, and does not filter by
+  record type. A group booking sitting at Paid when its end date passes will make
+  that flow fail, since PRO cannot hold Traveled. One for Irfan.
+- A party booking inherits its group's booking number, and its dates were
+  overwritten to the group's when created.
+
 ## Release
 
 Check-only validation, then a quick deploy after 15.10.2026 on Ali's explicit go.
