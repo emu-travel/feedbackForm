@@ -169,18 +169,23 @@ private class GxFeedbackTravellerInvitesTest {
     ];
   }
 
-  private static List<Traveler__c> travellersOf(String mainContactEmail) {
+  /** The invitations for one trip: one row per guest who was asked. */
+  private static List<Feedback_Invitation__c> invitationsOf(
+    String mainContactEmail
+  ) {
     return [
       SELECT
         Id,
-        Traveler__r.Email,
-        Survey_Secret__c,
-        Survey_Sent_On__c,
-        Survey_Reminder_Sent__c,
-        Survey_Answered_On__c
-      FROM Traveler__c
-      WHERE TravelQuote__r.MainContact__r.Email = :mainContactEmail
-      ORDER BY Traveler__r.LastName
+        Contact__r.Email,
+        Traveler__c,
+        Secret__c,
+        Survey_Link__c,
+        Sent_On__c,
+        Reminder_Sent__c,
+        Answered_On__c
+      FROM Feedback_Invitation__c
+      WHERE Booking__r.MainContact__r.Email = :mainContactEmail
+      ORDER BY Contact__r.LastName
     ];
   }
 
@@ -190,16 +195,15 @@ private class GxFeedbackTravellerInvitesTest {
    * trip; only the row that was invited carries a secret, because the run asks
    * each contact once.
    */
-  private static Traveler__c invitedRowFor(
+  private static Feedback_Invitation__c invitedRowFor(
     String bookingKey,
-    String travellerEmail
+    String guestEmail
   ) {
-    for (Traveler__c t : travellersOf(bookingKey)) {
+    for (Feedback_Invitation__c inv : invitationsOf(bookingKey)) {
       if (
-        t.Traveler__r.Email == travellerEmail &&
-        String.isNotBlank(t.Survey_Secret__c)
+        inv.Contact__r.Email == guestEmail && String.isNotBlank(inv.Secret__c)
       ) {
-        return t;
+        return inv;
       }
     }
     return null;
@@ -208,8 +212,8 @@ private class GxFeedbackTravellerInvitesTest {
   /** How many guests on a booking hold a link of their own. */
   private static Integer invitedCount(String bookingKey) {
     Integer count = 0;
-    for (Traveler__c t : travellersOf(bookingKey)) {
-      if (String.isNotBlank(t.Survey_Secret__c)) {
+    for (Feedback_Invitation__c inv : invitationsOf(bookingKey)) {
+      if (String.isNotBlank(inv.Secret__c)) {
         count++;
       }
     }
@@ -264,13 +268,19 @@ private class GxFeedbackTravellerInvitesTest {
     // the participant booking. Chris has no address, so he is not asked.
     Assert.areEqual(4, sent, 'Everyone reachable was asked once: ' + out);
 
-    Traveler__c anna = invitedRowFor(SOLO_TRIP, 'anna@example.invalid');
-    Traveler__c bruno = invitedRowFor(SOLO_TRIP, 'bruno@example.invalid');
+    Feedback_Invitation__c anna = invitedRowFor(
+      SOLO_TRIP,
+      'anna@example.invalid'
+    );
+    Feedback_Invitation__c bruno = invitedRowFor(
+      SOLO_TRIP,
+      'bruno@example.invalid'
+    );
     Assert.isNotNull(anna, 'Anna has her own link');
     Assert.isNotNull(bruno, 'Bruno has his own link');
     Assert.areNotEqual(
-      anna.Survey_Secret__c,
-      bruno.Survey_Secret__c,
+      anna.Secret__c,
+      bruno.Secret__c,
       'Two guests never share one link'
     );
   }
@@ -283,15 +293,18 @@ private class GxFeedbackTravellerInvitesTest {
     GxFeedbackScheduler.run();
     Test.stopTest();
 
-    for (Traveler__c t : travellersOf(SOLO_TRIP)) {
-      if (String.isBlank(t.Traveler__r.Email)) {
-        Assert.isNull(
-          t.Survey_Sent_On__c,
-          'Nobody is asked without an address to ask at'
-        );
-        Assert.isNull(t.Survey_Secret__c, 'And no link is minted for them');
-      }
+    for (Feedback_Invitation__c inv : invitationsOf(SOLO_TRIP)) {
+      Assert.areNotEqual(
+        'chris@example.invalid',
+        inv.Contact__r.Email,
+        'Nobody is asked without an address to ask at'
+      );
     }
+    Assert.areEqual(
+      2,
+      invitedCount(SOLO_TRIP),
+      'Only Anna and Bruno were asked on the solo trip'
+    );
   }
 
   @IsTest
@@ -335,16 +348,19 @@ private class GxFeedbackTravellerInvitesTest {
     GxFeedbackSettings.useForTest(settings(0));
     GxFeedbackScheduler.run();
 
-    Traveler__c anna = invitedRowFor(SOLO_TRIP, 'anna@example.invalid');
-    Traveler__c bruno = invitedRowFor(SOLO_TRIP, 'bruno@example.invalid');
+    Feedback_Invitation__c anna = invitedRowFor(
+      SOLO_TRIP,
+      'anna@example.invalid'
+    );
+    Feedback_Invitation__c bruno = invitedRowFor(
+      SOLO_TRIP,
+      'bruno@example.invalid'
+    );
 
     Test.startTest();
     GxFeedbackService.SubmitResult saved = GxFeedbackService.submit(
       JSON.serialize(
-        answerFrom(
-          bookingFor(SOLO_TRIP).BookingNumber__c,
-          anna.Survey_Secret__c
-        )
+        answerFrom(bookingFor(SOLO_TRIP).BookingNumber__c, anna.Secret__c)
       )
     );
     Test.stopTest();
@@ -354,7 +370,7 @@ private class GxFeedbackTravellerInvitesTest {
       'submitted',
       GxFeedbackService.getContext(
           bookingFor(SOLO_TRIP).BookingNumber__c,
-          anna.Survey_Secret__c
+          anna.Secret__c
         )
         .message,
       'Her own link is closed'
@@ -362,7 +378,7 @@ private class GxFeedbackTravellerInvitesTest {
     Assert.isTrue(
       GxFeedbackService.getContext(
           bookingFor(SOLO_TRIP).BookingNumber__c,
-          bruno.Survey_Secret__c
+          bruno.Secret__c
         )
         .ok,
       'Bruno can still answer for himself'
@@ -386,9 +402,9 @@ private class GxFeedbackTravellerInvitesTest {
     GxFeedbackScheduler.run();
 
     List<String> secrets = new List<String>();
-    for (Traveler__c t : travellersOf(SOLO_TRIP)) {
-      if (String.isNotBlank(t.Survey_Secret__c)) {
-        secrets.add(t.Survey_Secret__c);
+    for (Feedback_Invitation__c inv : invitationsOf(SOLO_TRIP)) {
+      if (String.isNotBlank(inv.Secret__c)) {
+        secrets.add(inv.Secret__c);
       }
     }
     Assert.areEqual(2, secrets.size(), 'Two links were minted');
@@ -421,30 +437,26 @@ private class GxFeedbackTravellerInvitesTest {
     GxFeedbackScheduler.run();
 
     // One guest answers; the other is moved back in time so a reminder is due.
-    List<Traveler__c> solo = travellersOf(SOLO_TRIP);
-    List<Traveler__c> moved = new List<Traveler__c>();
-    Traveler__c answered;
-    for (Traveler__c t : solo) {
-      if (String.isBlank(t.Survey_Secret__c)) {
+    List<Feedback_Invitation__c> moved = new List<Feedback_Invitation__c>();
+    Feedback_Invitation__c answered;
+    for (Feedback_Invitation__c inv : invitationsOf(SOLO_TRIP)) {
+      if (String.isBlank(inv.Secret__c)) {
         continue;
       }
       if (answered == null) {
-        answered = t;
+        answered = inv;
       }
       moved.add(
-        new Traveler__c(
-          Id = t.Id,
-          Survey_Sent_On__c = Datetime.now().addDays(-11)
+        new Feedback_Invitation__c(
+          Id = inv.Id,
+          Sent_On__c = Datetime.now().addDays(-11)
         )
       );
     }
     update moved;
     GxFeedbackService.submit(
       JSON.serialize(
-        answerFrom(
-          bookingFor(SOLO_TRIP).BookingNumber__c,
-          answered.Survey_Secret__c
-        )
+        answerFrom(bookingFor(SOLO_TRIP).BookingNumber__c, answered.Secret__c)
       )
     );
 
@@ -465,15 +477,80 @@ private class GxFeedbackTravellerInvitesTest {
       'Only the guest who stayed silent is reminded: ' + out
     );
 
-    for (Traveler__c t : travellersOf(SOLO_TRIP)) {
-      if (t.Id == answered.Id) {
+    for (Feedback_Invitation__c inv : invitationsOf(SOLO_TRIP)) {
+      if (inv.Id == answered.Id) {
         Assert.isFalse(
-          t.Survey_Reminder_Sent__c,
+          inv.Reminder_Sent__c,
           'The guest who answered is left alone'
         );
-        Assert.isNotNull(t.Survey_Answered_On__c, 'Their answer is recorded');
+        Assert.isNotNull(inv.Answered_On__c, 'Their answer is recorded');
       }
     }
+  }
+
+  /**
+   * The templates can only merge the booking's link, so the sender swaps in the
+   * traveller's. Without it every guest on a trip would be emailed the main
+   * contact's link, and the first of them to answer would close it for all.
+   */
+  @IsTest
+  static void eachGuestsEmailCarriesTheirOwnLink() {
+    String bookingLink = 'https://example.test/feedback/?b=X&k=BOOKINGSECRET';
+    String personLink = 'https://example.test/feedback/?b=X&k=ANNASECRET';
+    String body =
+      '<a href="' +
+      bookingLink +
+      '">Feedback geben</a> oder ' +
+      bookingLink;
+
+    String out = GxFeedbackSender.personalise(body, bookingLink, personLink);
+
+    Assert.isFalse(
+      out.contains('BOOKINGSECRET'),
+      'The booking\'s own link is gone'
+    );
+    Assert.areEqual(
+      2,
+      out.countMatches(personLink),
+      'Both the button and the line beneath it lead to this guest\'s survey'
+    );
+    Assert.areEqual(
+      body,
+      GxFeedbackSender.personalise(body, null, personLink),
+      'With nothing to swap the email is left as it is'
+    );
+  }
+
+  /** The link a guest is emailed is the one that opens their survey. */
+  @IsTest
+  static void theTravellersLinkFieldMatchesTheirSecret() {
+    GxFeedbackSettings.useForTest(settings(0));
+
+    Test.startTest();
+    GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Feedback_Invitation__c anna = invitedRowFor(
+      SOLO_TRIP,
+      'anna@example.invalid'
+    );
+    Feedback_Invitation__c fromOrg = [
+      SELECT Survey_Link__c, Secret__c
+      FROM Feedback_Invitation__c
+      WHERE Id = :anna.Id
+    ];
+    Assert.isTrue(
+      fromOrg.Survey_Link__c.endsWith('k=' + fromOrg.Secret__c),
+      'The traveller link carries their own secret: ' + fromOrg.Survey_Link__c
+    );
+    Assert.isTrue(
+      GxFeedbackService.getContext(
+          bookingFor(SOLO_TRIP).BookingNumber__c,
+          fromOrg.Secret__c
+        )
+        .ok,
+      'And that secret opens their survey'
+    );
   }
 
   @IsTest

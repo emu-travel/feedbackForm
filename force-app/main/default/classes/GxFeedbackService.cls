@@ -437,13 +437,13 @@ public without sharing class GxFeedbackService {
         Database.insert(ratings, true, AccessLevel.SYSTEM_MODE);
       }
 
-      // This traveller is done: it closes their link and keeps their reminder
+      // This guest is done: it closes their own link and keeps their reminder
       // from going out. The booking still moves on the first answer only.
-      if (inv.traveler != null) {
+      if (inv.row != null) {
         Database.update(
-          new Traveler__c(
-            Id = inv.traveler.Id,
-            Survey_Answered_On__c = Datetime.now()
+          new Feedback_Invitation__c(
+            Id = inv.row.Id,
+            Answered_On__c = Datetime.now()
           ),
           true,
           AccessLevel.SYSTEM_MODE
@@ -731,9 +731,9 @@ public without sharing class GxFeedbackService {
    */
   public class Invitation {
     public Booking__c booking;
-    /** Null when the link is the booking's own, for its main contact. */
-    public Traveler__c traveler;
-    /** The contact behind the link: the traveller, or the main contact. */
+    /** Null for a link minted before invitations were kept per person. */
+    public Feedback_Invitation__c row;
+    /** The person behind the link: a traveller, or the booking's main contact. */
     public Id personContactId;
   }
 
@@ -746,14 +746,14 @@ public without sharing class GxFeedbackService {
     String bookingNumber,
     String secret
   ) {
-    List<Traveler__c> travelers = [
-      SELECT Id, TravelQuote__c, Traveler__c, Survey_Answered_On__c
-      FROM Traveler__c
-      WHERE Survey_Secret__c = :secret
+    List<Feedback_Invitation__c> rows = [
+      SELECT Id, Booking__c, Contact__c, Answered_On__c
+      FROM Feedback_Invitation__c
+      WHERE Secret__c = :secret
       LIMIT 2
     ];
-    if (travelers.size() == 1 && travelers[0].TravelQuote__c != null) {
-      Booking__c b = bookingById(travelers[0].TravelQuote__c);
+    if (rows.size() == 1 && rows[0].Booking__c != null) {
+      Booking__c b = bookingById(rows[0].Booking__c);
       // The number still has to match the trip the secret belongs to, so a
       // mistyped or stitched-together link is refused rather than answered for
       // somebody else's booking. It is not what finds the trip: a group booking
@@ -763,8 +763,8 @@ public without sharing class GxFeedbackService {
       }
       Invitation inv = new Invitation();
       inv.booking = b;
-      inv.traveler = travelers[0];
-      inv.personContactId = travelers[0].Traveler__c;
+      inv.row = rows[0];
+      inv.personContactId = rows[0].Contact__c;
       return inv;
     }
 
@@ -1012,8 +1012,8 @@ public without sharing class GxFeedbackService {
    * answers carried a contact closes the booking's own link, as it always did.
    */
   private static Boolean hasExistingResponse(Id bookingId, Invitation inv) {
-    if (inv != null && inv.traveler != null) {
-      if (inv.traveler.Survey_Answered_On__c != null) {
+    if (inv != null && inv.row != null) {
+      if (inv.row.Answered_On__c != null) {
         return true;
       }
       Id person = inv.personContactId;

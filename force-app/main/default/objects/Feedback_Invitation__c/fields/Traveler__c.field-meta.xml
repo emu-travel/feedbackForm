@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Traveler__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description
+  >The traveller row this invitation came from, when it came from one. Empty when the booking's main contact was asked without travelling themselves.</description>
+    <externalId>false</externalId>
+    <label>Traveler</label>
+    <referenceTo>Traveler__c</referenceTo>
+    <relationshipLabel>Feedback Invitations</relationshipLabel>
+    <relationshipName>Feedback_Invitations</relationshipName>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

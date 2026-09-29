@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <allowInChatterGroups>false</allowInChatterGroups>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description
+  >One invited person per row: their own survey link, when they were asked, reminded and answered. It exists because a trip can carry several guests who each answer for themselves, and because the public survey must be able to resolve a link without ever reading a Contact record - a Traveler is a detail of its Contact, so the site could not read it without opening customer contacts to the guest user.</description>
+    <enableActivities>false</enableActivities>
+    <enableBulkApi>true</enableBulkApi>
+    <enableFeeds>false</enableFeeds>
+    <enableHistory>true</enableHistory>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <enableSharing>true</enableSharing>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>Feedback Invitation</label>
+    <nameField>
+        <displayFormat>INV-{00000}</displayFormat>
+        <label>Invitation</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Feedback Invitations</pluralLabel>
+    <sharingModel>Private</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>
