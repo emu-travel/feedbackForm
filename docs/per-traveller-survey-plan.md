@@ -1,8 +1,11 @@
 # Per-traveller feedback invitations (incl. group and PRO trips)
 
 Every traveller gets their own survey link, built from their own itinerary. Decided
-with Ali on 28.09.2026. Built and tested in the staging sandbox; production release
-only after the 15.10.2026 go-live, on Ali's explicit go.
+with Ali on 28.09.2026, built and tested in the staging sandbox on 29.09.2026.
+Production release only after the 15.10.2026 go-live, on Ali's explicit go.
+
+Status: **built and live-tested in the sandbox**. Production is untouched, and `main`
+still matches it.
 
 ## Decisions
 
@@ -18,9 +21,9 @@ only after the 15.10.2026 go-live, on Ali's explicit go.
 
 ## The data model (verified 28.09.2026, production and sandbox)
 
-- A group trip is **several Booking__c records**: the parent (record type PRO) and one
-  participant booking per party (record type Booking), linked by `TravelGroup__c`.
-- **BookingNumber__c is not unique**: parent and participants share it (P000378ES
+- A group trip is **several Booking\_\_c records**: the parent (record type PRO) and one
+  participant booking per party, linked by `TravelGroup__c`.
+- **BookingNumber\_\_c is not unique**: parent and participants share it (P000378ES
   exists 7 times in production).
 - The parent holds the package lines; **each participant booking carries its own full
   copy** (verified on P000378ES: flight, transfer, 2 hotels on every participant), plus
@@ -37,62 +40,110 @@ only after the 15.10.2026 go-live, on Ali's explicit go.
 ## Target behaviour
 
 1. **Recipients per booking**: travellers with an email, plus the booking's main
-   contact when not already among them. Duplicates removed by contact id, then email.
+   contact when not already among them. Duplicates removed by contact id, then by
+   lower-cased email - the org auto-creates a traveller row for the main contact, so
+   without the second pass that person would be asked twice.
 2. **Group trips**: participants are invited from their own participant booking. The
    group parent invites only its own main contact (the pro or organiser), and only if
    that person was not already invited as a participant or traveller.
 3. **Itinerary**: the snapshot is taken from the booking the person was invited from,
    with the group fallback described above.
-4. **Link**: `?b=<booking number>&k=<secret>` stays, but resolution is by **secret
-   only**, because the number is not unique.
+4. **Link**: `?b=<booking number>&k=<secret>` stays, but the **secret alone** resolves
+   the person, because the number is not unique. The number is still checked against
+   the trip the secret resolved to, so a mismatched pair is refused.
 5. **Answering**: refused only when that person has already answered.
 6. **Status**: first answer moves that booking to Feedback.
 7. **Reminders**: per person, one each.
 
-## New fields on `Traveler__c`
+## Where an invitation lives: `Feedback_Invitation__c`
 
-| Field                     | Type                             | Purpose                |
-| ------------------------- | -------------------------------- | ---------------------- |
-| `Survey_Secret__c`        | Text(64), unique, case sensitive | the person's own link  |
-| `Survey_Sent_On__c`       | Date/Time                        | when they were invited |
-| `Survey_Reminder_Sent__c` | Checkbox                         | one reminder ever      |
-| `Survey_Answered_On__c`   | Date/Time                        | when they answered     |
+One row per invited person. Created by `GxFeedbackDispatch` just before the email
+leaves, and it is what the public survey reads.
 
-The booking keeps `Form_Secret__c` (the main contact's link), `SurveySent__c` and
-`Survey_Sent_On__c` (first invitation for that booking).
+| Field              | Type                             | Purpose                                |
+| ------------------ | -------------------------------- | -------------------------------------- |
+| `Secret__c`        | Text(64), unique, case sensitive | the person's own link                  |
+| `Sent_On__c`       | Date/Time                        | when they were invited                 |
+| `Reminder_Sent__c` | Checkbox                         | one reminder ever                      |
+| `Answered_On__c`   | Date/Time                        | when they answered                     |
+| `Booking__c`       | Lookup (Booking, required)       | the trip this person answers for       |
+| `Contact__c`       | Lookup (Contact)                 | the person                             |
+| `Traveler__c`      | Lookup (Traveler)                | the traveller row it came from, if any |
+| `Survey_Link__c`   | Formula (Text)                   | the ready-made link, for the team      |
 
-## Class changes
+**Why a separate object rather than fields on `Traveler__c`.** The plan first put these
+fields on the traveller row. That cannot work: `Traveler__c` is a detail of **Contact**,
+so its sharing is controlled by the contact. Giving the public guest user access to
+traveller rows would mean opening customer contacts to it, and Salesforce refuses the
+sharing rule outright ("org wide default is Controlled By Parent"). The invitation
+object is private, shares nothing but itself, and the guest user reads it through one
+criteria-based rule: `Sent_On__c` is not empty, so only invitations that were really
+sent are visible. **The survey never reads a Contact record.**
 
-1. **GxFeedbackScheduler** - also select participant bookings whose group parent is
-   Traveled or Completed, not only bookings that qualify themselves.
-2. **GxFeedbackDispatch** - build the recipient list per booking; mint a secret per
-   person; snapshot per booking; per-person guards (already invited, already answered);
-   new refusal reason "no recipient with an email address".
-3. **GxFeedbackSender** - one email per recipient; reminders per recipient; the run
-   notice names anyone who could not be reached.
-4. **GxFeedbackService** - resolve by secret; per-person "already answered"; response
-   carries the person; stamp `Survey_Answered_On__c`.
-5. **GxFeedbackDashboardController** - response rate per person, with the per-booking
-   figure kept alongside for comparison.
-6. **Templates** - greet the traveller by name.
+The booking keeps `Form_Secret__c`, `SurveySent__c` and `Survey_Sent_On__c`, so a trip
+still knows it entered the programme.
 
-## Build order (sandbox)
+**Legacy trips** invited before this change have no invitation rows. They keep working:
+their main contact is judged and reminded from the booking exactly as before, and the
+survey window guard treats a booking already stamped as invited as inside the
+programme. Both fallbacks are covered by tests.
 
-1. Traveler fields.
-2. Dispatch recipient list and per-person secrets, with tests: no travellers, one,
-   several, missing emails, main-contact overlap, group parent plus participants.
-3. Sender per recipient, incl. reminders.
-4. Service: resolve by secret, per-person answering.
-5. Dashboard figures.
-6. Templates.
-7. Full test run, then a live sandbox test on group L000138TR (parent plus three
-   participants) with every link opened and submitted.
-8. Written summary with screenshots for Ali.
+The five `Survey_*` fields added to `Traveler__c` in the first commit are **no longer
+used by any code**. They are still in the repo and the sandbox, and can be removed in a
+separate clean-up once Ali confirms.
+
+## Class changes (as built)
+
+1. **GxFeedbackScheduler** - also selects participant bookings whose group parent is
+   Traveled or Completed; builds one request per traveller with an email plus the main
+   contact; the reminder pass reads `Feedback_Invitation__c` (sent, not reminded, not
+   answered) with a booking-level fallback for legacy trips.
+2. **GxFeedbackDispatch** - takes a traveller and contact per request, mints a secret
+   per person, upserts the invitation only for bookings that actually saved, snapshots
+   per booking, and judges booking status only when a trip **enters** the programme, so
+   one guest answering does not lock the others out. New refusal reason for a booking
+   with no reachable email.
+3. **GxFeedbackSender** - one email per recipient. The template can only merge the
+   booking's link, so for a personal link the email is rendered and that one link is
+   swapped for the person's; everything else about the email is unchanged. The
+   recipient contact is set on the message, so the greeting is the traveller's own.
+4. **GxFeedbackService** - resolves the invitation by secret, checks the booking number
+   against it, refuses only when **that person** already answered, writes the response
+   against the right contact and booking, and stamps `Answered_On__c`.
+5. **GxFeedbackDashboardController** - counts guests asked and guests answered, with
+   trips invited and trips answered kept alongside.
+6. **Dashboard (gxDashboardView)** - the tiles read "N guests asked" and the rate shows
+   "N of M trips" beneath it.
+7. **Permission sets** - `Golf_Extra_Feedback_Guest` gets read on the invitation and on
+   Secret, Sent On, Answered On and Contact. `Golf_Extra_Feedback_Admin` gets the object
+   and its fields, without which the fields exist but are invisible even to an admin.
+
+## Live sandbox test (29.09.2026)
+
+Group trip `GX-TRAV-LIVE`: a PRO group booking plus two participant bookings, one guest
+each, a hotel each, and a golf round on one party only.
+
+- The nightly run produced **three invitations with three different links**: the two
+  travellers and the organiser. Nobody was asked twice.
+- The traveller's link opened on the real sandbox site and showed **his own** itinerary,
+  including the golf round the other guest does not have.
+- Two guests answered the same trip: FB-00046 (overall 9, NPS 10) and FB-00047
+  (overall 6, NPS 5), each stored against the right contact and the right party booking.
+- After answering, that guest's link reported "submitted" while the organiser's stayed
+  open. Both party bookings moved to Feedback; the group booking stayed Completed.
+- Dashboard: 30 responses, 33 guests asked, 91 % rate, 33 trips invited, 30 answered,
+  NPS 70.0, 1 open follow-up.
+- 177 Apex tests and 64 dashboard Jest tests pass.
 
 ## Release
 
 Check-only validation, then a quick deploy after 15.10.2026 on Ali's explicit go.
-Rollback: revert the code; the new fields and any collected answers stay valid.
+The deploy carries the new object, its fields, the sharing rule, both permission sets
+and the classes. After deploying, the site has to be published so the guest user picks
+up the new access.
+
+Rollback: revert the code. The invitation object and any collected answers stay valid,
+and the booking-level fallbacks mean a reverted org still invites main contacts.
 
 ## Open points
 
@@ -100,3 +151,6 @@ Rollback: revert the code; the new fields and any collected answers stay valid.
   can add addresses?
 - Data protection: more guests receive email; the guest privacy note should be checked
   once more before release.
+- Should the golf pro also be asked on a PRO trip, or only the travelling guests?
+- Remove the unused `Traveler__c` survey fields, and tidy the sandbox test data
+  (GX-TRAV-LIVE trip, its contacts, invitations and responses).
