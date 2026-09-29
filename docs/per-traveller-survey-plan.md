@@ -135,6 +135,58 @@ each, a hotel each, and a golf round on one party only.
   NPS 70.0, 1 open follow-up.
 - 177 Apex tests and 64 dashboard Jest tests pass.
 
+## Edge-case round (29.09.2026)
+
+A second sandbox round, on trips built to break the design rather than to
+demonstrate it: a duplicate contact, two travellers sharing one inbox, a couple
+on one booking, a guest with no address, a party with no lines, the same guest on
+two trips, a trip too old, a trip that only ended today, a ten-party group, and
+nine mangled or stolen links.
+
+**Held up without changes**
+
+- Link handling. A made-up secret, another trip's number, a secret in the wrong
+  case, a truncated one, one with a trailing space, a blank one, a quoted SOQL
+  fragment and another guest's secret on this trip: all nine refused as
+  "invalid", none threw.
+- Two travellers sharing one inbox are asked once, whatever case the address is
+  written in.
+- A guest with no address is skipped, and the trip still asks everyone else.
+- The same guest on two trips gets two links, each resolving to its own trip.
+- A trip older than the age cap is not asked; a trip that ended today waits out
+  its 36 hours.
+- Answering closes only that guest: a second submission on the same link is
+  refused, the guest beside them stays open, and the reminder pass then reminds
+  the silent one and leaves the one who answered alone. A second reminder night
+  writes to nobody.
+- A ten-party group, 21 guests: 21 invitations in one run, 19 of 100 SOQL
+  queries, 3 DML statements, 258 ms of CPU.
+
+**Four things it broke, now fixed**
+
+1. **The wrong person's name.** `getContext` built its `guestName` from the
+   booking's main contact, so the second traveller on a booking came back as the
+   first one. No screen renders that field today, so no guest saw it, but the
+   survey's own contract was wrong. The name is now stamped on each invitation
+   (`Guest_Name__c`) as it is prepared, and read from there. It has to be stored,
+   because the public survey may never read a Contact.
+2. **Expiry measured from the trip, not the guest.** Validity counted from the
+   booking's `Survey_Sent_On__c`, which is whenever anyone on that trip was last
+   asked. A guest invited today on a trip asked a fortnight ago was told their
+   link had expired; a guest whose own link was long dead got it back because
+   somebody else was reminded. It now counts from the guest's own invitation,
+   falling back to the booking for links minted before invitations existed.
+3. **A guest added later was never asked.** The invitation pass only looks at
+   trips nobody has been asked about, so adding a traveller after the invitations
+   went out - or filling in the address the run notice asked for - achieved
+   nothing. A `latecomers()` pass now asks them on the next run. It only
+   considers trips that already carry invitations, so trips invited before this
+   existed behave exactly as they did.
+4. **A party with no lines got no survey at all.** The documented group fallback
+   had never been built: a participant booking carrying no rateable line was
+   refused with "nothing on this itinerary can be rated". It now falls back to
+   the group booking's lines, and only when the party holds nothing of its own.
+
 ## Release
 
 Check-only validation, then a quick deploy after 15.10.2026 on Ali's explicit go.

@@ -38,6 +38,9 @@ public with sharing class GxFeedbackDispatch {
   private static final String STATUS_COMPLETED = 'Completed';
 
   /** The size of Booking__c.Survey_Snapshot__c. */
+  /** Guest_Name__c on the invitation. */
+  private static final Integer GUEST_NAME_MAX_LENGTH = 255;
+
   private static final Integer SNAPSHOT_MAX_LENGTH = 131072;
 
   /** 24 random bytes, base64url encoded - 32 characters, ~192 bits. */
@@ -178,6 +181,12 @@ public with sharing class GxFeedbackDispatch {
       invitations.put(personKey(inv.Booking__c, inv.Contact__c), inv);
     }
 
+    // How each person is greeted, stored on their own invitation because the
+    // public survey may never read a Contact. Gathered for everyone this batch
+    // could ask: the person named on a request, and the main contact standing
+    // in when none is.
+    Map<Id, String> guestNames = guestNamesFor(requests, bookingIds);
+
     Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
       [
         SELECT
@@ -295,6 +304,11 @@ public with sharing class GxFeedbackDispatch {
       }
       if (inv.Traveler__c == null && r.travelerId != null) {
         inv.Traveler__c = r.travelerId;
+      }
+      // Kept current on every send, so a corrected name reaches the survey.
+      String greeting = guestNames.get(person);
+      if (String.isNotBlank(greeting)) {
+        inv.Guest_Name__c = greeting;
       }
       inv.Sent_On__c = Datetime.now();
       if (r.markReminder == true) {
@@ -512,6 +526,61 @@ public with sharing class GxFeedbackDispatch {
   }
 
   /** Booking id and contact id together, so one person's answer is one key. */
+  /**
+   * Salutation and name for everyone this batch could ask, in the same shape
+   * the booking's own MainContactName__c has, so a survey greets "Frau Eva
+   * Ehepaar" whether she is the trip's main contact or its second traveller.
+   *
+   * One query for the batch. The main contacts are included because a request
+   * that names nobody falls back to them.
+   */
+  private static Map<Id, String> guestNamesFor(
+    List<Request> requests,
+    Set<Id> bookingIds
+  ) {
+    Set<Id> people = new Set<Id>();
+    for (Request r : requests) {
+      if (r != null && r.contactId != null) {
+        people.add(r.contactId);
+      }
+    }
+    for (Booking__c b : [
+      SELECT MainContact__c
+      FROM Booking__c
+      WHERE Id IN :bookingIds AND MainContact__c != NULL
+    ]) {
+      people.add(b.MainContact__c);
+    }
+
+    Map<Id, String> names = new Map<Id, String>();
+    if (people.isEmpty()) {
+      return names;
+    }
+    for (Contact c : [
+      SELECT Id, Salutation, Name
+      FROM Contact
+      WHERE Id IN :people
+    ]) {
+      List<String> parts = new List<String>();
+      if (String.isNotBlank(c.Salutation)) {
+        parts.add(c.Salutation);
+      }
+      if (String.isNotBlank(c.Name)) {
+        parts.add(c.Name);
+      }
+      if (!parts.isEmpty()) {
+        String full = String.join(parts, ' ');
+        names.put(
+          c.Id,
+          full.length() > GUEST_NAME_MAX_LENGTH
+            ? full.substring(0, GUEST_NAME_MAX_LENGTH)
+            : full
+        );
+      }
+    }
+    return names;
+  }
+
   private static String personKey(Id bookingId, Id contactId) {
     return String.valueOf(bookingId) + ':' + String.valueOf(contactId);
   }

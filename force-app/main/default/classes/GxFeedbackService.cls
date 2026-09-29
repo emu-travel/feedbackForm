@@ -234,13 +234,13 @@ public without sharing class GxFeedbackService {
       return c;
     }
 
-    if (isExpired(b)) {
+    if (isExpired(b, inv)) {
       c.message = 'expired';
       return c;
     }
 
     c.bookingNumber = b.BookingNumber__c;
-    c.guestName = buildGuestName(b);
+    c.guestName = buildGuestName(b, inv);
     c.destination = b.DestinationCountry__c;
     c.region = b.Region__c;
     // The trip as it was when the guest was invited, if the booking moved on.
@@ -391,7 +391,7 @@ public without sharing class GxFeedbackService {
     // One response per booking. This is a stronger constraint than the
     // per-hour rate limit the Reiseanmeldung form needs, because that form
     // legitimately accepts repeat submissions and this one does not.
-    if (isExpired(b)) {
+    if (isExpired(b, inv)) {
       res.message = System.Label.Gx_Survey_Server_Expired;
       return res;
     }
@@ -747,7 +747,13 @@ public without sharing class GxFeedbackService {
     String secret
   ) {
     List<Feedback_Invitation__c> rows = [
-      SELECT Id, Booking__c, Contact__c, Answered_On__c
+      SELECT
+        Id,
+        Booking__c,
+        Contact__c,
+        Answered_On__c,
+        Sent_On__c,
+        Guest_Name__c
       FROM Feedback_Invitation__c
       WHERE Secret__c = :secret
       LIMIT 2
@@ -932,6 +938,18 @@ public without sharing class GxFeedbackService {
   private static Map<Id, List<Reservation__c>> loadRateableReservations(
     Map<Id, Booking__c> bookings
   ) {
+    return loadRateableReservations(bookings, true);
+  }
+
+  /**
+   * withGroupFallback is false when the group bookings themselves are being
+   * loaded, so a party pointing at a group that points back can never send
+   * this round in circles.
+   */
+  private static Map<Id, List<Reservation__c>> loadRateableReservations(
+    Map<Id, Booking__c> bookings,
+    Boolean withGroupFallback
+  ) {
     Map<Id, List<Reservation__c>> byBooking = new Map<Id, List<Reservation__c>>();
     if (bookings == null || bookings.isEmpty()) {
       return byBooking;
@@ -995,6 +1013,63 @@ public without sharing class GxFeedbackService {
         byBooking.get(r.Booking__c).add(r);
       }
     }
+    return withGroupFallback == true ? fillFromGroup(byBooking) : byBooking;
+  }
+
+  /**
+   * A participant booking with no rateable line of its own is asked about the
+   * group booking's list instead.
+   *
+   * The package lines are normally copied down to every party, so a party with
+   * nothing at all is a gap in the data rather than a guest who travelled with
+   * nothing. Without this they would be refused a survey altogether, which is
+   * the one outcome nobody can correct afterwards. Only parties holding nothing
+   * are filled, so a party with an itinerary of its own is never mixed with the
+   * group's.
+   */
+  private static Map<Id, List<Reservation__c>> fillFromGroup(
+    Map<Id, List<Reservation__c>> byBooking
+  ) {
+    Set<Id> empties = new Set<Id>();
+    for (Id bookingId : byBooking.keySet()) {
+      if (byBooking.get(bookingId).isEmpty()) {
+        empties.add(bookingId);
+      }
+    }
+    if (empties.isEmpty()) {
+      return byBooking;
+    }
+
+    Map<Id, Id> groupOf = new Map<Id, Id>();
+    Set<Id> groupIds = new Set<Id>();
+    for (Booking__c party : [
+      SELECT Id, TravelGroup__c
+      FROM Booking__c
+      WHERE Id IN :empties AND TravelGroup__c != NULL
+    ]) {
+      groupOf.put(party.Id, party.TravelGroup__c);
+      groupIds.add(party.TravelGroup__c);
+    }
+    if (groupIds.isEmpty()) {
+      return byBooking;
+    }
+
+    Map<Id, List<Reservation__c>> groupLines = loadRateableReservations(
+      new Map<Id, Booking__c>(
+        [
+          SELECT Id, Status__c, Survey_Trip_End__c
+          FROM Booking__c
+          WHERE Id IN :groupIds
+        ]
+      ),
+      false
+    );
+    for (Id partyId : groupOf.keySet()) {
+      List<Reservation__c> lines = groupLines.get(groupOf.get(partyId));
+      if (lines != null && !lines.isEmpty()) {
+        byBooking.put(partyId, lines);
+      }
+    }
     return byBooking;
   }
 
@@ -1034,7 +1109,24 @@ public without sharing class GxFeedbackService {
       ] > 0;
   }
 
-  private static String buildGuestName(Booking__c b) {
+  /**
+   * The person holding this link, not the trip's main contact. A couple on one
+   * booking each get their own invitation, and the second of them would
+   * otherwise be greeted by the first one's name and salutation.
+   *
+   * The name is read from the invitation rather than from the Contact, because
+   * the public survey may never read a Contact record. Links minted before
+   * invitations existed carry no row, so those still greet the booking's main
+   * contact - which is exactly who held such a link.
+   */
+  private static String buildGuestName(Booking__c b, Invitation inv) {
+    if (
+      inv != null &&
+      inv.row != null &&
+      String.isNotBlank(inv.row.Guest_Name__c)
+    ) {
+      return inv.row.Guest_Name__c;
+    }
     return String.isNotBlank(b.MainContactName__c)
       ? b.MainContactName__c
       : null;
@@ -1114,14 +1206,24 @@ public without sharing class GxFeedbackService {
    * disables expiry entirely.
    */
   @TestVisible
-  private static Boolean isExpired(Booking__c b) {
+  private static Boolean isExpired(Booking__c b, Invitation inv) {
     Decimal validityDays = GxFeedbackSettings.linkValidityDays();
     if (validityDays == null || validityDays <= 0) {
       return false;
     }
-    Date reference = b.Survey_Sent_On__c != null
-      ? b.Survey_Sent_On__c.date()
-      : (b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c);
+    // This guest's own invitation first. The booking's date is the trip's last
+    // invitation of anyone, so measuring from it both revives a link that
+    // should have died - because somebody else was reminded - and kills a link
+    // handed out today on a trip asked a fortnight ago.
+    Datetime askedThisPerson = inv != null &&
+      inv.row != null
+      ? inv.row.Sent_On__c
+      : null;
+    Date reference = askedThisPerson != null
+      ? askedThisPerson.date()
+      : (b.Survey_Sent_On__c != null
+          ? b.Survey_Sent_On__c.date()
+          : (b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c));
     if (reference == null) {
       return false;
     }

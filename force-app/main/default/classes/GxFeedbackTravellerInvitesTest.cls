@@ -180,6 +180,7 @@ private class GxFeedbackTravellerInvitesTest {
         Traveler__c,
         Secret__c,
         Survey_Link__c,
+        Guest_Name__c,
         Sent_On__c,
         Reminder_Sent__c,
         Answered_On__c
@@ -565,5 +566,182 @@ private class GxFeedbackTravellerInvitesTest {
     for (GxFeedbackSender.Result r : second) {
       Assert.isFalse(r.sent, 'Nobody is invited twice: ' + r.message);
     }
+  }
+  /**
+   * Two guests on one booking: the second must not be greeted by the first
+   * one's name. The page reads the name from the invitation, never from a
+   * Contact, because the public survey may not read contacts at all.
+   */
+  @IsTest
+  static void theSurveyGreetsTheGuestHoldingTheLink() {
+    GxFeedbackSettings.useForTest(settings(0));
+    GxFeedbackScheduler.run();
+
+    Booking__c solo = bookingFor(SOLO_TRIP);
+    Feedback_Invitation__c bruno = invitedRowFor(
+      SOLO_TRIP,
+      'bruno@example.invalid'
+    );
+
+    Test.startTest();
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      solo.BookingNumber__c,
+      bruno.Secret__c
+    );
+    Test.stopTest();
+
+    Assert.isTrue(c.ok, 'Bruno can open his own link: ' + c.message);
+    Assert.isTrue(
+      c.guestName != null && c.guestName.contains('Bruno'),
+      'The page greets Bruno, not the main contact of the trip: ' + c.guestName
+    );
+  }
+
+  /**
+   * Validity runs from this guest's own invitation. Measured from the booking
+   * it would both revive a dead link because somebody else was reminded, and
+   * kill a link handed out today on a trip asked a fortnight ago.
+   */
+  @IsTest
+  static void aGuestsLinkExpiresOnTheirOwnClock() {
+    GxFeedbackSettings.useForTest(settings(0));
+    GxFeedbackScheduler.run();
+
+    Booking__c solo = bookingFor(SOLO_TRIP);
+    Feedback_Invitation__c bruno = invitedRowFor(
+      SOLO_TRIP,
+      'bruno@example.invalid'
+    );
+    // Bruno was asked long ago; the trip was asked again today, for Anna.
+    update new Feedback_Invitation__c(
+      Id = bruno.Id,
+      Sent_On__c = Datetime.now().addDays(-400)
+    );
+    update new Booking__c(Id = solo.Id, Survey_Sent_On__c = Datetime.now());
+
+    Test.startTest();
+    GxFeedbackService.Context stale = GxFeedbackService.getContext(
+      solo.BookingNumber__c,
+      bruno.Secret__c
+    );
+    update new Feedback_Invitation__c(
+      Id = bruno.Id,
+      Sent_On__c = Datetime.now()
+    );
+    update new Booking__c(
+      Id = solo.Id,
+      Survey_Sent_On__c = Datetime.now().addDays(-400)
+    );
+    GxFeedbackService.Context fresh = GxFeedbackService.getContext(
+      solo.BookingNumber__c,
+      bruno.Secret__c
+    );
+    Test.stopTest();
+
+    Assert.areEqual(
+      'expired',
+      stale.message,
+      'His own link is old, whatever the trip was asked today'
+    );
+    Assert.isTrue(
+      fresh.ok,
+      'And asked today it works, however long ago the trip was asked: ' +
+      fresh.message
+    );
+  }
+
+  /**
+   * The team adds a guest, or fills in the address the run notice asked for,
+   * after the trip was invited. Without a pass of its own that person is never
+   * asked: the invitation pass only looks at trips nobody has been asked about.
+   */
+  @IsTest
+  static void aGuestAddedAfterTheInvitationsWentOutIsStillAsked() {
+    GxFeedbackSettings.useForTest(settings(0));
+    GxFeedbackScheduler.run();
+    Integer asked = invitedCount(SOLO_TRIP);
+
+    Booking__c solo = bookingFor(SOLO_TRIP);
+    Contact late = new Contact(
+      FirstName = 'Lena',
+      LastName = 'Later',
+      Email = 'lena@example.invalid'
+    );
+    insert late;
+    insert traveller(solo.Id, late.Id);
+
+    Test.startTest();
+    GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.areEqual(
+      asked + 1,
+      invitedCount(SOLO_TRIP),
+      'The guest added later is asked, and nobody is asked twice'
+    );
+    Assert.isNotNull(
+      invitedRowFor(SOLO_TRIP, 'lena@example.invalid'),
+      'Lena holds a link of her own'
+    );
+  }
+
+  /** Two travellers, one inbox: the trip writes to that address once. */
+  @IsTest
+  static void aLatecomerSharingAnInboxIsNotAskedAgain() {
+    GxFeedbackSettings.useForTest(settings(0));
+    GxFeedbackScheduler.run();
+    Integer asked = invitedCount(SOLO_TRIP);
+
+    Booking__c solo = bookingFor(SOLO_TRIP);
+    Contact sameInbox = new Contact(
+      FirstName = 'Beate',
+      LastName = 'Berger',
+      Email = 'BRUNO@example.invalid'
+    );
+    insert sameInbox;
+    insert traveller(solo.Id, sameInbox.Id);
+
+    Test.startTest();
+    GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.areEqual(
+      asked,
+      invitedCount(SOLO_TRIP),
+      'An address this trip already writes to is not written to twice'
+    );
+  }
+
+  /**
+   * A party booking carrying no lines of its own still travelled with the
+   * group, so it is asked about the group booking's itinerary rather than
+   * refused a survey altogether.
+   */
+  @IsTest
+  static void aPartyWithoutLinesIsAskedAboutTheGroupsItinerary() {
+    GxFeedbackSettings.useForTest(settings(0));
+    Booking__c party = bookingFor(PARTY_TRIP);
+    delete [SELECT Id FROM Reservation__c WHERE Booking__c = :party.Id];
+
+    Test.startTest();
+    GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Feedback_Invitation__c dora = invitedRowFor(
+      PARTY_TRIP,
+      'dora@example.invalid'
+    );
+    Assert.isNotNull(dora, 'A party with no lines of its own is still asked');
+
+    GxFeedbackService.Context c = GxFeedbackService.getContext(
+      bookingFor(PARTY_TRIP).BookingNumber__c,
+      dora.Secret__c
+    );
+    Assert.isTrue(c.ok, 'Her survey opens: ' + c.message);
+    Assert.areEqual(
+      1,
+      c.hotels.size(),
+      'And asks about the hotel the group booking carries'
+    );
   }
 }

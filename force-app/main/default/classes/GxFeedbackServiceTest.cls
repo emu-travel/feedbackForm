@@ -1305,7 +1305,7 @@ private class GxFeedbackServiceTest {
     update b;
 
     Assert.isFalse(
-      GxFeedbackService.isExpired(b),
+      GxFeedbackService.isExpired(b, null),
       'With no date to measure from the secret stays the only gate'
     );
   }
@@ -1318,7 +1318,7 @@ private class GxFeedbackServiceTest {
     update b;
 
     Assert.isTrue(
-      GxFeedbackService.isExpired(b),
+      GxFeedbackService.isExpired(b, null),
       'A trip that started long ago is expired even without an end date'
     );
   }
@@ -1354,7 +1354,7 @@ private class GxFeedbackServiceTest {
     update b;
 
     Assert.isTrue(
-      GxFeedbackService.isExpired(theBooking()),
+      GxFeedbackService.isExpired(theBooking(), null),
       'Once asked, the clock is the invitation - not the trip dates'
     );
   }
@@ -1369,7 +1369,7 @@ private class GxFeedbackServiceTest {
       'This booking predates the field, as every booking invited before it did'
     );
     Assert.isFalse(
-      GxFeedbackService.isExpired(b),
+      GxFeedbackService.isExpired(b, null),
       'And is still measured from its trip end'
     );
   }

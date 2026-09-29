@@ -92,6 +92,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
+        <field>Feedback_Invitation__c.Guest_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
         <field>Feedback_Invitation__c.Secret__c</field>
         <readable>true</readable>
     </fieldPermissions>
