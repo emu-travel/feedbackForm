@@ -242,12 +242,27 @@ up the new access.
 Rollback: revert the code. The invitation object and any collected answers stay valid,
 and the booking-level fallbacks mean a reverted org still invites main contacts.
 
+## Before go-live - decisions Ali has to make
+
+- [ ] **Schedule the nightly job in production.** `GxFeedbackScheduler` is not
+      scheduled in either org. On 15.10.2026 the start date opens and, without
+      this, no invitation is ever sent and nothing says so.
+- [ ] **Decide what happens to `Auto Assign All Travelers`.** A guest is only
+      asked about their own part of a trip when the services they were not on
+      are not linked to them. That automation links every traveller to every
+      service, so unless it is unticked on a service that belongs to some of the
+      party only, the whole party is asked about it, exactly as before this
+      change. Either tell the team to untick it whenever itineraries differ, or
+      ask Irfan whether it should default to off for hotels and golf rounds.
+      Half of this feature is a working practice, not code.
+- [ ] **Fill in the 8 travellers in production who have no email address**, or
+      accept that they are never asked.
+- [ ] **Check the guest privacy note**, since more guests now receive email.
+- [ ] **Decide whether the golf pro is asked on a PRO trip**, or only the
+      travelling guests.
+
 ## Open points
 
-- Travellers without an email (8 of 101 in production): show them somewhere so the team
-  can add addresses?
-- Data protection: more guests receive email; the guest privacy note should be checked
-  once more before release.
-- Should the golf pro also be asked on a PRO trip, or only the travelling guests?
+- Travellers without an email: show them somewhere so the team can add addresses?
 - Remove the unused `Traveler__c` survey fields, and tidy the sandbox test data
   (GX-TRAV-LIVE trip, its contacts, invitations and responses).

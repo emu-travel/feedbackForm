@@ -849,4 +849,57 @@ private class GxFeedbackTravellerInvitesTest {
       'The hotel they shared is still on her survey'
     );
   }
+  /**
+   * A trip whose main contact has no address and no traveller who does. Nobody
+   * can be asked, so nobody is - and the trip must not be left marked as asked,
+   * or adding the address later would achieve nothing.
+   */
+  @IsTest
+  static void aTripNobodyCanBeWrittenToIsLeftForNextTime() {
+    GxFeedbackSettings.useForTest(settings(0));
+    Booking__c solo = bookingFor(SOLO_TRIP);
+
+    Contact silent = new Contact(FirstName = 'Stille', LastName = 'Post');
+    insert silent;
+    Opportunity opp = [SELECT Id, AccountId FROM Opportunity LIMIT 1];
+    Booking__c trip = newBooking(
+      'Traveller test - unreachable',
+      opp.AccountId,
+      silent.Id,
+      opp.Id
+    );
+    insert trip;
+
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    insert new Reservation__c(
+      Booking__c = trip.Id,
+      Travel_Location__c = [
+        SELECT Travel_Location__c
+        FROM Reservation__c
+        WHERE Booking__c = :solo.Id
+        LIMIT 1
+      ]
+      .Travel_Location__c,
+      AccountType__c = 'Hotel',
+      Pricing__c = 'Leistung',
+      Status__c = 'Completed',
+      Date_Begin__c = Date.today().addDays(-14),
+      Date_End__c = Date.today().addDays(-7)
+    );
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    Test.startTest();
+    GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    Assert.areEqual(
+      0,
+      [SELECT COUNT() FROM Feedback_Invitation__c WHERE Booking__c = :trip.Id],
+      'Nobody was given a link they could never be sent'
+    );
+    Assert.isFalse(
+      [SELECT SurveySent__c FROM Booking__c WHERE Id = :trip.Id].SurveySent__c,
+      'And the trip waits for an address rather than counting as asked'
+    );
+  }
 }

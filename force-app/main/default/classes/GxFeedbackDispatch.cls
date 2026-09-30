@@ -186,6 +186,11 @@ public with sharing class GxFeedbackDispatch {
     // could ask: the person named on a request, and the main contact standing
     // in when none is.
     Map<Id, String> guestNames = guestNamesFor(requests, bookingIds);
+    // Who can actually be written to. A booking's main contact is asked even
+    // when no traveller row names them, so without this a guest with no address
+    // is given an invitation, the send fails, and the trip is left marked as
+    // asked - which is the one state nothing retries.
+    Set<Id> reachable = reachableFrom(guestNames.keySet());
 
     Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
       [
@@ -291,6 +296,7 @@ public with sharing class GxFeedbackDispatch {
         answeredBookings,
         answeredByPerson,
         rateable,
+        reachable,
         resending
       );
       if (problem != null) {
@@ -608,6 +614,22 @@ public with sharing class GxFeedbackDispatch {
     return names;
   }
 
+  /** Of the people this batch might ask, the ones with an address to ask at. */
+  private static Set<Id> reachableFrom(Set<Id> people) {
+    Set<Id> reachable = new Set<Id>();
+    if (people == null || people.isEmpty()) {
+      return reachable;
+    }
+    for (Contact c : [
+      SELECT Id
+      FROM Contact
+      WHERE Id IN :people AND Email != NULL
+    ]) {
+      reachable.add(c.Id);
+    }
+    return reachable;
+  }
+
   private static String personKey(Id bookingId, Id contactId) {
     return String.valueOf(bookingId) + ':' + String.valueOf(contactId);
   }
@@ -625,6 +647,7 @@ public with sharing class GxFeedbackDispatch {
     Set<Id> answeredBookings,
     Set<String> answeredByPerson,
     Set<Id> rateable,
+    Set<Id> reachable,
     Boolean allowResend
   ) {
     if (b == null) {
@@ -687,6 +710,12 @@ public with sharing class GxFeedbackDispatch {
     }
     if (!waitingPeriodPassed(b)) {
       return 'Waiting period after the trip has not passed yet';
+    }
+    // Judged last, with the trip already due: a trip still waiting out its
+    // dates is not an address problem, and saying so every night would bury
+    // the guests the team can actually do something about.
+    if (!reachable.contains(person)) {
+      return 'This guest has no email address';
     }
     if (!rateable.contains(b.Id)) {
       return 'Nothing on this itinerary can be rated';

@@ -45,9 +45,12 @@ private class GxFeedbackDispatchTest {
     );
     insert new List<Account>{ customer, hotel };
 
+    // With an address, because a guest who cannot be written to is refused
+    // before anything else is judged.
     Contact guest = new Contact(
       LastName = 'von Bern',
       FirstName = 'Maximilian',
+      Email = 'maximilian@example.invalid',
       AccountId = customer.Id
     );
     insert guest;
