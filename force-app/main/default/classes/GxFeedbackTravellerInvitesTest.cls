@@ -498,9 +498,13 @@ private class GxFeedbackTravellerInvitesTest {
   static void eachGuestsEmailCarriesTheirOwnLink() {
     String bookingLink = 'https://example.test/feedback/?b=X&k=BOOKINGSECRET';
     String personLink = 'https://example.test/feedback/?b=X&k=ANNASECRET';
+    // A rendered template writes the address into the markup with the
+    // ampersand escaped, and leaves it plain in the text beneath. Both have to
+    // end up pointing at this guest, which is exactly what swapping the whole
+    // address misses.
     String body =
       '<a href="' +
-      bookingLink +
+      bookingLink.replace('&', '&amp;') +
       '">Feedback geben</a> oder ' +
       bookingLink;
 
@@ -512,7 +516,7 @@ private class GxFeedbackTravellerInvitesTest {
     );
     Assert.areEqual(
       2,
-      out.countMatches(personLink),
+      out.countMatches('ANNASECRET'),
       'Both the button and the line beneath it lead to this guest\'s survey'
     );
     Assert.areEqual(

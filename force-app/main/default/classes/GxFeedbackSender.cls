@@ -263,7 +263,31 @@ public with sharing class GxFeedbackSender {
     ) {
       return body;
     }
+    // The secret, not the whole address. A rendered template writes the link
+    // into HTML as ...&amp;k=..., so looking for the address as the database
+    // spells it finds nothing and every guest is sent the booking's own link.
+    // The secret itself is letters, digits, dash and underscore, which no
+    // encoding touches, so swapping that works in the HTML and the plain text
+    // alike.
+    String bookingSecret = secretIn(bookingLink);
+    String personSecret = secretIn(personLink);
+    if (String.isNotBlank(bookingSecret) && String.isNotBlank(personSecret)) {
+      return bookingSecret == personSecret
+        ? body
+        : body.replace(bookingSecret, personSecret);
+    }
     return body.replace(bookingLink, personLink);
+  }
+
+  /** The k= token of a survey link, or null if there is not one. */
+  @TestVisible
+  private static String secretIn(String url) {
+    if (String.isBlank(url) || !url.contains('k=')) {
+      return null;
+    }
+    Matcher m = Pattern.compile('^[A-Za-z0-9_-]+')
+      .matcher(url.substringAfter('k='));
+    return m.find() ? m.group(0) : null;
   }
 
   private static String firstError(Messaging.SendEmailResult r) {
