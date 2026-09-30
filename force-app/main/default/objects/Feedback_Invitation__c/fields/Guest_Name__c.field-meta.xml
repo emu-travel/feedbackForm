@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Guest_Name__c</fullName>
+    <description
+  >How the survey greets this guest, copied from their contact as the invitation is prepared. It is stored here because the public survey must never read a Contact record: without it the page would have to fall back to the booking's main contact, and the second traveller on a trip would be greeted by the first one's name.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >The name the survey greets this guest with. Set automatically.</inlineHelpText>
+    <label>Guest Name</label>
+    <length>255</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

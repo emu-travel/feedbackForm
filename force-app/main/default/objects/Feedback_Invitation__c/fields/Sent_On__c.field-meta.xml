@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Sent_On__c</fullName>
+    <description
+  >When this person was last asked: set as their invitation is prepared and moved forward again by their reminder. The reminder pass waits Reminder_Delay_Days__c after it, and the survey's expiry counts from it, so a reminded guest gets a full validity window from the day they were last asked.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >When we last asked this guest. Set automatically.</inlineHelpText>
+    <label>Sent On</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>DateTime</type>
+</CustomField>
