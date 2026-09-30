@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Survey_Snapshot__c</fullName>
+    <description
+  >What this guest is asked to rate, when that is not the whole trip. A traveller who stayed a night longer, or skipped a round the others played, is authorised for a different set of services, and only those are saved here. Blank means the trip's own list applies, which is the ordinary case where everybody shared the same itinerary. It is stored on the invitation because the public survey may never read the traveller records the authorisation hangs from.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >Only this guest's part of the trip, when it differs from the rest. Set automatically.</inlineHelpText>
+    <label>Survey Snapshot</label>
+    <length>131072</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+</CustomField>

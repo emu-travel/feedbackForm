@@ -235,6 +235,22 @@ public with sharing class GxFeedbackDispatch {
     // its own costs two queries apiece, which a nightly run cannot afford.
     // The same pass builds the list saved with a first invitation.
     Map<Id, String> snapshots = GxFeedbackService.surveySnapshots(bookingIds);
+
+    // The guests in this batch whose own part of the trip may differ from the
+    // rest of the party's.
+    Map<Id, Set<Id>> guestsByBooking = new Map<Id, Set<Id>>();
+    for (Request r : requests) {
+      if (r == null || r.bookingId == null || r.contactId == null) {
+        continue;
+      }
+      if (!guestsByBooking.containsKey(r.bookingId)) {
+        guestsByBooking.put(r.bookingId, new Set<Id>());
+      }
+      guestsByBooking.get(r.bookingId).add(r.contactId);
+    }
+    Map<String, String> personalSnapshots = GxFeedbackService.snapshotsPerGuest(
+      guestsByBooking
+    );
     Set<Id> rateable = new Set<Id>(snapshots.keySet());
     for (Booking__c saved : bookings.values()) {
       // A guest already asked keeps the list they were sent, whatever the
@@ -309,6 +325,17 @@ public with sharing class GxFeedbackDispatch {
       String greeting = guestNames.get(person);
       if (String.isNotBlank(greeting)) {
         inv.Guest_Name__c = greeting;
+      }
+      // Their own part of the trip, when it is not the whole of it. Saved once,
+      // with their first invitation, so a reminder or a resend still asks about
+      // the trip they were actually on.
+      if (inv.Id == null) {
+        String mine = personalSnapshots.get(
+          GxFeedbackService.personKey(b.Id, person)
+        );
+        if (String.isNotBlank(mine) && mine.length() <= SNAPSHOT_MAX_LENGTH) {
+          inv.Survey_Snapshot__c = mine;
+        }
       }
       inv.Sent_On__c = Datetime.now();
       if (r.markReminder == true) {

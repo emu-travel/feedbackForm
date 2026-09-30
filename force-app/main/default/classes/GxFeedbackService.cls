@@ -257,7 +257,7 @@ public without sharing class GxFeedbackService {
     c.trustpilotUrl = GxFeedbackSettings.trustpilotUrl();
     c.googleMapsUrl = GxFeedbackSettings.googleMapsUrl();
 
-    applyItinerary(c, surveyLines(b));
+    applyItinerary(c, surveyLines(b, inv));
 
     // A booking with nothing rateable gets no survey rather than an empty one.
     if (
@@ -410,7 +410,7 @@ public without sharing class GxFeedbackService {
     // Only the lines the guest was asked about may be referenced, so a
     // tampered payload cannot attach feedback to someone else's trip.
     Map<Id, Reservation__c> allowed = new Map<Id, Reservation__c>(
-      surveyLines(b)
+      surveyLines(b, inv)
     );
 
     Savepoint sp = Database.setSavepoint();
@@ -753,7 +753,8 @@ public without sharing class GxFeedbackService {
         Contact__c,
         Answered_On__c,
         Sent_On__c,
-        Guest_Name__c
+        Guest_Name__c,
+        Survey_Snapshot__c
       FROM Feedback_Invitation__c
       WHERE Secret__c = :secret
       LIMIT 2
@@ -867,13 +868,145 @@ public without sharing class GxFeedbackService {
   }
 
   /**
+   * The part of a trip that belongs to one traveller, for the travellers whose
+   * part is not the whole of it.
+   *
+   * The org records who was on which service on Authorized_Traveler__c, and the
+   * team uses it: a guest who stays a night longer, or sits a round out, is
+   * authorised for a different set. A service nobody is linked to belongs to
+   * everyone, which is how an ordinary trip behaves and why most travellers
+   * come back with nothing here.
+   *
+   * Keyed booking + traveller. Only travellers who differ from the trip are
+   * returned, so the common case costs no storage and behaves exactly as it
+   * did. Two queries for the whole batch.
+   */
+  public static Map<String, String> snapshotsPerGuest(
+    Map<Id, Set<Id>> contactsByBooking
+  ) {
+    Map<String, String> personal = new Map<String, String>();
+    if (contactsByBooking == null || contactsByBooking.isEmpty()) {
+      return personal;
+    }
+    Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
+      [
+        SELECT Id, Status__c, Survey_Trip_End__c
+        FROM Booking__c
+        WHERE Id IN :contactsByBooking.keySet()
+      ]
+    );
+    Map<Id, List<Reservation__c>> rateable = loadRateableReservations(bookings);
+
+    Set<Id> lineIds = new Set<Id>();
+    for (List<Reservation__c> lines : rateable.values()) {
+      for (Reservation__c r : lines) {
+        lineIds.add(r.Id);
+      }
+    }
+    if (lineIds.isEmpty()) {
+      return personal;
+    }
+
+    // One person can hold more than one traveller row on a trip - the org
+    // makes one of its own for the main contact - so authorisation is gathered
+    // per person, not per row. Miss that and the guest loses everything linked
+    // to the row they were not invited from.
+    Map<Id, String> personOfRow = new Map<Id, String>();
+    for (Traveler__c t : [
+      SELECT Id, TravelQuote__c, Traveler__c
+      FROM Traveler__c
+      WHERE
+        TravelQuote__c IN :contactsByBooking.keySet()
+        AND Traveler__c != NULL
+    ]) {
+      personOfRow.put(t.Id, personKey(t.TravelQuote__c, t.Traveler__c));
+    }
+
+    // Who was on what, by person. A service with no rows at all is shared.
+    Map<Id, Set<String>> peopleOnLine = new Map<Id, Set<String>>();
+    for (Authorized_Traveler__c a : [
+      SELECT TravelItems__c, Traveler__c
+      FROM Authorized_Traveler__c
+      WHERE TravelItems__c IN :lineIds AND Traveler__c != NULL
+    ]) {
+      String who = personOfRow.get(a.Traveler__c);
+      if (who == null) {
+        continue;
+      }
+      if (!peopleOnLine.containsKey(a.TravelItems__c)) {
+        peopleOnLine.put(a.TravelItems__c, new Set<String>());
+      }
+      peopleOnLine.get(a.TravelItems__c).add(who);
+    }
+    if (peopleOnLine.isEmpty()) {
+      return personal;
+    }
+
+    for (Id bookingId : contactsByBooking.keySet()) {
+      List<Reservation__c> all = rateable.get(bookingId);
+      if (all == null || all.isEmpty()) {
+        continue;
+      }
+      for (Id contactId : contactsByBooking.get(bookingId)) {
+        String who = personKey(bookingId, contactId);
+        List<Reservation__c> mine = new List<Reservation__c>();
+        for (Reservation__c r : all) {
+          Set<String> onIt = peopleOnLine.get(r.Id);
+          if (onIt == null || onIt.contains(who)) {
+            mine.add(r);
+          }
+        }
+        // Their part is the whole trip: nothing to keep.
+        //
+        // Nothing at all is treated the same way. A guest linked to none of the
+        // trip's services is a gap in the data rather than someone who
+        // travelled with nothing, and the forgiving reading - they were on the
+        // trip like everyone else - is the one that cannot cost us their
+        // feedback.
+        if (mine.isEmpty() || mine.size() == all.size()) {
+          continue;
+        }
+        personal.put(who, JSON.serialize(mine));
+      }
+    }
+    return personal;
+  }
+
+  /** Key for snapshotsPerGuest: one trip, one person. */
+  public static String personKey(Id bookingId, Id contactId) {
+    return bookingId + ':' + contactId;
+  }
+
+  /**
    * What the survey asks about: the list saved with the first invitation, as it
    * was then. Later changes to the booking - a line canceled, a hotel swapped, a
    * stay added, automation touching line statuses - do not reach it; that is
    * the point. Only a booking with nothing saved (invited before the list was
    * kept, or with a list too long for the field) is read from the booking.
    */
-  private static List<Reservation__c> surveyLines(Booking__c b) {
+  private static List<Reservation__c> surveyLines(
+    Booking__c b,
+    Invitation inv
+  ) {
+    // This guest's own part of the trip, when it is not the whole of it: one
+    // traveller stays a night longer, another skips a round the rest played.
+    // Saved with their invitation, so nobody is asked about somebody else's
+    // hotel or tee time.
+    if (
+      inv != null &&
+      inv.row != null &&
+      String.isNotBlank(inv.row.Survey_Snapshot__c)
+    ) {
+      try {
+        return (List<Reservation__c>) JSON.deserialize(
+          inv.row.Survey_Snapshot__c,
+          List<Reservation__c>.class
+        );
+      } catch (Exception e) {
+        // Unreadable: fall through to the trip's own list rather than leave
+        // this guest without a survey.
+      }
+    }
     if (String.isNotBlank(b.Survey_Snapshot__c)) {
       try {
         return (List<Reservation__c>) JSON.deserialize(

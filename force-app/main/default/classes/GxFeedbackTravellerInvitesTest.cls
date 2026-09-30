@@ -748,4 +748,105 @@ private class GxFeedbackTravellerInvitesTest {
       'And asks about the hotel the group booking carries'
     );
   }
+  /**
+   * One guest stays a night longer and plays a round the others go home before.
+   * The org records who was on which service, so only he is asked about it.
+   */
+  @IsTest
+  static void aGuestIsAskedOnlyAboutTheServicesTheyWereOn() {
+    GxFeedbackSettings.useForTest(settings(0));
+    Booking__c solo = bookingFor(SOLO_TRIP);
+    Account course = new Account(
+      Name = 'Extra Round Golf',
+      Account_Type__c = 'Golfclub',
+      BillingCity = 'Faro',
+      BillingCountry = 'Portugal'
+    );
+    insert course;
+
+    TriggerHandler.bypass('ReservationTriggerHandler');
+    Reservation__c extra = new Reservation__c(
+      Booking__c = solo.Id,
+      Travel_Location__c = course.Id,
+      AccountType__c = 'Golfclub',
+      Pricing__c = 'Leistung',
+      Status__c = 'Completed',
+      Date_Begin__c = Date.today().addDays(-8),
+      Date_End__c = Date.today().addDays(-8),
+      AutoAssigneAllTravelers__c = false
+    );
+    insert extra;
+    TriggerHandler.clearBypass('ReservationTriggerHandler');
+
+    // Everyone is on the hotel; only Bruno is on the extra round. One person
+    // can hold several traveller rows, so every row of theirs is linked.
+    Map<String, List<Id>> rowsOf = new Map<String, List<Id>>();
+    for (Traveler__c t : [
+      SELECT Id, Traveler__r.Email
+      FROM Traveler__c
+      WHERE TravelQuote__c = :solo.Id AND Traveler__c != NULL
+    ]) {
+      if (!rowsOf.containsKey(t.Traveler__r.Email)) {
+        rowsOf.put(t.Traveler__r.Email, new List<Id>());
+      }
+      rowsOf.get(t.Traveler__r.Email).add(t.Id);
+    }
+    List<Authorized_Traveler__c> onIt = new List<Authorized_Traveler__c>();
+    for (Reservation__c line : [
+      SELECT Id
+      FROM Reservation__c
+      WHERE Booking__c = :solo.Id AND Id != :extra.Id
+    ]) {
+      for (String email : rowsOf.keySet()) {
+        for (Id rowId : rowsOf.get(email)) {
+          onIt.add(
+            new Authorized_Traveler__c(
+              TravelItems__c = line.Id,
+              Traveler__c = rowId
+            )
+          );
+        }
+      }
+    }
+    for (Id rowId : rowsOf.get('bruno@example.invalid')) {
+      onIt.add(
+        new Authorized_Traveler__c(
+          TravelItems__c = extra.Id,
+          Traveler__c = rowId
+        )
+      );
+    }
+    delete [
+      SELECT Id
+      FROM Authorized_Traveler__c
+      WHERE TravelItems__c = :extra.Id
+    ];
+    insert onIt;
+
+    Test.startTest();
+    GxFeedbackScheduler.run();
+    Test.stopTest();
+
+    String tripNumber = bookingFor(SOLO_TRIP).BookingNumber__c;
+    GxFeedbackService.Context hers = GxFeedbackService.getContext(
+      tripNumber,
+      invitedRowFor(SOLO_TRIP, 'anna@example.invalid').Secret__c
+    );
+    GxFeedbackService.Context his = GxFeedbackService.getContext(
+      tripNumber,
+      invitedRowFor(SOLO_TRIP, 'bruno@example.invalid').Secret__c
+    );
+
+    Assert.areEqual(
+      0,
+      hers.golfCourses.size(),
+      'Anna went home before that round and is not asked about it'
+    );
+    Assert.areEqual(1, his.golfCourses.size(), 'Bruno played it, so he is');
+    Assert.areEqual(
+      1,
+      hers.hotels.size(),
+      'The hotel they shared is still on her survey'
+    );
+  }
 }
