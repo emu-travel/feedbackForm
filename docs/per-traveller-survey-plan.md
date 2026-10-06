@@ -278,14 +278,15 @@ and the booking-level fallbacks mean a reverted org still invites main contacts.
 - [ ] **Schedule the nightly job in production.** `GxFeedbackScheduler` is not
       scheduled in either org. On 15.10.2026 the start date opens and, without
       this, no invitation is ever sent and nothing says so.
-- [ ] **Decide what happens to `Auto Assign All Travelers`.** A guest is only
-      asked about their own part of a trip when the services they were not on
-      are not linked to them. That automation links every traveller to every
-      service, so unless it is unticked on a service that belongs to some of the
-      party only, the whole party is asked about it, exactly as before this
-      change. Either tell the team to untick it whenever itineraries differ, or
-      ask Irfan whether it should default to off for hotels and golf rounds.
-      Half of this feature is a working practice, not code.
+- [ ] **Tell the team about `Auto Assign All Travelers`.** Decided 06.10.2026:
+      the automation stays as it is, and the team is told instead. The survey
+      now asks each guest only about the services they are recorded as being
+      on, so when a service belongs to part of the party only, that checkbox
+      has to be unticked on it and just those people assigned. Left ticked, the
+      whole party is asked about it. Proportionate because it is the exception:
+      of 28 production trips with two or more travellers, 26 share every
+      service and only 2 split them. Ali is sending this to the team.
+
 - [ ] **Fill in the 8 travellers in production who have no email address**, or
       accept that they are never asked.
 - [ ] **Check the guest privacy note**, since more guests now receive email.
