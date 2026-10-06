@@ -325,8 +325,11 @@ and the booking-level fallbacks mean a reverted org still invites main contacts.
 - [ ] **Fill in the 8 travellers in production who have no email address**, or
       accept that they are never asked.
 - [ ] **Check the guest privacy note**, since more guests now receive email.
-- [ ] **Decide whether the golf pro is asked on a PRO trip**, or only the
-      travelling guests.
+- [x] **The golf pro is asked, about his own trip.** Decided 06.10.2026: he
+      travels with the group, stays in the hotel and plays, so he is a guest
+      like any other. No change was needed - he is already invited on the group
+      booking, which carries the package he travelled on, and he is asked once,
+      never again as a participant.
 
 ## Open points
 
