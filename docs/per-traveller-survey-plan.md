@@ -310,6 +310,43 @@ out before 17.10.2026, a trip ending on the 15th plus the 36 hour wait.
 Also learned: the six `AccountEngagementTravelRequest` tests that fail in the
 sandbox pass in production, so the full local suite is usable there.
 
+## Tested in production (06.10.2026)
+
+Four trips built in production and run through the real code, the real emails
+and the real site. Every address was a plus-address of Ali's own inbox, so
+nothing could reach anyone else, and the survey window was moved to 02.10
+temporarily after checking three times that **no real booking had ended in the
+last 45 days in any status** - so the only thing the programme could find was
+the test data.
+
+Seven guests asked across five bookings. What it proved:
+
+- **Each guest has their own link**, checked in the sent emails rather than the
+  records. That is the check that caught the bug where every guest was emailed
+  the booking's link.
+- **Two guests answered the same trip and disagreed.** Vater Einzel gave overall
+  1 and NPS 5; Mutter Einzel gave 9 and 10. Under the old behaviour her opinion
+  would never have been collected. Confirmed from the guest's side too: his link
+  then said the feedback was already in, hers opened normally.
+- **Per-person itineraries held.** Alpha Eins played an extra round at Cornelia
+  Golf Club and was asked about two courses; his wife was asked about one.
+  Cornelia ended with exactly one rating, from the only guest who played it.
+- **A shared inbox was written to once**, and a guest with no address was
+  skipped without stopping the trip.
+- **A PRO group worked**: parties at Invoiced and Paid invited through the
+  group's Completed status, the organiser asked once on the group booking.
+- **Reminders went only to the three who had stayed silent**, each carrying
+  their own link and the reminder wording.
+- **The detractor alert** fired to the travel designer and the copy address,
+  both Ali, so no colleague was emailed.
+- **The dashboard** read 4 responses, 7 guests asked, 5 trips invited, NPS 50,
+  one open follow-up. Guests counted beside trips, which is the change.
+
+One thing the test data made confusing rather than the product: two guests
+shared the surname Eins, so both emails greeted "Sehr geehrter Herr Eins".
+German form is salutation plus surname, so a real married couple on one booking
+will read the same way. Each still carries its own link.
+
 ## Release
 
 Check-only validation, then a quick deploy after 15.10.2026 on Ali's explicit go.
