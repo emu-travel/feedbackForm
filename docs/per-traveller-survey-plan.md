@@ -232,6 +232,37 @@ whole way, Accepted -> Traveled -> Completed -> Feedback.
 - A party booking inherits its group's booking number, and its dates were
   overwritten to the group's when created.
 
+## How a group trip reaches the survey (06.10.2026)
+
+Agreed with Ali and Irfan: the PRO record type will not get a "Traveled" step.
+Its path runs Paid -> Completed -> Feedback, so **Completed does for a group
+booking what Traveled does for an ordinary one**. The survey needed no change
+for this: it has always accepted Traveled or Completed as "this trip happened".
+
+What was missing was anything to move a group booking there. Two scheduled flows
+now carry a finished group trip to the survey, ten minutes apart:
+
+| When (Berlin) | Flow                                | What it does                                                  |
+| ------------- | ----------------------------------- | ------------------------------------------------------------- |
+| 00:20         | `Gx - Mark Group Trips Completed`   | A PRO booking whose end date has passed goes to **Completed** |
+| 00:30         | `Gx - Mark Group Parties Travelled` | Its parties then go to **Traveled**                           |
+| 07:00         | `GxFeedbackScheduler`               | Everyone on the trip is invited                               |
+
+Both leave alone anything still at Calculation, Offered or Discussion, where
+nothing was agreed, and anything Rejected or Canceled. Both check the record
+type, because Traveled does not exist on the PRO path and Salesforce refuses it
+there outright.
+
+Verified in the sandbox on a group at "LT booked" that had ended: it moved to
+Completed, three controls did not move (a group still at Calculation, one whose
+trip has not ended, and an ordinary FIT booking), and the nightly run then
+invited the organiser on the group booking and the guest on the party.
+
+**One consequence for the team:** on a PRO booking, Completed means both "the
+trip is over" and "the survey has gone out", because the path has one step
+fewer. The booking's Survey Sent On field, or its invitations, are where to look
+for the difference.
+
 ## Release
 
 Check-only validation, then a quick deploy after 15.10.2026 on Ali's explicit go.
