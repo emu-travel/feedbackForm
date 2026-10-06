@@ -270,24 +270,42 @@ go in one go: the deploying user has no access to fields that did not exist a
 moment earlier, so every test touching them fails. The first full validation
 failed exactly that way, 98 tests of 169.
 
-| Step | What                                                                                            | State                                 |
-| ---- | ----------------------------------------------------------------------------------------------- | ------------------------------------- |
-| 1    | The object, its fields, both permission sets, the guest sharing rule. No Apex, so no tests run. | **live in production**                |
-| 2    | `Golf_Extra_Feedback_Admin` assigned to Ali and Kaan.                                           | **done**                              |
-| 3    | Apex, the two nightly flows, the dashboard component.                                           | **validated, 1103 tests, 0 failures** |
+| Step | What                                                                                            | State                              |
+| ---- | ----------------------------------------------------------------------------------------------- | ---------------------------------- |
+| 1    | The object, its fields, both permission sets, the guest sharing rule. No Apex, so no tests run. | **live in production**             |
+| 2    | `Golf_Extra_Feedback_Admin` assigned to Ali and Kaan.                                           | **done**                           |
+| 3    | Apex, the two nightly flows, the dashboard component.                                           | **live in production, 06.10.2026** |
 
-Step 3 is validated as job `0AfMz000002QyaTKAS` and can be deployed without
-re-running the tests, but Salesforce expires a validation after about ten days,
-so it needs redoing if it is not used by around 16.10.
+Step 3 validated with 1103 tests and no failures, and went in the same day.
 
 Manifests for each step are in `release/per-traveller/`. They deliberately leave
 out the Account and Booking sharing rules, which already exist in production and
 would only set off a sharing recalculation, and the five unused `Traveler__c`
 survey fields.
 
-Two risks that did not materialise: production accepted both flows as Active,
-and `GxFeedbackScheduler` deployed despite already being scheduled. Worth
-knowing for next time rather than assuming.
+**Flows reach production as Draft, whatever the metadata says.** Both nightly
+flows arrived inactive and would simply never have run, with nothing reporting
+it. The validation had suggested otherwise, which is worth remembering: a
+validation says a flow can be deployed, not that it will be active. They were
+activated afterwards through their flow definitions (`FlowDefinition` carrying
+`activeVersionNumber`, deployed at API 43.0, the Tooling endpoint not being
+reachable from the CLI here). Any flow deployed to production needs the same
+step, and needs checking rather than assuming.
+
+`GxFeedbackScheduler` deployed cleanly despite already being scheduled, which
+was the other risk and did not materialise.
+
+What runs each night in production now:
+
+| Berlin | Job                               |
+| ------ | --------------------------------- |
+| 00:20  | Gx - Mark Group Trips Completed   |
+| 00:30  | Gx - Mark Group Parties Travelled |
+| 07:00  | Golf Extra Feedback               |
+
+Deployed on a day when all three provably had nothing to do: 0 trips due, 0
+parties to promote, 0 group trips to complete. The first guest email cannot go
+out before 17.10.2026, a trip ending on the 15th plus the 36 hour wait.
 
 Also learned: the six `AccountEngagementTravelRequest` tests that fail in the
 sandbox pass in production, so the full local suite is usable there.
