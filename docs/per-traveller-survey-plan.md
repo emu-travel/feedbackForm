@@ -263,6 +263,35 @@ trip is over" and "the survey has gone out", because the path has one step
 fewer. The booking's Survey Sent On field, or its invitations, are where to look
 for the difference.
 
+## Getting it into production (06.10.2026)
+
+Deployed in steps, because a brand-new object and the Apex that reads it cannot
+go in one go: the deploying user has no access to fields that did not exist a
+moment earlier, so every test touching them fails. The first full validation
+failed exactly that way, 98 tests of 169.
+
+| Step | What                                                                                            | State                                 |
+| ---- | ----------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1    | The object, its fields, both permission sets, the guest sharing rule. No Apex, so no tests run. | **live in production**                |
+| 2    | `Golf_Extra_Feedback_Admin` assigned to Ali and Kaan.                                           | **done**                              |
+| 3    | Apex, the two nightly flows, the dashboard component.                                           | **validated, 1103 tests, 0 failures** |
+
+Step 3 is validated as job `0AfMz000002QyaTKAS` and can be deployed without
+re-running the tests, but Salesforce expires a validation after about ten days,
+so it needs redoing if it is not used by around 16.10.
+
+Manifests for each step are in `release/per-traveller/`. They deliberately leave
+out the Account and Booking sharing rules, which already exist in production and
+would only set off a sharing recalculation, and the five unused `Traveler__c`
+survey fields.
+
+Two risks that did not materialise: production accepted both flows as Active,
+and `GxFeedbackScheduler` deployed despite already being scheduled. Worth
+knowing for next time rather than assuming.
+
+Also learned: the six `AccountEngagementTravelRequest` tests that fail in the
+sandbox pass in production, so the full local suite is usable there.
+
 ## Release
 
 Check-only validation, then a quick deploy after 15.10.2026 on Ali's explicit go.
@@ -275,9 +304,15 @@ and the booking-level fallbacks mean a reverted org still invites main contacts.
 
 ## Before go-live - decisions Ali has to make
 
-- [ ] **Schedule the nightly job in production.** `GxFeedbackScheduler` is not
-      scheduled in either org. On 15.10.2026 the start date opens and, without
-      this, no invitation is ever sent and nothing says so.
+- [x] **Schedule the nightly job in production.** Done 06.10.2026: "Golf Extra
+      Feedback" runs daily at 07:00 Berlin. It is inert until a trip ends on or
+      after the start date, so the first invitation cannot go out before
+      17.10.2026 (a trip ending on the 15th, plus the 36 hour wait). Scheduled
+      early on purpose: it was the one gap that would have let go-live pass with
+      nothing sent and nothing saying so, and it doubles as the fallback - if
+      the per-traveller release is not deployed by 15.10, the programme still
+      starts on time with one invitation per booking.
+
 - [ ] **Tell the team about `Auto Assign All Travelers`.** Decided 06.10.2026:
       the automation stays as it is, and the team is told instead. The survey
       now asks each guest only about the services they are recorded as being
