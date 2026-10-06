@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reminder_Sent__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description
+  >Set once this person has been reminded, so one reminder stays one reminder. Set before the reminder email leaves, so a failed send is not retried: with a guest's inbox at stake, under-reminding is the safer failure.</description>
+    <externalId>false</externalId>
+    <inlineHelpText
+  >Whether this guest has already had a reminder. Set automatically.</inlineHelpText>
+    <label>Reminder Sent</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

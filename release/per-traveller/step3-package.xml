@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Step 3 of the per-traveller release: the code.
+
+  The object, its fields, the permission sets and the sharing rule went in step
+  1 and are deliberately not repeated here. The two existing sharing rules on
+  Account and Booking are left alone too, so nothing sets off a sharing
+  recalculation it does not need to.
+
+  This is the step that changes behaviour. After it, every traveller with an
+  email address is asked for their own feedback, and the two nightly flows start
+  carrying finished group trips and their parties along.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>GxFeedbackDashboardController</members>
+        <members>GxFeedbackDashboardControllerTest</members>
+        <members>GxFeedbackDispatch</members>
+        <members>GxFeedbackDispatchTest</members>
+        <members>GxFeedbackScheduler</members>
+        <members>GxFeedbackSender</members>
+        <members>GxFeedbackService</members>
+        <members>GxFeedbackServiceTest</members>
+        <members>GxFeedbackTravellerInvitesTest</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>Gx_Mark_Group_Parties_Travelled</members>
+        <members>Gx_Mark_Group_Trips_Completed</members>
+        <name>Flow</name>
+    </types>
+    <types>
+        <members>gxDashboardView</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <version>67.0</version>
+</Package>

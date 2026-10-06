@@ -32,6 +32,18 @@ public with sharing class GxFeedbackSender {
       description='Set by the nightly reminder pass, so a guest is only ever reminded once.'
     )
     public Boolean markReminder = false;
+
+    @InvocableVariable(
+      label='Traveler Id'
+      description='The traveller row this invitation comes from, when it comes from one.'
+    )
+    public Id travelerId;
+
+    @InvocableVariable(
+      label='Contact Id'
+      description='The person to ask. Empty means the booking\'s main contact.'
+    )
+    public Id contactId;
   }
 
   public class Result {
@@ -52,6 +64,12 @@ public with sharing class GxFeedbackSender {
 
     @InvocableVariable(label='Reminder')
     public Boolean reminder = false;
+
+    @InvocableVariable(
+      label='Traveler Id'
+      description='The traveller this result is about. Empty when it was the booking\'s main contact.'
+    )
+    public Id travelerId;
 
     /**
      * Due, but not sent for a reason someone has to act on: the booking could
@@ -84,6 +102,8 @@ public with sharing class GxFeedbackSender {
     for (Request r : requests) {
       GxFeedbackDispatch.Request p = new GxFeedbackDispatch.Request();
       p.bookingId = r == null ? null : r.bookingId;
+      p.travelerId = r == null ? null : r.travelerId;
+      p.contactId = r == null ? null : r.contactId;
       p.allowResend = r != null && r.allowResend == true;
       p.markReminder = r != null && r.markReminder == true;
       toPrepare.add(p);
@@ -95,6 +115,7 @@ public with sharing class GxFeedbackSender {
 
     Map<String, Id> templates = templateIds();
     Id senderId = senderId();
+    Map<Id, String> bookingLinks = bookingLinksFor(prepared);
 
     List<Messaging.SingleEmailMessage> outbox = new List<Messaging.SingleEmailMessage>();
     List<Result> awaitingSend = new List<Result>();
@@ -104,6 +125,7 @@ public with sharing class GxFeedbackSender {
       Result out = new Result();
       out.surveyUrl = p.surveyUrl;
       out.bookingNumber = p.bookingNumber;
+      out.travelerId = requests[i] == null ? null : requests[i].travelerId;
       // A reminder is a different email, not the same one sent twice.
       Boolean reminding =
         requests[i] != null &&
@@ -136,12 +158,35 @@ public with sharing class GxFeedbackSender {
       }
 
       Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
-      mail.setTemplateId(templateId);
-      // The Contact makes Recipient merge fields resolve; the booking makes
-      // Booking__c ones - including the survey link - resolve.
+      // The Contact makes Recipient merge fields resolve - so the greeting is
+      // this traveller's, not the booking's main contact's - and the booking
+      // makes Booking__c ones resolve.
       mail.setTargetObjectId(p.recipientContactId);
       mail.setWhatId(requests[i].bookingId);
       mail.setSaveAsActivity(true);
+      Boolean ownLink =
+        String.isNotBlank(p.surveyUrl) &&
+        p.surveyUrl != bookingLinks.get(requests[i].bookingId);
+      if (!ownLink) {
+        mail.setTemplateId(templateId);
+      } else {
+        // A traveller has a link of their own, but the template can only merge
+        // the booking's. So the template is rendered here and that one link is
+        // swapped for theirs; everything else about the email is unchanged.
+        Messaging.SingleEmailMessage rendered = Messaging.renderStoredEmailTemplate(
+          templateId,
+          p.recipientContactId,
+          requests[i].bookingId
+        );
+        String bookingLink = bookingLinks.get(requests[i].bookingId);
+        mail.setSubject(rendered.getSubject());
+        mail.setHtmlBody(
+          personalise(rendered.getHtmlBody(), bookingLink, p.surveyUrl)
+        );
+        mail.setPlainTextBody(
+          personalise(rendered.getPlainTextBody(), bookingLink, p.surveyUrl)
+        );
+      }
       if (senderId != null) {
         mail.setOrgWideEmailAddressId(senderId);
       }
@@ -168,6 +213,81 @@ public with sharing class GxFeedbackSender {
     }
 
     return results;
+  }
+
+  /**
+   * The booking's own survey link, for the trips that are inviting a traveller.
+   * It is what the template merges, and what the traveller's link replaces.
+   */
+  private static Map<Id, String> bookingLinksFor(
+    List<GxFeedbackDispatch.Result> prepared
+  ) {
+    Set<Id> bookingIds = new Set<Id>();
+    for (GxFeedbackDispatch.Result p : prepared) {
+      if (p.ok && p.bookingId != null) {
+        bookingIds.add(p.bookingId);
+      }
+    }
+    Map<Id, String> links = new Map<Id, String>();
+    if (bookingIds.isEmpty()) {
+      return links;
+    }
+    for (Booking__c b : [
+      SELECT Id, Survey_Link__c
+      FROM Booking__c
+      WHERE Id IN :bookingIds
+    ]) {
+      links.put(b.Id, b.Survey_Link__c);
+    }
+    return links;
+  }
+
+  /**
+   * Swaps the booking's link for this traveller's. Every occurrence, because
+   * the templates carry it on the button, on the fallback line beneath it and
+   * in the plain text part - and all three have to lead to the same person's
+   * survey. The body is returned untouched when there is nothing to swap, so a
+   * missing link is visible as a missing link rather than silently sending
+   * somebody else's.
+   */
+  @TestVisible
+  private static String personalise(
+    String body,
+    String bookingLink,
+    String personLink
+  ) {
+    if (
+      String.isBlank(body) ||
+      String.isBlank(bookingLink) ||
+      String.isBlank(personLink)
+    ) {
+      return body;
+    }
+    // The secret, not the whole address. A rendered template writes the link
+    // into HTML as ...&amp;k=..., so looking for the address as the database
+    // spells it finds nothing and every guest is sent the booking's own link.
+    // The secret itself is letters, digits, dash and underscore, which no
+    // encoding touches, so swapping that works in the HTML and the plain text
+    // alike.
+    String bookingSecret = secretIn(bookingLink);
+    String personSecret = secretIn(personLink);
+    if (String.isNotBlank(bookingSecret) && String.isNotBlank(personSecret)) {
+      return bookingSecret == personSecret
+        ? body
+        : body.replace(bookingSecret, personSecret);
+    }
+    return body.replace(bookingLink, personLink);
+  }
+
+  /** The k= token of a survey link, or null if there is not one. */
+  @TestVisible
+  private static String secretIn(String url) {
+    if (String.isBlank(url) || !url.contains('k=')) {
+      return null;
+    }
+    Matcher m = Pattern.compile('^[A-Za-z0-9_-]+')
+      .matcher(url.substringAfter('k='));
+    return m.find() ? m.group(0) : null;
   }
 
   private static String firstError(Messaging.SendEmailResult r) {

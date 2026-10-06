@@ -38,6 +38,9 @@ public with sharing class GxFeedbackDispatch {
   private static final String STATUS_COMPLETED = 'Completed';
 
   /** The size of Booking__c.Survey_Snapshot__c. */
+  /** Guest_Name__c on the invitation. */
+  private static final Integer GUEST_NAME_MAX_LENGTH = 255;
+
   private static final Integer SNAPSHOT_MAX_LENGTH = 131072;
 
   /** 24 random bytes, base64url encoded - 32 characters, ~192 bits. */
@@ -82,6 +85,18 @@ public with sharing class GxFeedbackDispatch {
       description='Set by the reminder pass. Records that this guest has now been reminded, so they are only ever reminded once.'
     )
     public Boolean markReminder = false;
+
+    @InvocableVariable(
+      label='Traveler Id'
+      description='The traveller row this invitation comes from, when it comes from one. Kept on the invitation so the team can see who on the trip was asked.'
+    )
+    public Id travelerId;
+
+    @InvocableVariable(
+      label='Contact Id'
+      description='The person to ask. Empty means the booking\'s main contact, which is how a one-off send from the booking works.'
+    )
+    public Id contactId;
   }
 
   public class Result {
@@ -102,6 +117,18 @@ public with sharing class GxFeedbackDispatch {
       description='Who the invitation should go to.'
     )
     public Id recipientContactId;
+
+    @InvocableVariable(
+      label='Traveler Id'
+      description='The traveller this invitation belongs to. Empty when it went to the booking\'s main contact.'
+    )
+    public Id travelerId;
+
+    @InvocableVariable(
+      label='Booking Id'
+      description='The trip this invitation is about.'
+    )
+    public Id bookingId;
 
     @InvocableVariable(
       label='Skipped Reason'
@@ -134,6 +161,37 @@ public with sharing class GxFeedbackDispatch {
       }
     }
 
+    // One invited person, one link, on a row of their own: their secret, their
+    // sent and reminded dates, their answer. So several guests on one trip are
+    // asked, reminded and closed independently of each other.
+    Map<String, Feedback_Invitation__c> invitations = new Map<String, Feedback_Invitation__c>();
+    for (Feedback_Invitation__c inv : [
+      SELECT
+        Id,
+        Booking__c,
+        Contact__c,
+        Traveler__c,
+        Secret__c,
+        Sent_On__c,
+        Reminder_Sent__c,
+        Answered_On__c
+      FROM Feedback_Invitation__c
+      WHERE Booking__c IN :bookingIds
+    ]) {
+      invitations.put(personKey(inv.Booking__c, inv.Contact__c), inv);
+    }
+
+    // How each person is greeted, stored on their own invitation because the
+    // public survey may never read a Contact. Gathered for everyone this batch
+    // could ask: the person named on a request, and the main contact standing
+    // in when none is.
+    Map<Id, String> guestNames = guestNamesFor(requests, bookingIds);
+    // Who can actually be written to. A booking's main contact is asked even
+    // when no traveller row names them, so without this a guest with no address
+    // is given an invitation, the send fails, and the trip is left marked as
+    // asked - which is the one state nothing retries.
+    Set<Id> reachable = reachableFrom(guestNames.keySet());
+
     Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
       [
         SELECT
@@ -150,20 +208,30 @@ public with sharing class GxFeedbackDispatch {
           Survey_Reminder_Sent__c,
           Survey_Trip_Start__c,
           Survey_Trip_End__c,
-          Survey_Snapshot__c
+          Survey_Snapshot__c,
+          TravelGroup__c,
+          TravelGroup__r.Status__c
         FROM Booking__c
         WHERE Id IN :bookingIds
       ]
     );
 
-    // Bookings that already carry feedback are never invited twice.
-    Set<Id> answered = new Set<Id>();
+    // Nobody is asked twice. Per person, because several people can be asked
+    // about the same trip: an answer closes that person's invitation, not
+    // everyone else's. A response from before answers were attributed carries
+    // no contact; it still closes the booking's main-contact invitation.
+    Set<Id> answeredBookings = new Set<Id>();
+    Set<String> answeredByPerson = new Set<String>();
     for (Feedback_Response__c f : [
-      SELECT Booking__c
+      SELECT Booking__c, Contact__c
       FROM Feedback_Response__c
       WHERE Booking__c IN :bookingIds
     ]) {
-      answered.add(f.Booking__c);
+      if (f.Contact__c == null) {
+        answeredBookings.add(f.Booking__c);
+      } else {
+        answeredByPerson.add(personKey(f.Booking__c, f.Contact__c));
+      }
     }
 
     // An invitation to a survey with no questions in it is worse than no
@@ -172,6 +240,22 @@ public with sharing class GxFeedbackDispatch {
     // its own costs two queries apiece, which a nightly run cannot afford.
     // The same pass builds the list saved with a first invitation.
     Map<Id, String> snapshots = GxFeedbackService.surveySnapshots(bookingIds);
+
+    // The guests in this batch whose own part of the trip may differ from the
+    // rest of the party's.
+    Map<Id, Set<Id>> guestsByBooking = new Map<Id, Set<Id>>();
+    for (Request r : requests) {
+      if (r == null || r.bookingId == null || r.contactId == null) {
+        continue;
+      }
+      if (!guestsByBooking.containsKey(r.bookingId)) {
+        guestsByBooking.put(r.bookingId, new Set<Id>());
+      }
+      guestsByBooking.get(r.bookingId).add(r.contactId);
+    }
+    Map<String, String> personalSnapshots = GxFeedbackService.snapshotsPerGuest(
+      guestsByBooking
+    );
     Set<Id> rateable = new Set<Id>(snapshots.keySet());
     for (Booking__c saved : bookings.values()) {
       // A guest already asked keeps the list they were sent, whatever the
@@ -182,6 +266,9 @@ public with sharing class GxFeedbackDispatch {
     }
 
     Map<Id, Booking__c> toUpdate = new Map<Id, Booking__c>();
+    List<Feedback_Invitation__c> invitationsToSave = new List<Feedback_Invitation__c>();
+    List<Result> resultOfInvitation = new List<Result>();
+    List<Id> bookingOfInvitation = new List<Id>();
     Map<Id, List<Result>> readyByBooking = new Map<Id, List<Result>>();
 
     for (Request r : requests) {
@@ -190,17 +277,77 @@ public with sharing class GxFeedbackDispatch {
         r.bookingId == null
         ? null
         : bookings.get(r.bookingId);
+      // Who is being asked: the person named on the request, or the booking's
+      // main contact when nobody is named.
+      Id person = r == null ? null : r.contactId;
+      if (person == null && b != null) {
+        person = b.MainContact__c;
+      }
+      Feedback_Invitation__c inv = b == null ||
+        person == null
+        ? null
+        : invitations.get(personKey(b.Id, person));
 
       Boolean resending = r != null && r.allowResend == true;
-      String problem = ineligibleReason(b, answered, rateable, resending);
+      String problem = ineligibleReason(
+        b,
+        person,
+        inv,
+        answeredBookings,
+        answeredByPerson,
+        rateable,
+        reachable,
+        resending
+      );
       if (problem != null) {
         out.skippedReason = problem;
         results.add(out);
         continue;
       }
 
+      // The booking keeps a secret of its own: the email template merges the
+      // booking's link, and the sender swaps in this person's. A blank one
+      // would leave nothing to swap.
       if (String.isBlank(b.Form_Secret__c)) {
         b.Form_Secret__c = newSecret();
+      }
+      // This person's own invitation: minted the first time they are asked,
+      // and moved forward when they are reminded or sent to again.
+      if (inv == null) {
+        inv = new Feedback_Invitation__c(
+          Booking__c = b.Id,
+          Contact__c = person,
+          Traveler__c = r.travelerId
+        );
+        invitations.put(personKey(b.Id, person), inv);
+      }
+      if (String.isBlank(inv.Secret__c)) {
+        inv.Secret__c = newSecret();
+      }
+      if (inv.Traveler__c == null && r.travelerId != null) {
+        inv.Traveler__c = r.travelerId;
+      }
+      // Kept current on every send, so a corrected name reaches the survey.
+      String greeting = guestNames.get(person);
+      if (String.isNotBlank(greeting)) {
+        inv.Guest_Name__c = greeting;
+      }
+      // Their own part of the trip, when it is not the whole of it. Saved once,
+      // with their first invitation, so a reminder or a resend still asks about
+      // the trip they were actually on.
+      if (inv.Id == null) {
+        String mine = personalSnapshots.get(
+          GxFeedbackService.personKey(b.Id, person)
+        );
+        if (String.isNotBlank(mine) && mine.length() <= SNAPSHOT_MAX_LENGTH) {
+          inv.Survey_Snapshot__c = mine;
+        }
+      }
+      inv.Sent_On__c = Datetime.now();
+      if (r.markReminder == true) {
+        // Set before the reminder leaves, so a failed send is not retried.
+        // With a guest's inbox at stake, under-reminding is the safer failure.
+        inv.Reminder_Sent__c = true;
       }
       // The trip as it was when the guest was first asked. Reminders, resends
       // and later edits to the booking leave it alone, so the dashboard and
@@ -231,23 +378,28 @@ public with sharing class GxFeedbackDispatch {
       }
       b.SurveySent__c = true;
       // Moves forward on every send, reminder included, because the survey's
-      // expiry counts from the last time the guest was actually asked.
+      // expiry counts from the last time the guest was actually asked. On a
+      // trip with several travellers this records the trip's last invitation;
+      // each traveller's own dates live on their Traveler__c row.
       b.Survey_Sent_On__c = Datetime.now();
       if (r.markReminder == true) {
-        // Set before the reminder leaves, so a failed send is not retried.
-        // With a guest's inbox at stake, under-reminding is the safer failure.
         b.Survey_Reminder_Sent__c = true;
       }
       toUpdate.put(b.Id, b);
+      invitationsToSave.add(inv);
+      resultOfInvitation.add(out);
+      bookingOfInvitation.add(b.Id);
       if (!readyByBooking.containsKey(b.Id)) {
         readyByBooking.put(b.Id, new List<Result>());
       }
       readyByBooking.get(b.Id).add(out);
 
       out.ok = true;
+      out.bookingId = b.Id;
       out.bookingNumber = b.BookingNumber__c;
-      out.recipientContactId = b.MainContact__c;
-      out.surveyUrl = buildUrl(b);
+      out.recipientContactId = person;
+      out.travelerId = inv.Traveler__c;
+      out.surveyUrl = buildUrl(b, inv.Secret__c);
       results.add(out);
     }
 
@@ -261,6 +413,7 @@ public with sharing class GxFeedbackDispatch {
       // no email, because its link would lead nowhere.
       Map<Id, String> refused = new Map<Id, String>();
       saveSeparatingRefusals(toUpdate.values(), refused);
+
       for (Id bookingId : refused.keySet()) {
         String reason =
           'The booking could not be saved: ' + refused.get(bookingId);
@@ -270,6 +423,38 @@ public with sharing class GxFeedbackDispatch {
           out.surveyUrl = null;
           out.recipientContactId = null;
           out.skippedReason = reason;
+        }
+      }
+    }
+
+    // The guests' own invitations, saved after their trip and only for the
+    // trips that saved: a guest whose booking the org refused keeps no link and
+    // no sent date, so the next run asks them again, while everyone else on the
+    // trip still goes out tonight.
+    if (!invitationsToSave.isEmpty()) {
+      List<Feedback_Invitation__c> rows = new List<Feedback_Invitation__c>();
+      List<Result> rowResults = new List<Result>();
+      for (Integer i = 0; i < invitationsToSave.size(); i++) {
+        if (resultOfInvitation[i].ok) {
+          rows.add(invitationsToSave[i]);
+          rowResults.add(resultOfInvitation[i]);
+        }
+      }
+      if (!rows.isEmpty()) {
+        List<Database.UpsertResult> saved = Database.upsert(rows, false);
+        for (Integer i = 0; i < rows.size(); i++) {
+          if (saved[i].isSuccess()) {
+            continue;
+          }
+          rowResults[i].ok = false;
+          rowResults[i].saveFailed = true;
+          rowResults[i].surveyUrl = null;
+          rowResults[i].recipientContactId = null;
+          rowResults[i].skippedReason =
+            'The invitation could not be saved: ' +
+            (saved[i].getErrors().isEmpty()
+              ? 'no reason given'
+              : saved[i].getErrors()[0].getMessage().stripHtmlTags());
         }
       }
     }
@@ -373,11 +558,96 @@ public with sharing class GxFeedbackDispatch {
       : errors[0].getMessage().stripHtmlTags();
   }
 
-  /** Null when the booking is ready; otherwise why it was skipped. */
+  /** Booking id and contact id together, so one person's answer is one key. */
+  /**
+   * Salutation and name for everyone this batch could ask, in the same shape
+   * the booking's own MainContactName__c has, so a survey greets "Frau Eva
+   * Ehepaar" whether she is the trip's main contact or its second traveller.
+   *
+   * One query for the batch. The main contacts are included because a request
+   * that names nobody falls back to them.
+   */
+  private static Map<Id, String> guestNamesFor(
+    List<Request> requests,
+    Set<Id> bookingIds
+  ) {
+    Set<Id> people = new Set<Id>();
+    for (Request r : requests) {
+      if (r != null && r.contactId != null) {
+        people.add(r.contactId);
+      }
+    }
+    for (Booking__c b : [
+      SELECT MainContact__c
+      FROM Booking__c
+      WHERE Id IN :bookingIds AND MainContact__c != NULL
+    ]) {
+      people.add(b.MainContact__c);
+    }
+
+    Map<Id, String> names = new Map<Id, String>();
+    if (people.isEmpty()) {
+      return names;
+    }
+    for (Contact c : [
+      SELECT Id, Salutation, Name
+      FROM Contact
+      WHERE Id IN :people
+    ]) {
+      List<String> parts = new List<String>();
+      if (String.isNotBlank(c.Salutation)) {
+        parts.add(c.Salutation);
+      }
+      if (String.isNotBlank(c.Name)) {
+        parts.add(c.Name);
+      }
+      if (!parts.isEmpty()) {
+        String full = String.join(parts, ' ');
+        names.put(
+          c.Id,
+          full.length() > GUEST_NAME_MAX_LENGTH
+            ? full.substring(0, GUEST_NAME_MAX_LENGTH)
+            : full
+        );
+      }
+    }
+    return names;
+  }
+
+  /** Of the people this batch might ask, the ones with an address to ask at. */
+  private static Set<Id> reachableFrom(Set<Id> people) {
+    Set<Id> reachable = new Set<Id>();
+    if (people == null || people.isEmpty()) {
+      return reachable;
+    }
+    for (Contact c : [
+      SELECT Id
+      FROM Contact
+      WHERE Id IN :people AND Email != NULL
+    ]) {
+      reachable.add(c.Id);
+    }
+    return reachable;
+  }
+
+  private static String personKey(Id bookingId, Id contactId) {
+    return String.valueOf(bookingId) + ':' + String.valueOf(contactId);
+  }
+
+  /**
+   * Null when this person on this booking is ready; otherwise why they were
+   * skipped. The trip's own guards (status, window, waiting period, something
+   * to rate) apply to everyone on it; the guards on having been asked and
+   * having answered apply to the one person being prepared.
+   */
   private static String ineligibleReason(
     Booking__c b,
-    Set<Id> answered,
+    Id person,
+    Feedback_Invitation__c inv,
+    Set<Id> answeredBookings,
+    Set<String> answeredByPerson,
     Set<Id> rateable,
+    Set<Id> reachable,
     Boolean allowResend
   ) {
     if (b == null) {
@@ -386,21 +656,53 @@ public with sharing class GxFeedbackDispatch {
     if (String.isBlank(b.BookingNumber__c)) {
       return 'Booking has no booking number';
     }
-    if (b.MainContact__c == null) {
+    if (person == null) {
       return 'Booking has no main contact to invite';
     }
-    if (answered.contains(b.Id)) {
+    // A guest who answered is finished, whichever way the answer was stored: on
+    // their own invitation, or - for a response saved before answers carried a
+    // contact - on the booking itself, which closes its main contact.
+    if (
+      answeredByPerson.contains(personKey(b.Id, person)) ||
+      (inv != null &&
+      inv.Answered_On__c != null) ||
+      (person == b.MainContact__c && answeredBookings.contains(b.Id))
+    ) {
       return 'Feedback already received';
     }
-    if (b.SurveySent__c == true && allowResend != true) {
+    // Asked already: their own invitation says so. A trip invited before this
+    // ran carries no invitation rows, so its main contact is judged by the
+    // booking, which is what marked them as asked at the time.
+    Boolean alreadyAsked = inv != null
+      ? inv.Sent_On__c != null
+      : (person == b.MainContact__c && b.SurveySent__c == true);
+    if (alreadyAsked && allowResend != true) {
       return 'Invitation already sent';
     }
-    if (!ELIGIBLE_BOOKING_STATUS.contains(b.Status__c)) {
+    // A participant booking under a group trip counts as travelled when its
+    // group booking does: the team marks the group, not every party under it.
+    Boolean groupTraveled =
+      b.TravelGroup__c != null &&
+      b.TravelGroup__r != null &&
+      ELIGIBLE_BOOKING_STATUS.contains(b.TravelGroup__r.Status__c);
+    // Status decides who enters the programme, so it is judged once per trip.
+    // A trip already invited has passed it: its status may since have moved to
+    // Feedback because one guest answered, and that must not stop the guests
+    // beside them being asked or reminded.
+    if (
+      b.SurveySent__c != true &&
+      !ELIGIBLE_BOOKING_STATUS.contains(b.Status__c) &&
+      !groupTraveled
+    ) {
       return 'Trip is not marked Traveled yet (status ' + b.Status__c + ')';
     }
     // The window decides who enters the programme. A guest we have already
     // invited is inside it, so reminders and resends are not re-judged here.
-    if (b.Survey_Sent_On__c == null) {
+    // A trip already invited is inside the programme, whether this person has
+    // their own invitation row or the trip was invited before rows existed.
+    Boolean insideProgramme =
+      (inv != null && inv.Sent_On__c != null) || b.Survey_Sent_On__c != null;
+    if (!insideProgramme) {
       String outside = outsideSurveyWindow(b);
       if (outside != null) {
         return outside;
@@ -408,6 +710,12 @@ public with sharing class GxFeedbackDispatch {
     }
     if (!waitingPeriodPassed(b)) {
       return 'Waiting period after the trip has not passed yet';
+    }
+    // Judged last, with the trip already due: a trip still waiting out its
+    // dates is not an address problem, and saying so every night would bury
+    // the guests the team can actually do something about.
+    if (!reachable.contains(person)) {
+      return 'This guest has no email address';
     }
     if (!rateable.contains(b.Id)) {
       return 'Nothing on this itinerary can be rated';
@@ -479,9 +787,14 @@ public with sharing class GxFeedbackDispatch {
     return Datetime.now() >= tripEnd.addMinutes((hours * 60).intValue());
   }
 
-  private static String buildUrl(Booking__c b) {
+  /**
+   * The booking number is in the link for people reading it, not for finding
+   * anything: a group booking and every participant booking under it share one
+   * number. The secret alone identifies the person and their trip.
+   */
+  private static String buildUrl(Booking__c b, String secret) {
     String base = GxFeedbackSettings.surveyBaseUrl();
-    if (String.isBlank(base)) {
+    if (String.isBlank(base) || String.isBlank(secret)) {
       return null;
     }
     if (!base.endsWith('/') && !base.endsWith('=')) {
@@ -491,7 +804,7 @@ public with sharing class GxFeedbackDispatch {
       '?b=' +
       EncodingUtil.urlEncode(b.BookingNumber__c, 'UTF-8') +
       '&k=' +
-      EncodingUtil.urlEncode(b.Form_Secret__c, 'UTF-8');
+      EncodingUtil.urlEncode(secret, 'UTF-8');
   }
 
   /**

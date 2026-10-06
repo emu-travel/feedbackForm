@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Booking__c</fullName>
+    <deleteConstraint>Cascade</deleteConstraint>
+    <description
+  >The trip this person was invited about. A lookup, not a master-detail, so the public survey can read an invitation without reading anything else; the guest sharing rule keys on Sent On.</description>
+    <externalId>false</externalId>
+    <label>Booking</label>
+    <referenceTo>Booking__c</referenceTo>
+    <relationshipLabel>Feedback Invitations</relationshipLabel>
+    <relationshipName>Feedback_Invitations</relationshipName>
+    <required>true</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

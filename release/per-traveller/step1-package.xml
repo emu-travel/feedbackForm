@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Step 1 of the per-traveller release.
+
+  The new object, its fields, the two permission sets and the guest sharing rule
+  that belongs to the object. No Apex, so production runs no tests and nothing
+  can fail on access to fields nobody has been granted yet.
+
+  Nothing in production reads or writes this object until step 3 deploys the
+  Apex, so this is additive and inert on its own.
+
+  Between this and step 3, Golf_Extra_Feedback_Admin has to be assigned to the
+  people who should see invitations, including whoever runs the next deploy.
+  That assignment is what the failing validation was missing.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Feedback_Invitation__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>Feedback_Invitation__c.Answered_On__c</members>
+        <members>Feedback_Invitation__c.Booking__c</members>
+        <members>Feedback_Invitation__c.Contact__c</members>
+        <members>Feedback_Invitation__c.Guest_Name__c</members>
+        <members>Feedback_Invitation__c.Reminder_Sent__c</members>
+        <members>Feedback_Invitation__c.Secret__c</members>
+        <members>Feedback_Invitation__c.Sent_On__c</members>
+        <members>Feedback_Invitation__c.Survey_Link__c</members>
+        <members>Feedback_Invitation__c.Survey_Snapshot__c</members>
+        <members>Feedback_Invitation__c.Traveler__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>Golf_Extra_Feedback_Admin</members>
+        <members>Golf_Extra_Feedback_Guest</members>
+        <name>PermissionSet</name>
+    </types>
+    <types>
+        <members>Feedback_Invitation__c.Gx_Feedback_Guest_Invitations</members>
+        <name>SharingGuestRule</name>
+    </types>
+    <types>
+        <members>Feedback_Invitation__c</members>
+        <name>SharingRules</name>
+    </types>
+    <version>67.0</version>
+</Package>

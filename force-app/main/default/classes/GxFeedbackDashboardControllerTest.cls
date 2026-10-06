@@ -277,9 +277,52 @@ private class GxFeedbackDashboardControllerTest {
 
     // GXD-6 carries the old flow's SurveySent__c but was never sent this
     // survey. Counting it would drag the rate down for no real reason.
-    Assert.areEqual(5, k.invited, 'Five bookings carry Survey_Sent_On__c');
+    // No travellers in this fixture, so every invited trip stands for the one
+    // guest it was sent to: its main contact.
+    Assert.areEqual(5, k.invited, 'Five guests were asked');
     Assert.areEqual(4, k.answeredInvitations, 'Four of them answered');
     Assert.areEqual(80, k.responseRate, '4 of 5');
+    Assert.areEqual(5, k.tripsInvited, 'Five trips were invited');
+    Assert.areEqual(4, k.tripsAnswered, 'Four trips heard back');
+  }
+
+  /**
+   * A trip with several travellers is several guests, and the rate is answers
+   * over people asked. Counting trips would put three answers over one
+   * invitation and read as 300 per cent.
+   */
+  @IsTest
+  static void theRateCountsGuestsNotTrips() {
+    Booking__c trip = [
+      SELECT Id, MainContact__c
+      FROM Booking__c
+      WHERE BookingNumber__c = 'GXD-4'
+    ];
+    // Two guests on the one trip, each with an invitation of their own. This
+    // is what the dashboard counts: the invitations, not the bookings.
+    insert new List<Feedback_Invitation__c>{
+      new Feedback_Invitation__c(
+        Booking__c = trip.Id,
+        Contact__c = trip.MainContact__c,
+        Secret__c = 'dashboard-guest-one',
+        Sent_On__c = Datetime.now().addDays(-2)
+      ),
+      new Feedback_Invitation__c(
+        Booking__c = trip.Id,
+        Contact__c = trip.MainContact__c,
+        Secret__c = 'dashboard-guest-two',
+        Sent_On__c = Datetime.now().addDays(-2)
+      )
+    };
+
+    GxFeedbackDashboardController.Kpis k = load(null).kpis;
+
+    // GXD-4 now stands for its two invited guests instead of one main contact;
+    // the other four trips carry no invitations, so each counts once for the
+    // person the booking itself was invited for.
+    Assert.areEqual(6, k.invited, 'Two guests on GXD-4, four elsewhere');
+    Assert.areEqual(5, k.tripsInvited, 'Still five trips');
+    Assert.areEqual(67, k.responseRate, 'Four answers over six guests asked');
   }
 
   // ------------------------------------------------------------------

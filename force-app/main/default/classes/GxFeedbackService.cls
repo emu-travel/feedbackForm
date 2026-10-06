@@ -222,24 +222,25 @@ public without sharing class GxFeedbackService {
       return c;
     }
 
-    Booking__c b = resolveBooking(bookingNumber, secret);
-    if (b == null) {
+    Invitation inv = resolveInvitation(bookingNumber, secret);
+    if (inv == null) {
       c.message = 'invalid';
       return c;
     }
+    Booking__c b = inv.booking;
 
-    if (hasExistingResponse(b.Id)) {
+    if (hasExistingResponse(b.Id, inv)) {
       c.message = 'submitted';
       return c;
     }
 
-    if (isExpired(b)) {
+    if (isExpired(b, inv)) {
       c.message = 'expired';
       return c;
     }
 
     c.bookingNumber = b.BookingNumber__c;
-    c.guestName = buildGuestName(b);
+    c.guestName = buildGuestName(b, inv);
     c.destination = b.DestinationCountry__c;
     c.region = b.Region__c;
     // The trip as it was when the guest was invited, if the booking moved on.
@@ -256,7 +257,7 @@ public without sharing class GxFeedbackService {
     c.trustpilotUrl = GxFeedbackSettings.trustpilotUrl();
     c.googleMapsUrl = GxFeedbackSettings.googleMapsUrl();
 
-    applyItinerary(c, surveyLines(b));
+    applyItinerary(c, surveyLines(b, inv));
 
     // A booking with nothing rateable gets no survey rather than an empty one.
     if (
@@ -380,21 +381,22 @@ public without sharing class GxFeedbackService {
       return res;
     }
 
-    Booking__c b = resolveBooking(p.bookingNumber, p.secret);
-    if (b == null) {
+    Invitation inv = resolveInvitation(p.bookingNumber, p.secret);
+    if (inv == null) {
       res.message = System.Label.Gx_Survey_Server_Invalid_Link;
       return res;
     }
+    Booking__c b = inv.booking;
 
     // One response per booking. This is a stronger constraint than the
     // per-hour rate limit the Reiseanmeldung form needs, because that form
     // legitimately accepts repeat submissions and this one does not.
-    if (isExpired(b)) {
+    if (isExpired(b, inv)) {
       res.message = System.Label.Gx_Survey_Server_Expired;
       return res;
     }
 
-    if (hasExistingResponse(b.Id)) {
+    if (hasExistingResponse(b.Id, inv)) {
       res.message = System.Label.Gx_Survey_Server_Already_Answered;
       return res;
     }
@@ -408,12 +410,12 @@ public without sharing class GxFeedbackService {
     // Only the lines the guest was asked about may be referenced, so a
     // tampered payload cannot attach feedback to someone else's trip.
     Map<Id, Reservation__c> allowed = new Map<Id, Reservation__c>(
-      surveyLines(b)
+      surveyLines(b, inv)
     );
 
     Savepoint sp = Database.setSavepoint();
     try {
-      Feedback_Response__c resp = buildResponse(p, b);
+      Feedback_Response__c resp = buildResponse(p, b, inv.personContactId);
       // System mode, deliberately. Feedback_Response__c is a detail of
       // Booking__c, and inserting a detail record requires EDIT access to its
       // master. A guest user can only ever hold Read Only on a booking - that
@@ -433,6 +435,19 @@ public without sharing class GxFeedbackService {
       unlinkRemovedReservations(ratings, allowed.keySet());
       if (!ratings.isEmpty()) {
         Database.insert(ratings, true, AccessLevel.SYSTEM_MODE);
+      }
+
+      // This guest is done: it closes their own link and keeps their reminder
+      // from going out. The booking still moves on the first answer only.
+      if (inv.row != null) {
+        Database.update(
+          new Feedback_Invitation__c(
+            Id = inv.row.Id,
+            Answered_On__c = Datetime.now()
+          ),
+          true,
+          AccessLevel.SYSTEM_MODE
+        );
       }
 
       moveToAnswered(b);
@@ -485,10 +500,14 @@ public without sharing class GxFeedbackService {
     }
   }
 
-  private static Feedback_Response__c buildResponse(Payload p, Booking__c b) {
+  private static Feedback_Response__c buildResponse(
+    Payload p,
+    Booking__c b,
+    Id personContactId
+  ) {
     return new Feedback_Response__c(
       Booking__c = b.Id,
-      Contact__c = b.MainContact__c,
+      Contact__c = personContactId != null ? personContactId : b.MainContact__c,
       Language__c = LANGUAGES.contains(p.language) ? p.language : 'DE',
       Overall_Experience__c = p.overallExperience,
       Overall_Experience_Comment__c = clean(p.overallExperienceComment),
@@ -706,6 +725,66 @@ public without sharing class GxFeedbackService {
   // ------------------------------------------------------------------
   // Shared helpers
 
+  /**
+   * Who opened a link, and which trip it is about. One trip can have several
+   * links: one per traveller, plus the booking's own for its main contact.
+   */
+  public class Invitation {
+    public Booking__c booking;
+    /** Null for a link minted before invitations were kept per person. */
+    public Feedback_Invitation__c row;
+    /** The person behind the link: a traveller, or the booking's main contact. */
+    public Id personContactId;
+  }
+
+  /**
+   * Resolves a link by its secret alone. The booking number in the URL is for
+   * the reader, not for finding anything: a group booking and every participant
+   * booking under it share one number, so only the secret identifies the person.
+   */
+  private static Invitation resolveInvitation(
+    String bookingNumber,
+    String secret
+  ) {
+    List<Feedback_Invitation__c> rows = [
+      SELECT
+        Id,
+        Booking__c,
+        Contact__c,
+        Answered_On__c,
+        Sent_On__c,
+        Guest_Name__c,
+        Survey_Snapshot__c
+      FROM Feedback_Invitation__c
+      WHERE Secret__c = :secret
+      LIMIT 2
+    ];
+    if (rows.size() == 1 && rows[0].Booking__c != null) {
+      Booking__c b = bookingById(rows[0].Booking__c);
+      // The number still has to match the trip the secret belongs to, so a
+      // mistyped or stitched-together link is refused rather than answered for
+      // somebody else's booking. It is not what finds the trip: a group booking
+      // and its participant bookings all carry the same number.
+      if (b == null || b.BookingNumber__c != bookingNumber) {
+        return null;
+      }
+      Invitation inv = new Invitation();
+      inv.booking = b;
+      inv.row = rows[0];
+      inv.personContactId = rows[0].Contact__c;
+      return inv;
+    }
+
+    Booking__c own = resolveBooking(bookingNumber, secret);
+    if (own == null) {
+      return null;
+    }
+    Invitation inv = new Invitation();
+    inv.booking = own;
+    inv.personContactId = own.MainContact__c;
+    return inv;
+  }
+
   private static Booking__c resolveBooking(
     String bookingNumber,
     String secret
@@ -731,6 +810,31 @@ public without sharing class GxFeedbackService {
       LIMIT 2
     ];
     return found.size() == 1 ? found[0] : null;
+  }
+
+  /** The trip a traveller's link belongs to, with everything the survey reads. */
+  private static Booking__c bookingById(Id bookingId) {
+    List<Booking__c> found = [
+      SELECT
+        Id,
+        BookingNumber__c,
+        MainContact__c,
+        MainContactName__c,
+        Status__c,
+        Start_Date__c,
+        End_Date__c,
+        toLabel(DestinationCountry__c),
+        toLabel(Region__c),
+        Form_Designer_Name__c,
+        Survey_Sent_On__c,
+        Survey_Trip_Start__c,
+        Survey_Trip_End__c,
+        Survey_Snapshot__c
+      FROM Booking__c
+      WHERE Id = :bookingId
+      LIMIT 1
+    ];
+    return found.isEmpty() ? null : found[0];
   }
 
   /**
@@ -764,13 +868,145 @@ public without sharing class GxFeedbackService {
   }
 
   /**
+   * The part of a trip that belongs to one traveller, for the travellers whose
+   * part is not the whole of it.
+   *
+   * The org records who was on which service on Authorized_Traveler__c, and the
+   * team uses it: a guest who stays a night longer, or sits a round out, is
+   * authorised for a different set. A service nobody is linked to belongs to
+   * everyone, which is how an ordinary trip behaves and why most travellers
+   * come back with nothing here.
+   *
+   * Keyed booking + traveller. Only travellers who differ from the trip are
+   * returned, so the common case costs no storage and behaves exactly as it
+   * did. Two queries for the whole batch.
+   */
+  public static Map<String, String> snapshotsPerGuest(
+    Map<Id, Set<Id>> contactsByBooking
+  ) {
+    Map<String, String> personal = new Map<String, String>();
+    if (contactsByBooking == null || contactsByBooking.isEmpty()) {
+      return personal;
+    }
+    Map<Id, Booking__c> bookings = new Map<Id, Booking__c>(
+      [
+        SELECT Id, Status__c, Survey_Trip_End__c
+        FROM Booking__c
+        WHERE Id IN :contactsByBooking.keySet()
+      ]
+    );
+    Map<Id, List<Reservation__c>> rateable = loadRateableReservations(bookings);
+
+    Set<Id> lineIds = new Set<Id>();
+    for (List<Reservation__c> lines : rateable.values()) {
+      for (Reservation__c r : lines) {
+        lineIds.add(r.Id);
+      }
+    }
+    if (lineIds.isEmpty()) {
+      return personal;
+    }
+
+    // One person can hold more than one traveller row on a trip - the org
+    // makes one of its own for the main contact - so authorisation is gathered
+    // per person, not per row. Miss that and the guest loses everything linked
+    // to the row they were not invited from.
+    Map<Id, String> personOfRow = new Map<Id, String>();
+    for (Traveler__c t : [
+      SELECT Id, TravelQuote__c, Traveler__c
+      FROM Traveler__c
+      WHERE
+        TravelQuote__c IN :contactsByBooking.keySet()
+        AND Traveler__c != NULL
+    ]) {
+      personOfRow.put(t.Id, personKey(t.TravelQuote__c, t.Traveler__c));
+    }
+
+    // Who was on what, by person. A service with no rows at all is shared.
+    Map<Id, Set<String>> peopleOnLine = new Map<Id, Set<String>>();
+    for (Authorized_Traveler__c a : [
+      SELECT TravelItems__c, Traveler__c
+      FROM Authorized_Traveler__c
+      WHERE TravelItems__c IN :lineIds AND Traveler__c != NULL
+    ]) {
+      String who = personOfRow.get(a.Traveler__c);
+      if (who == null) {
+        continue;
+      }
+      if (!peopleOnLine.containsKey(a.TravelItems__c)) {
+        peopleOnLine.put(a.TravelItems__c, new Set<String>());
+      }
+      peopleOnLine.get(a.TravelItems__c).add(who);
+    }
+    if (peopleOnLine.isEmpty()) {
+      return personal;
+    }
+
+    for (Id bookingId : contactsByBooking.keySet()) {
+      List<Reservation__c> all = rateable.get(bookingId);
+      if (all == null || all.isEmpty()) {
+        continue;
+      }
+      for (Id contactId : contactsByBooking.get(bookingId)) {
+        String who = personKey(bookingId, contactId);
+        List<Reservation__c> mine = new List<Reservation__c>();
+        for (Reservation__c r : all) {
+          Set<String> onIt = peopleOnLine.get(r.Id);
+          if (onIt == null || onIt.contains(who)) {
+            mine.add(r);
+          }
+        }
+        // Their part is the whole trip: nothing to keep.
+        //
+        // Nothing at all is treated the same way. A guest linked to none of the
+        // trip's services is a gap in the data rather than someone who
+        // travelled with nothing, and the forgiving reading - they were on the
+        // trip like everyone else - is the one that cannot cost us their
+        // feedback.
+        if (mine.isEmpty() || mine.size() == all.size()) {
+          continue;
+        }
+        personal.put(who, JSON.serialize(mine));
+      }
+    }
+    return personal;
+  }
+
+  /** Key for snapshotsPerGuest: one trip, one person. */
+  public static String personKey(Id bookingId, Id contactId) {
+    return bookingId + ':' + contactId;
+  }
+
+  /**
    * What the survey asks about: the list saved with the first invitation, as it
    * was then. Later changes to the booking - a line canceled, a hotel swapped, a
    * stay added, automation touching line statuses - do not reach it; that is
    * the point. Only a booking with nothing saved (invited before the list was
    * kept, or with a list too long for the field) is read from the booking.
    */
-  private static List<Reservation__c> surveyLines(Booking__c b) {
+  private static List<Reservation__c> surveyLines(
+    Booking__c b,
+    Invitation inv
+  ) {
+    // This guest's own part of the trip, when it is not the whole of it: one
+    // traveller stays a night longer, another skips a round the rest played.
+    // Saved with their invitation, so nobody is asked about somebody else's
+    // hotel or tee time.
+    if (
+      inv != null &&
+      inv.row != null &&
+      String.isNotBlank(inv.row.Survey_Snapshot__c)
+    ) {
+      try {
+        return (List<Reservation__c>) JSON.deserialize(
+          inv.row.Survey_Snapshot__c,
+          List<Reservation__c>.class
+        );
+      } catch (Exception e) {
+        // Unreadable: fall through to the trip's own list rather than leave
+        // this guest without a survey.
+      }
+    }
     if (String.isNotBlank(b.Survey_Snapshot__c)) {
       try {
         return (List<Reservation__c>) JSON.deserialize(
@@ -835,6 +1071,18 @@ public without sharing class GxFeedbackService {
   private static Map<Id, List<Reservation__c>> loadRateableReservations(
     Map<Id, Booking__c> bookings
   ) {
+    return loadRateableReservations(bookings, true);
+  }
+
+  /**
+   * withGroupFallback is false when the group bookings themselves are being
+   * loaded, so a party pointing at a group that points back can never send
+   * this round in circles.
+   */
+  private static Map<Id, List<Reservation__c>> loadRateableReservations(
+    Map<Id, Booking__c> bookings,
+    Boolean withGroupFallback
+  ) {
     Map<Id, List<Reservation__c>> byBooking = new Map<Id, List<Reservation__c>>();
     if (bookings == null || bookings.isEmpty()) {
       return byBooking;
@@ -898,6 +1146,63 @@ public without sharing class GxFeedbackService {
         byBooking.get(r.Booking__c).add(r);
       }
     }
+    return withGroupFallback == true ? fillFromGroup(byBooking) : byBooking;
+  }
+
+  /**
+   * A participant booking with no rateable line of its own is asked about the
+   * group booking's list instead.
+   *
+   * The package lines are normally copied down to every party, so a party with
+   * nothing at all is a gap in the data rather than a guest who travelled with
+   * nothing. Without this they would be refused a survey altogether, which is
+   * the one outcome nobody can correct afterwards. Only parties holding nothing
+   * are filled, so a party with an itinerary of its own is never mixed with the
+   * group's.
+   */
+  private static Map<Id, List<Reservation__c>> fillFromGroup(
+    Map<Id, List<Reservation__c>> byBooking
+  ) {
+    Set<Id> empties = new Set<Id>();
+    for (Id bookingId : byBooking.keySet()) {
+      if (byBooking.get(bookingId).isEmpty()) {
+        empties.add(bookingId);
+      }
+    }
+    if (empties.isEmpty()) {
+      return byBooking;
+    }
+
+    Map<Id, Id> groupOf = new Map<Id, Id>();
+    Set<Id> groupIds = new Set<Id>();
+    for (Booking__c party : [
+      SELECT Id, TravelGroup__c
+      FROM Booking__c
+      WHERE Id IN :empties AND TravelGroup__c != NULL
+    ]) {
+      groupOf.put(party.Id, party.TravelGroup__c);
+      groupIds.add(party.TravelGroup__c);
+    }
+    if (groupIds.isEmpty()) {
+      return byBooking;
+    }
+
+    Map<Id, List<Reservation__c>> groupLines = loadRateableReservations(
+      new Map<Id, Booking__c>(
+        [
+          SELECT Id, Status__c, Survey_Trip_End__c
+          FROM Booking__c
+          WHERE Id IN :groupIds
+        ]
+      ),
+      false
+    );
+    for (Id partyId : groupOf.keySet()) {
+      List<Reservation__c> lines = groupLines.get(groupOf.get(partyId));
+      if (lines != null && !lines.isEmpty()) {
+        byBooking.put(partyId, lines);
+      }
+    }
     return byBooking;
   }
 
@@ -909,15 +1214,52 @@ public without sharing class GxFeedbackService {
     return b.Survey_Trip_End__c != null ? b.Survey_Trip_End__c : b.End_Date__c;
   }
 
-  private static Boolean hasExistingResponse(Id bookingId) {
+  /**
+   * Whether this person has already answered for this trip. Per person, because
+   * several travellers can be asked about one booking; a response saved before
+   * answers carried a contact closes the booking's own link, as it always did.
+   */
+  private static Boolean hasExistingResponse(Id bookingId, Invitation inv) {
+    if (inv != null && inv.row != null) {
+      if (inv.row.Answered_On__c != null) {
+        return true;
+      }
+      Id person = inv.personContactId;
+      return [
+          SELECT COUNT()
+          FROM Feedback_Response__c
+          WHERE Booking__c = :bookingId AND Contact__c = :person
+        ] > 0;
+    }
+    Id mainContact = inv == null ? null : inv.personContactId;
     return [
         SELECT COUNT()
         FROM Feedback_Response__c
-        WHERE Booking__c = :bookingId
+        WHERE
+          Booking__c = :bookingId
+          AND (Contact__c = NULL
+          OR Contact__c = :mainContact)
       ] > 0;
   }
 
-  private static String buildGuestName(Booking__c b) {
+  /**
+   * The person holding this link, not the trip's main contact. A couple on one
+   * booking each get their own invitation, and the second of them would
+   * otherwise be greeted by the first one's name and salutation.
+   *
+   * The name is read from the invitation rather than from the Contact, because
+   * the public survey may never read a Contact record. Links minted before
+   * invitations existed carry no row, so those still greet the booking's main
+   * contact - which is exactly who held such a link.
+   */
+  private static String buildGuestName(Booking__c b, Invitation inv) {
+    if (
+      inv != null &&
+      inv.row != null &&
+      String.isNotBlank(inv.row.Guest_Name__c)
+    ) {
+      return inv.row.Guest_Name__c;
+    }
     return String.isNotBlank(b.MainContactName__c)
       ? b.MainContactName__c
       : null;
@@ -997,14 +1339,24 @@ public without sharing class GxFeedbackService {
    * disables expiry entirely.
    */
   @TestVisible
-  private static Boolean isExpired(Booking__c b) {
+  private static Boolean isExpired(Booking__c b, Invitation inv) {
     Decimal validityDays = GxFeedbackSettings.linkValidityDays();
     if (validityDays == null || validityDays <= 0) {
       return false;
     }
-    Date reference = b.Survey_Sent_On__c != null
-      ? b.Survey_Sent_On__c.date()
-      : (b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c);
+    // This guest's own invitation first. The booking's date is the trip's last
+    // invitation of anyone, so measuring from it both revives a link that
+    // should have died - because somebody else was reminded - and kills a link
+    // handed out today on a trip asked a fortnight ago.
+    Datetime askedThisPerson = inv != null &&
+      inv.row != null
+      ? inv.row.Sent_On__c
+      : null;
+    Date reference = askedThisPerson != null
+      ? askedThisPerson.date()
+      : (b.Survey_Sent_On__c != null
+          ? b.Survey_Sent_On__c.date()
+          : (b.End_Date__c != null ? b.End_Date__c : b.Start_Date__c));
     if (reference == null) {
       return false;
     }

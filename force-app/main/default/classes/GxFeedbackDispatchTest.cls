@@ -45,9 +45,12 @@ private class GxFeedbackDispatchTest {
     );
     insert new List<Account>{ customer, hotel };
 
+    // With an address, because a guest who cannot be written to is refused
+    // before anything else is judged.
     Contact guest = new Contact(
       LastName = 'von Bern',
       FirstName = 'Maximilian',
+      Email = 'maximilian@example.invalid',
       AccountId = customer.Id
     );
     insert guest;
@@ -149,10 +152,22 @@ private class GxFeedbackDispatchTest {
       after.Form_Secret__c.length() >= 20,
       'The token carries real entropy'
     );
+    // The secret belongs to the person asked, on their own invitation row, so
+    // several guests on one trip never share a link.
+    Feedback_Invitation__c invitation = [
+      SELECT Secret__c, Contact__c
+      FROM Feedback_Invitation__c
+      WHERE Booking__r.BookingNumber__c = :BOOKING_NUM
+    ];
     Assert.isTrue(
       r.surveyUrl.contains('b=' + BOOKING_NUM) &&
-      r.surveyUrl.contains('k=' + after.Form_Secret__c),
+      r.surveyUrl.contains('k=' + invitation.Secret__c),
       'The link carries both halves of the credential: ' + r.surveyUrl
+    );
+    Assert.areEqual(
+      r.recipientContactId,
+      invitation.Contact__c,
+      'And it belongs to the guest it was addressed to'
     );
   }
 
